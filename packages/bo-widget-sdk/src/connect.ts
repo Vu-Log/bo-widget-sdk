@@ -16,14 +16,25 @@ export interface ConnectOptions {
    * page that would frame the widget can answer the handshake.
    */
   targetOrigin?: string;
-  /** Time to wait for the back office to answer the iframe handshake, in ms. Defaults to 10 000. */
+  /** Time to wait for the back office to answer the iframe handshake, in ms. Defaults to 10 000; `Infinity` waits as long as timers allow. */
   handshakeTimeout?: number;
-  /** Time to wait for the answer to a request in an iframe, in ms. Defaults to 30 000. */
+  /** Time to wait for the answer to a request in an iframe, in ms. Defaults to 30 000; `Infinity` waits as long as timers allow. */
   requestTimeout?: number;
 }
 
 const DEFAULT_HANDSHAKE_TIMEOUT = 10_000;
 const DEFAULT_REQUEST_TIMEOUT = 30_000;
+// Longest delay `setTimeout` accepts: a longer one fires at once.
+const MAX_TIMEOUT = 2 ** 31 - 1;
+
+/** Reads a timeout option: a positive number of ms, capped so that `Infinity` means "as long as possible". */
+const readTimeout = (name: string, value: number | undefined, fallback: number): number => {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) {
+    throw new TypeError(`connect: ${name} must be a positive number of milliseconds`);
+  }
+  return Math.min(value, MAX_TIMEOUT);
+};
 
 const toClient = (transport: BoTransport): BoClient => {
   const client: BoClient = {
@@ -61,10 +72,17 @@ const toClient = (transport: BoTransport): BoClient => {
  * Either way, the returned client has the same API, so the widget's code is the same.
  *
  * @param element - The widget's custom element, or nothing in an iframe.
- * @param options - Handshake options (iframe only).
+ * An element without `vulogBo` inside an iframe falls back to the iframe channel.
+ *
+ * @param element - The widget's custom element, or nothing in an iframe.
+ * @param options - Options of the iframe channel; ignored for a Web Component.
  * @returns The connected client.
+ * @throws {TypeError} When a timeout option is not a positive number.
  * @throws {BoError} `DISCONNECTED` when the widget is neither given the injected API nor in an
- * iframe, `TIMEOUT` when the back office does not answer the handshake, or the error it answers.
+ * iframe, or when the handshake cannot be posted or the channel closes; `INTERNAL` with reason
+ * `invalid-host-api` when `element.vulogBo` is not a back office API, or `invalid-welcome` when the
+ * back office answers a malformed `welcome`; `TIMEOUT` when the back office does not answer the
+ * handshake; or the error the back office answers instead of `welcome`.
  *
  * @example
  * ```ts
@@ -78,7 +96,8 @@ const toClient = (transport: BoTransport): BoClient => {
  *     this.bo = await connect(this);
  *     const { fleetId } = await this.bo.getContext();
  *     const response = await this.bo.authFetch(`api/v1/fleets/${fleetId}/vehicles`);
- *     this.attachShadow({ mode: 'open' }).textContent = `${(await response.json()).length} vehicles`;
+ *     const root = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
+ *     root.textContent = `${(await response.json()).length} vehicles`;
  *   }
  *
  *   disconnectedCallback() {
@@ -93,6 +112,13 @@ export const connect = async (
 ): Promise<BoClient> => {
   const injected = (element as { vulogBo?: unknown } | null | undefined)?.vulogBo;
   if (isInjectedHostApi(injected)) return toClient(createInjectedTransport(injected));
+  if (injected !== undefined && injected !== null) {
+    throw new BoError(
+      'INTERNAL',
+      'element.vulogBo is not a back office API (getContext, on and off are required)',
+      { reason: 'invalid-host-api' },
+    );
+  }
 
   const inIframe = typeof window !== 'undefined' && window.parent !== window;
   if (!inIframe) {
@@ -108,8 +134,12 @@ export const connect = async (
     targetOrigin: options.targetOrigin ?? '*',
     widgetId: options.widgetId ?? null,
     widgetVersion: options.widgetVersion ?? null,
-    handshakeTimeout: options.handshakeTimeout ?? DEFAULT_HANDSHAKE_TIMEOUT,
-    requestTimeout: options.requestTimeout ?? DEFAULT_REQUEST_TIMEOUT,
+    handshakeTimeout: readTimeout(
+      'handshakeTimeout',
+      options.handshakeTimeout,
+      DEFAULT_HANDSHAKE_TIMEOUT,
+    ),
+    requestTimeout: readTimeout('requestTimeout', options.requestTimeout, DEFAULT_REQUEST_TIMEOUT),
   });
   return toClient(transport);
 };

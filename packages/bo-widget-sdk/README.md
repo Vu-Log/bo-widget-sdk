@@ -3,7 +3,7 @@
 Framework-agnostic client for widgets embedded in the Vulog back office (BO), as a Web Component or in an iframe.
 
 - **One API for both modes.** `connect()` finds how the widget runs and returns the same client: your widget code does not change between a Web Component and an iframe.
-- **No dependency** in the main entry, so it fits any stack: React, Svelte, Lit, Vue or plain JavaScript.
+- **Nothing imported** by the main entry (`zod` is only loaded by `/manifest`), so it fits any stack: React, Svelte, Lit, Vue or plain JavaScript.
 - **Authenticated `fetch`** to the Vulog APIs, with token caching and renewal when needed.
 - **Manifest validation** (`@vulog/bo-widget-sdk/manifest`) with the rules applied on publication.
 
@@ -28,7 +28,7 @@ export default class FleetReport extends HTMLElement {
   private bo?: BoClient;
 
   async connectedCallback() {
-    const root = this.attachShadow({ mode: 'open' });
+    const root = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
     this.bo = await connect(this);
     const { fleetId } = await this.bo.getContext();
     const response = await this.bo.authFetch(`api/v1/fleets/${fleetId}/vehicles`);
@@ -53,6 +53,7 @@ import { connect } from '@vulog/bo-widget-sdk';
 
 const bo = await connect();
 const { locale } = await bo.getContext();
+render(locale);
 bo.on('localeChanged', ({ locale }) => render(locale));
 ```
 
@@ -73,11 +74,11 @@ bo.on('localeChanged', ({ locale }) => render(locale));
 | `getAccessToken()`               | `accessToken` | `{ accessToken, expiresAt }` (ms since the epoch, or `null`)                                                                            |
 | `navigate({ path })`             | `navigate`    | Navigates the BO: `/app/...` is a BO route, `details/1` is relative to the widget's view                                                |
 | `notify({ message, severity? })` | `notify`      | Shows a BO snackbar (`success`, `info`, `warning`, `error`)                                                                             |
-| `resize({ height })`             |               | Asks for a height in pixels, or `null` (iframe only; a Web Component already fills the page)                                            |
+| `resize({ height })`             |               | Asks for a height in pixels, or `null` (iframe only; a Web Component already fills the content zone)                                    |
 | `on(name, listener)`             |               | Listens to `localeChanged`, `fleetChanged`, `userChanged`, `themeChanged`, `routeChanged`; returns a function that removes the listener |
 | `off(name, listener)`            |               | Removes a listener                                                                                                                      |
 | `authFetch(input, init?)`        | see below     | `fetch` with the Vulog authentication                                                                                                   |
-| `disconnect()`                   |               | Stops listening; pending requests reject with `DISCONNECTED`                                                                            |
+| `disconnect()`                   |               | Stops listening; pending and later requests reject with `DISCONNECTED`, in both modes                                                   |
 
 Permissions are declared in the widget manifest (`widget.json`). In an iframe, a request without its permission rejects with `FORBIDDEN`.
 
@@ -92,9 +93,11 @@ const response = await bo.authFetch(`api/v1/fleets/${fleetId}/vehicles`, { metho
 | Path relative to the Vulog API (`api/v1/...`), or URL under `baseUrl` | `X-API-Key`, plus `Authorization: Bearer` in an iframe (as a Web Component, the BO service worker adds it) | `apiInfo`, plus `accessToken` in an iframe |
 | Any other absolute URL (your own backend)                             | `Authorization: Bearer` only, never the API key                                                            | `accessToken`                              |
 
-When the SDK adds the token, it keeps it in cache, renews it a minute before it expires, shares one request between concurrent calls, and retries a `401` once with a new token. A `ReadableStream` body cannot be sent twice: use a string, `Blob` or `FormData` body when a retry may happen.
+When the SDK adds the token, it keeps it in cache while its expiry is known, renews it on the next call once it expires within a minute, shares one request between concurrent calls, and retries a `401` once with a new token. A `ReadableStream` body cannot be sent twice: use a string, `Blob` or `FormData` body when a retry may happen. A Vulog API call as a Web Component is not retried: the BO service worker owns its token.
 
-A path that resolves outside `baseUrl` (`../admin`) is refused with a `TypeError`.
+To tell a Vulog URL from a third-party one, the SDK asks for the API info once; without the `apiInfo` permission, every absolute URL is a third-party API.
+
+A relative path is resolved under `baseUrl`, leading `/` ignored; one that resolves outside it (`../admin` when `baseUrl` has a path) is refused with a `TypeError`, and so is a `Request` object (pass a string or a `URL`). `authFetch` also rejects with what `fetch` rejects with (network `TypeError`, `AbortError`).
 
 ### Errors
 

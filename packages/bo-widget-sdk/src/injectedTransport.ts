@@ -1,12 +1,19 @@
 import { BoError, fromHostError } from './errors.js';
-import type { BoEventListener, BoEventName, BoRequests, BoTransport } from './types.js';
+import {
+  PROTOCOL_VERSION,
+  type BoEventListener,
+  type BoEventName,
+  type BoRequests,
+  type BoTransport,
+} from './types.js';
 
 /**
  * API the back office injects into a Web Component as `element.vulogBo`, before inserting it. It
- * has no `resize`: a Web Component already fills the content zone.
+ * has no `resize`: a Web Component already fills the content zone. A request an older back office
+ * does not serve is missing: it rejects with `UNKNOWN_TYPE`.
  */
-export interface InjectedHostApi extends Omit<BoRequests, 'resize'> {
-  readonly protocolVersion: number;
+export interface InjectedHostApi extends Partial<Omit<BoRequests, 'resize'>> {
+  readonly protocolVersion?: number;
   on(name: string, listener: (data: unknown) => void): void;
   off(name: string, listener: (data: unknown) => void): void;
 }
@@ -21,38 +28,59 @@ type HostRequest =
   | 'navigate'
   | 'notify';
 
+type Listener = (data: unknown) => void;
+
 /** Tells whether `value` looks like the API the back office injects into a Web Component. */
 export const isInjectedHostApi = (value: unknown): value is InjectedHostApi => {
   if (typeof value !== 'object' || value === null) return false;
   const api = value as Record<string, unknown>;
-  return typeof api.getContext === 'function' && typeof api.on === 'function';
+  return (
+    typeof api.getContext === 'function' &&
+    typeof api.on === 'function' &&
+    typeof api.off === 'function'
+  );
 };
 
+const disconnected = (request: string): BoError =>
+  new BoError('DISCONNECTED', `${request}: the connection to the back office is closed`);
+
 /**
- * Wraps the API injected into a Web Component as a transport: same requests as the port, errors
- * converted to `BoError`, `resize` answered `{ height: null }`.
+ * Wraps the API injected into a Web Component as a transport, with the behavior of the port: same
+ * requests, errors converted to `BoError`, `resize` answered `{ height: null }`, a listener added
+ * twice called once, and after `close` pending and new requests reject with `DISCONNECTED` and no
+ * event is delivered.
  */
 export const createInjectedTransport = (hostApi: InjectedHostApi): BoTransport => {
   // Listeners added through this transport, so that `close` removes them from the host API.
-  const added = new Set<[string, (data: unknown) => void]>();
+  const listeners = new Map<string, Set<Listener>>();
+  // Rejects of the requests in flight, called by `close`.
+  const pending = new Set<(error: BoError) => void>();
+  let closed = false;
 
   const call =
     (request: HostRequest) =>
-    async (payload?: unknown): Promise<never> => {
-      const method = hostApi[request] as ((payload?: unknown) => Promise<never>) | undefined;
-      if (typeof method !== 'function') {
-        throw new BoError('UNKNOWN_TYPE', `${request}: not served by this back office`);
-      }
-      try {
-        return await method.call(hostApi, payload);
-      } catch (error) {
-        throw fromHostError(error, request);
-      }
-    };
+    (payload?: unknown): Promise<never> =>
+      new Promise<never>((resolve, reject) => {
+        if (closed) {
+          reject(disconnected(request));
+          return;
+        }
+        const method = hostApi[request] as ((payload?: unknown) => Promise<never>) | undefined;
+        if (typeof method !== 'function') {
+          reject(new BoError('UNKNOWN_TYPE', `${request}: not served by this back office`));
+          return;
+        }
+        pending.add(reject);
+        Promise.resolve()
+          .then(() => method.call(hostApi, payload))
+          .then(resolve, (error: unknown) => reject(fromHostError(error, request)))
+          .finally(() => pending.delete(reject));
+      });
 
   return {
     mode: 'webcomponent',
-    protocolVersion: hostApi.protocolVersion,
+    protocolVersion:
+      typeof hostApi.protocolVersion === 'number' ? hostApi.protocolVersion : PROTOCOL_VERSION,
     grantedPermissions: null,
     getContext: call('getContext'),
     getCurrentUser: call('getCurrentUser'),
@@ -62,21 +90,27 @@ export const createInjectedTransport = (hostApi: InjectedHostApi): BoTransport =
     getTheme: call('getTheme'),
     navigate: call('navigate'),
     notify: call('notify'),
-    resize: async () => ({ height: null }),
+    resize: async () => {
+      if (closed) throw disconnected('resize');
+      return { height: null };
+    },
     on<K extends BoEventName>(name: K, listener: BoEventListener<K>) {
-      const entry: [string, (data: unknown) => void] = [name, listener as (data: unknown) => void];
-      hostApi.on(name, entry[1]);
-      added.add(entry);
+      if (closed || listeners.get(name)?.has(listener as Listener)) return;
+      hostApi.on(name, listener as Listener);
+      if (!listeners.has(name)) listeners.set(name, new Set());
+      listeners.get(name)?.add(listener as Listener);
     },
     off<K extends BoEventName>(name: K, listener: BoEventListener<K>) {
-      hostApi.off(name, listener as (data: unknown) => void);
-      for (const entry of added) {
-        if (entry[0] === name && entry[1] === listener) added.delete(entry);
-      }
+      if (!listeners.get(name)?.delete(listener as Listener)) return;
+      hostApi.off(name, listener as Listener);
     },
     close() {
-      for (const [name, listener] of added) hostApi.off(name, listener);
-      added.clear();
+      if (closed) return;
+      closed = true;
+      for (const [name, set] of listeners) for (const listener of set) hostApi.off(name, listener);
+      listeners.clear();
+      for (const reject of pending) reject(disconnected('Request'));
+      pending.clear();
     },
   };
 };

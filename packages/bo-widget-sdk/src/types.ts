@@ -151,7 +151,7 @@ export type AuthFetch = (input: string | URL, init?: RequestInit) => Promise<Res
 export interface BoClient extends BoRequests {
   /** How the widget runs. */
   readonly mode: BoMode;
-  /** Protocol version the back office serves. */
+  /** Protocol version the back office serves (this SDK's version when an injected API does not say). */
   readonly protocolVersion: number;
   /**
    * Permissions the back office grants the widget (iframe), `null` for a Web Component, whose
@@ -173,13 +173,26 @@ export interface BoClient extends BoRequests {
    *   against `baseUrl` and `X-API-Key` is added (permission `apiInfo`). In an iframe, the
    *   `Authorization: Bearer` header is added too (permission `accessToken`); a Web Component gets
    *   it from the back office service worker.
-   * - Any other absolute URL is a third-party API: only the `Bearer` header is added, never the
-   *   API key.
+   * - Any other absolute URL is a third-party API: only the `Bearer` header is added (permission
+   *   `accessToken`), never the API key. To tell them apart, the SDK asks for the API info once;
+   *   without the `apiInfo` permission, every absolute URL is a third-party API.
    *
-   * Whenever the SDK adds the `Bearer` header, the token is cached, refreshed a minute before it
-   * expires, shared by concurrent calls, and a `401` is retried once with a new token.
+   * A relative path is resolved under `baseUrl`, leading `/` ignored; one that resolves outside it
+   * is refused. Whenever the SDK adds the `Bearer` header, the token is cached while its expiry is
+   * known, renewed on the next call once it expires within a minute, shared by concurrent calls,
+   * and a `401` is retried once with a new token (the body of the request must be sendable twice:
+   * not a `ReadableStream`). A Vulog API call as a Web Component is not retried: the back office
+   * service worker owns its token.
+   *
+   * @throws {BoError} From `getApiInfo` or `getAccessToken` (`FORBIDDEN`, `INTERNAL` with reason
+   * `no-token`…).
+   * @throws {TypeError} When `input` is not a string or a URL, or resolves outside `baseUrl`, and
+   * whatever `fetch` throws (network failure, `AbortError`).
    */
   authFetch: AuthFetch;
-  /** Stops listening to the back office; pending requests reject with `DISCONNECTED`. */
+  /**
+   * Stops listening to the back office: listeners are removed, and pending and later requests
+   * reject with `DISCONNECTED`, the same way in both modes.
+   */
   disconnect(): void;
 }

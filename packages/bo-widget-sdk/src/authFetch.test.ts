@@ -226,3 +226,144 @@ describe('authFetch in an iframe', () => {
     );
   });
 });
+
+describe('authFetch: URL resolution', () => {
+  const withBase = (baseUrl: string) => {
+    const src = source('iframe', [token('t1')]);
+    src.getApiInfo.mockResolvedValue({ baseUrl, apiKey: 'api-key' });
+    return createAuthFetch(src);
+  };
+
+  it('joins a relative path to a baseUrl without trailing slash', async () => {
+    await withBase('https://api.example.com/boapi/proxy')('api/v1/me');
+    expect(lastCall().url).toBe(`${BASE_URL}api/v1/me`);
+  });
+
+  it('never sends the API key to a sibling path of the base', async () => {
+    await withBase('https://api.example.com/boapi/proxy')(
+      'https://api.example.com/boapi/proxy-other/x',
+    );
+    expect(lastCall()).toMatchObject({ apiKey: null, authorization: 'Bearer t1' });
+  });
+
+  it('compares URLs with a non-canonical baseUrl', async () => {
+    await withBase('HTTPS://API.EXAMPLE.COM:443/boapi/proxy/')('api/v1/me');
+    expect(lastCall()).toMatchObject({ url: `${BASE_URL}api/v1/me`, apiKey: 'api-key' });
+  });
+
+  it('keeps a protocol-relative path under baseUrl', async () => {
+    await withBase(BASE_URL)('//evil.example/x');
+    expect(lastCall()).toMatchObject({ url: `${BASE_URL}evil.example/x`, apiKey: 'api-key' });
+  });
+
+  it.each(['../x', '%2e%2e/admin', '..\\admin'])('refuses %j', async (path) => {
+    await expect(withBase('https://api.example.com/boapi/proxy')(path)).rejects.toThrow(TypeError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a Request input, whose body could not be sent twice', async () => {
+    const request = new Request('https://middleware.example.org/x');
+    await expect(withBase(BASE_URL)(request as unknown as string)).rejects.toThrow(TypeError);
+  });
+});
+
+describe('authFetch: 401 retry', () => {
+  it('keeps the method, body, caller headers and API key on the retry', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('', { status: 401 }))
+      .mockResolvedValueOnce(new Response('ok'));
+    await createAuthFetch(source('iframe', [token('old'), token('new')]))('api/v1/vehicles', {
+      method: 'POST',
+      body: '{"a":1}',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const retry = lastCall(1);
+    expect(retry).toMatchObject({ apiKey: 'api-key', authorization: 'Bearer new' });
+    expect(retry.init).toMatchObject({ method: 'POST', body: '{"a":1}' });
+    expect(new Headers(retry.init?.headers).get('Content-Type')).toBe('application/json');
+  });
+
+  it('releases the body of the dropped 401 answer', async () => {
+    const dropped = new Response('expired', { status: 401 });
+    const cancel = vi.spyOn(dropped.body as ReadableStream, 'cancel');
+    fetchMock.mockResolvedValueOnce(dropped).mockResolvedValueOnce(new Response('ok'));
+    await createAuthFetch(source('iframe', [token('a'), token('b')]))('x');
+    expect(cancel).toHaveBeenCalled();
+  });
+
+  it('rejects with no-token when the new token cannot be had after a 401', async () => {
+    fetchMock.mockResolvedValue(new Response('', { status: 401 }));
+    const src = source('iframe', [token('old')]);
+    src.getAccessToken
+      .mockResolvedValueOnce(token('old'))
+      .mockRejectedValueOnce(new BoError('INTERNAL', 'expired', { reason: 'no-token' }));
+    await expect(createAuthFetch(src)('x')).rejects.toMatchObject({ reason: 'no-token' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a 401 of a third-party API as a Web Component', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('', { status: 401 }))
+      .mockResolvedValueOnce(new Response('ok'));
+    const response = await createAuthFetch(source('webcomponent', [token('old'), token('new')]))(
+      'https://middleware.example.org/x',
+    );
+    expect(response.status).toBe(200);
+    expect(lastCall(0).authorization).toBe('Bearer old');
+    expect(lastCall(1).authorization).toBe('Bearer new');
+  });
+
+  it('renews the token once for concurrent 401s', async () => {
+    fetchMock.mockImplementation(async (_url, init) =>
+      new Headers(init?.headers).get('Authorization') === 'Bearer old'
+        ? new Response('', { status: 401 })
+        : new Response('ok'),
+    );
+    const src = source('iframe', [token('old'), token('new'), token('third')]);
+    const authFetch = createAuthFetch(src);
+    await Promise.all([authFetch('a'), authFetch('b')]);
+    expect(src.getAccessToken).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('authFetch: answers of the back office', () => {
+  it.each([
+    ['no apiKey', { baseUrl: BASE_URL, apiKey: '' }],
+    ['a relative baseUrl', { baseUrl: '/boapi/proxy/', apiKey: 'k' }],
+    ['nothing', undefined],
+  ])('rejects API info with %s as invalid-api-info', async (_label, info) => {
+    const src = source('webcomponent');
+    src.getApiInfo.mockResolvedValue(info as never);
+    await expect(createAuthFetch(src)('api/v1/me')).rejects.toMatchObject({
+      code: 'INTERNAL',
+      reason: 'invalid-api-info',
+    });
+  });
+
+  it.each([
+    ['an empty token', { accessToken: '', expiresAt: null }],
+    ['no token', {}],
+  ])('rejects %s as invalid-token, without calling the API', async (_label, answer) => {
+    const src = source('iframe');
+    src.getAccessToken.mockResolvedValue(answer as BoAccessToken);
+    await expect(createAuthFetch(src)('x')).rejects.toMatchObject({ reason: 'invalid-token' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('uses a token whose expiry is not a number, without keeping it', async () => {
+    const src = source('iframe');
+    src.getAccessToken.mockResolvedValue({ accessToken: 't', expiresAt: 'soon' as never });
+    const authFetch = createAuthFetch(src);
+    await authFetch('a');
+    await authFetch('b');
+    expect(lastCall().authorization).toBe('Bearer t');
+    expect(src.getAccessToken).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats absolute URLs as third-party when an older back office has no getApiInfo', async () => {
+    const src = source('iframe', [token('t1')]);
+    src.getApiInfo.mockRejectedValue(new BoError('UNKNOWN_TYPE', 'getApiInfo'));
+    await createAuthFetch(src)('https://middleware.example.org/x');
+    expect(lastCall()).toMatchObject({ apiKey: null, authorization: 'Bearer t1' });
+  });
+});

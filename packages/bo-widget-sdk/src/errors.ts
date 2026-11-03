@@ -9,34 +9,41 @@
  * - `TIMEOUT`: no answer in time (handshake or request).
  * - `DISCONNECTED`: the connection is closed, or the widget is not displayed by a back office.
  */
-export type BoErrorCode =
-  'UNKNOWN_TYPE' | 'FORBIDDEN' | 'INVALID_PAYLOAD' | 'INTERNAL' | 'TIMEOUT' | 'DISCONNECTED';
+export type BoErrorCode = (typeof ERROR_CODES)[number];
 
-const ERROR_CODES: readonly string[] = [
+const ERROR_CODES = [
   'UNKNOWN_TYPE',
   'FORBIDDEN',
   'INVALID_PAYLOAD',
   'INTERNAL',
   'TIMEOUT',
   'DISCONNECTED',
-];
+] as const;
+
+const isErrorCode = (value: unknown): value is BoErrorCode =>
+  (ERROR_CODES as readonly unknown[]).includes(value);
 
 /** Details of a {@link BoError}. */
 export interface BoErrorDetails {
-  /** Why an `INTERNAL` error happened, when known. */
+  /** Why the request failed, when known (mostly on `INTERNAL`). */
   reason?: string | null;
-  /** HTTP status behind an `INTERNAL` error, when known. */
+  /** HTTP status behind the error, when known (mostly on `INTERNAL`). */
   status?: number | null;
   cause?: unknown;
 }
 
 /**
- * Error with which every request of a {@link BoClient} rejects, the same way as a Web Component and
- * in an iframe, so that a widget branches on `code` and `reason` only.
+ * Error with which every request of a `BoClient` rejects, the same way as a Web Component and in an
+ * iframe, so that a widget branches on `code` and `reason` only. `authFetch` may also reject with
+ * the errors of `fetch` itself (`TypeError`, `AbortError`) and with a `TypeError` for an input it
+ * refuses.
  *
  * Known `reason` values: `no-token` (session expired: no access token), `not-installed` (the
  * widget is not installed, so it has no settings), `disposed` (the widget was removed from the
- * page), `ERR_NETWORK` or another transport or server error code.
+ * page), `ERR_NETWORK` or another transport or server error code, and, for a back office that
+ * answers something unexpected, `invalid-welcome`, `invalid-host-api`, `invalid-api-info`,
+ * `invalid-token`, `malformed-answer` or `messageerror`. A wire code this SDK does not know becomes
+ * `INTERNAL` with that code as `reason`.
  *
  * @example
  * ```ts
@@ -72,16 +79,16 @@ export interface WireError {
 
 /** Builds the {@link BoError} of a failed answer posted on the port. */
 export const fromWireError = (error: WireError | undefined, request: string): BoError => {
-  const code =
-    typeof error?.code === 'string' && ERROR_CODES.includes(error.code)
-      ? (error.code as BoErrorCode)
-      : 'INTERNAL';
+  const known = isErrorCode(error?.code);
+  const code = known ? (error?.code as BoErrorCode) : 'INTERNAL';
   const message =
     typeof error?.message === 'string' && error.message
       ? error.message
       : `${request}: the back office failed`;
+  // A code from a newer back office is kept as the reason, so that it is not lost.
+  const fallbackReason = !known && typeof error?.code === 'string' ? error.code : null;
   return new BoError(code, message, {
-    reason: typeof error?.reason === 'string' ? error.reason : null,
+    reason: typeof error?.reason === 'string' ? error.reason : fallbackReason,
     status: typeof error?.status === 'number' ? error.status : null,
   });
 };
@@ -99,7 +106,11 @@ export const fromHostError = (error: unknown, request: string): BoError => {
     message?: unknown;
   };
   const text =
-    typeof message === 'string' && message ? message : `${request}: the back office failed`;
+    typeof message === 'string' && message
+      ? message
+      : typeof error === 'string' && error
+        ? error
+        : `${request}: the back office failed`;
   if (code === 'invalid-payload') return new BoError('INVALID_PAYLOAD', text, { cause: error });
   return new BoError('INTERNAL', text, {
     reason: typeof code === 'string' ? code : null,

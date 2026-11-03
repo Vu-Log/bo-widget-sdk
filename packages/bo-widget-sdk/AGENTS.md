@@ -7,21 +7,21 @@ You are writing or changing a **Vulog back office (BO) widget**: a page the BO s
 - Entry points: `@vulog/bo-widget-sdk` (protocol client, no dependency) and `@vulog/bo-widget-sdk/manifest` (Zod schemas of `widget.json`).
 - `connect(element?, options?)` returns a `BoClient` with **the same API in both modes**. Write the widget once.
 - Web Component: `connect(this)` inside `connectedCallback`. iframe: `connect()` without argument.
-- All requests are async and reject with `BoError` (`code`, `reason`, `status`), never with another error type, except `authFetch`, which may also reject with the `TypeError` of `fetch` (network) or of a path outside `baseUrl`.
-- Events: `on(name, listener)` returns the unsubscribe function. Names: `localeChanged`, `fleetChanged`, `userChanged`, `themeChanged`, `routeChanged`. The initial state is **not** pushed: read it with the getters first.
+- All requests are async and reject with `BoError` (`code`, `reason`, `status`), never with another error type, except `authFetch`, which may also reject with what `fetch` rejects with (`TypeError` on network failure, `AbortError` on abort) and with a `TypeError` for an input it refuses (a `Request` object, a path outside `baseUrl`).
+- Events: `on(name, listener)` returns the unsubscribe function. Names: `localeChanged`, `fleetChanged`, `userChanged`, `themeChanged`, `routeChanged`. The initial state is **not** pushed: read it first with `getContext` (locale, fleet), `getCurrentUser` and `getTheme`. No getter gives the current route: `getContext().basename` is the widget's view, then follow `routeChanged`.
 - Permissions (`accessToken`, `apiInfo`, `navigate`, `notify`) come from the `permissions` of `widget.json`. In an iframe, a missing permission rejects with `FORBIDDEN`; as a Web Component, they are declarative.
 
 ## Rules
 
-1. **Web Component: export the class, never call `customElements.define`**, and never register other custom elements globally. The BO registers the class under a tag it computes (`widget-` + hash). Do not assume the tag name: use `this`.
-2. Mount the UI in `connectedCallback`, clean up everything in `disconnectedCallback`: call `bo.disconnect()`, remove listeners and timers, unmount the framework root.
-3. Keep styles in the Shadow DOM (`this.attachShadow({ mode: 'open' })`). Never inject CSS into `document.head`.
+1. **Web Component: export the class, never call `customElements.define`**, and never register other custom elements globally. The BO registers the class under a tag it chooses. Do not assume the tag name: use `this`.
+2. Mount the UI in `connectedCallback`, clean up everything in `disconnectedCallback`: call `bo.disconnect()`, remove listeners and timers, unmount the framework root. `connectedCallback` can run again when the element is moved: reuse `this.shadowRoot`, and expect `disconnectedCallback` to run before `connect()` resolves.
+3. Keep styles in the Shadow DOM (`this.shadowRoot ?? this.attachShadow({ mode: 'open' })`). Never inject CSS into `document.head`.
 4. Call Vulog APIs with `bo.authFetch('api/v1/...')`, a path relative to the API base URL. Do not build URLs from `getApiInfo()` by hand, do not add `Authorization` or `X-API-Key` yourself, and do not call `getAccessToken()` for Vulog APIs.
 5. Use `getAccessToken()` or `authFetch(absoluteUrl)` only for a third-party backend that expects the Vulog token. The widget needs the `accessToken` permission.
 6. Navigate with `bo.navigate({ path })`, never with `window.location` or `history`: `'/app/...'` is a BO route under the current fleet, `'details/1'` is relative to the widget's view.
 7. Show feedback with `bo.notify({ message, severity })` (`success`, `info`, `warning`, `error`).
 8. Use `getCurrentUser()` to know who is connected. Never decode the token.
-9. Handle a `401` from `authFetch` (session lost) by showing a message, not by retrying in a loop: the SDK already retried once.
+9. Handle a `401` from `authFetch` (session lost) by showing a message, never by retrying in a loop. When the SDK adds the token itself (iframe, or a third-party URL), it has already retried once with a new token.
 10. Keep secrets out of the widget bundle: it is public. Settings needing a secret belong to your backend.
 
 ## Error handling
@@ -44,7 +44,7 @@ try {
 }
 ```
 
-`reason: 'disposed'` means the widget was removed while a request was pending: ignore it.
+`reason: 'disposed'` (or `DISCONNECTED` after your own `disconnect()`) means the widget was removed while a request was pending: ignore it.
 
 ## Minimal widgets
 
@@ -58,7 +58,7 @@ export default class extends HTMLElement {
   private stop?: () => void;
 
   async connectedCallback() {
-    const root = this.attachShadow({ mode: 'open' });
+    const root = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
     this.bo = await connect(this);
     const render = (locale: string | null) => (root.textContent = `Locale: ${locale}`);
     render((await this.bo.getContext()).locale);
@@ -93,14 +93,30 @@ import { publishedWidgetManifestSchema } from '@vulog/bo-widget-sdk/manifest';
 const result = publishedWidgetManifestSchema.safeParse(manifest);
 ```
 
-Shape: `manifestVersion: 1`, `id` (kebab-case, ≤ 63), `name`, `version` (semver without `+build`), `runtime` (`{ type: 'webcomponent', entry: 'index.js' }` or `{ type: 'iframe', entry: 'index.html' }`), `protocol: { version: 2 }`, and optionally `description` (Markdown, ≤ 2000), `author`, `icon` (path inside the bundle), `menu`, `permissions`, `settings` (`{ key, type: 'string' | 'url' | 'number' | 'boolean', required?, label?, default? }`). Unknown fields are errors.
+Shape: `manifestVersion: 1`, `id` (kebab-case, ≤ 63), `name`, `version` (semver without `+build`), `runtime` (`{ type: 'webcomponent', entry: 'index.js' }` or `{ type: 'iframe', entry: 'index.html' }`), `protocol: { version: 2 }`, and optionally `description` (Markdown, ≤ 2000), `author` (`{ name, email? }`), `icon` (path inside the bundle), `menu` (`{ defaultSection?, defaultTarget?, defaultPosition?: 'before' | 'after', defaultRoles?: string[], label? }`), `permissions`, `settings` (`{ key, type: 'string' | 'url' | 'number' | 'boolean', required?, label?, default? }`). Every `label` is a record per locale (`{ en: 'Fleet report', fr: 'Rapport de flotte' }`), never a string. Unknown fields are errors.
 
 ## Testing a widget
 
-Pass a fake injected API to `connect`: any object with `getContext` and `on` methods is used as the BO.
+Pass a fake injected API to `connect`: any object with `getContext`, `on` and `off` methods is used as the BO, in `mode: 'webcomponent'`. Then:
+
+- a request the fake does not define rejects with `UNKNOWN_TYPE`;
+- Vulog API calls of `authFetch` get no `Authorization` header (the BO service worker adds it), so stub `fetch`;
+- `resize` resolves `{ height: null }`;
+- keep the listeners to emit events.
 
 ```ts
+import { connect } from '@vulog/bo-widget-sdk';
+
+const listeners = new Map<string, Set<(data: unknown) => void>>();
 const bo = await connect({
-  vulogBo: { protocolVersion: 2, getContext: async () => context, on() {}, off() {} /* … */ },
+  vulogBo: {
+    protocolVersion: 2,
+    getContext: async () => context,
+    getApiInfo: async () => ({ baseUrl: 'https://api.example.com/', apiKey: 'test' }),
+    on: (name: string, listener: (data: unknown) => void) =>
+      listeners.set(name, (listeners.get(name) ?? new Set()).add(listener)),
+    off: (name: string, listener: (data: unknown) => void) => listeners.get(name)?.delete(listener),
+  },
 });
+const emit = (name: string, data: unknown) => listeners.get(name)?.forEach((l) => l(data));
 ```

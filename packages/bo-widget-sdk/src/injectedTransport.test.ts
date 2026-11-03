@@ -50,9 +50,13 @@ describe('isInjectedHostApi', () => {
     expect(isInjectedHostApi(fakeHostApi().api)).toBe(true);
   });
 
-  it.each([undefined, null, 'vulogBo', {}, { getContext: () => null }])('rejects %j', (value) => {
-    expect(isInjectedHostApi(value)).toBe(false);
-  });
+  const noop = (): null => null;
+  it.each([undefined, null, 'vulogBo', {}, { getContext: noop }, { getContext: noop, on: noop }])(
+    'rejects %j',
+    (value) => {
+      expect(isInjectedHostApi(value)).toBe(false);
+    },
+  );
 });
 
 describe('createInjectedTransport', () => {
@@ -132,5 +136,96 @@ describe('createInjectedTransport', () => {
     expect(() =>
       createInjectedTransport(api).on('localeChanged', 'x' as unknown as () => void),
     ).toThrow(TypeError);
+  });
+  it('defaults protocolVersion to the SDK version when the host does not say', () => {
+    const { api } = fakeHostApi();
+    const transport = createInjectedTransport({
+      ...api,
+      protocolVersion: undefined,
+    } as unknown as InjectedHostApi);
+    expect(transport.protocolVersion).toBe(2);
+  });
+
+  it('calls the host methods with the host as this', async () => {
+    class Host {
+      readonly protocolVersion = 2;
+      private readonly context = context;
+      async getContext(): Promise<typeof context> {
+        return this.context;
+      }
+      on() {}
+      off() {}
+    }
+    await expect(createInjectedTransport(new Host()).getContext()).resolves.toEqual(context);
+  });
+
+  it('converts an error the host throws synchronously', async () => {
+    const { api } = fakeHostApi({
+      getTheme: (() => {
+        throw Object.assign(new Error('broken'), { code: 'boom' });
+      }) as NonNullable<InjectedHostApi['getTheme']>,
+    });
+    await expect(createInjectedTransport(api).getTheme()).rejects.toMatchObject({
+      code: 'INTERNAL',
+      reason: 'boom',
+    });
+  });
+
+  it('calls a listener added twice once, as the port does', () => {
+    const { api, emit } = fakeHostApi();
+    const transport = createInjectedTransport(api);
+    const listener = vi.fn();
+    transport.on('localeChanged', listener);
+    transport.on('localeChanged', listener);
+    emit('localeChanged', { locale: 'fr' });
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(api.on).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call the host off for a listener it never added', () => {
+    const { api } = fakeHostApi();
+    createInjectedTransport(api).off('localeChanged', vi.fn());
+    expect(api.off).not.toHaveBeenCalled();
+  });
+
+  it('removes only the remaining listeners when closed', () => {
+    const { api } = fakeHostApi();
+    const transport = createInjectedTransport(api);
+    const removed = vi.fn();
+    const kept = vi.fn();
+    transport.on('fleetChanged', removed);
+    transport.on('fleetChanged', kept);
+    transport.off('fleetChanged', removed);
+    vi.mocked(api.off).mockClear();
+    transport.close();
+    expect(api.off).toHaveBeenCalledTimes(1);
+    expect(api.off).toHaveBeenCalledWith('fleetChanged', kept);
+  });
+
+  it('rejects pending and later requests with DISCONNECTED once closed, as the port does', async () => {
+    let answer: (value: unknown) => void = () => {};
+    const { api } = fakeHostApi({
+      getSettings: vi.fn(() => new Promise((resolve) => (answer = resolve))) as NonNullable<
+        InjectedHostApi['getSettings']
+      >,
+    });
+    const transport = createInjectedTransport(api);
+    const pending = transport.getSettings();
+    await Promise.resolve();
+    transport.close();
+    answer({ late: true });
+    await expect(pending).rejects.toMatchObject({ code: 'DISCONNECTED' });
+    await expect(transport.getContext()).rejects.toMatchObject({ code: 'DISCONNECTED' });
+    await expect(transport.resize({ height: 1 })).rejects.toMatchObject({ code: 'DISCONNECTED' });
+    expect(api.getContext).not.toHaveBeenCalled();
+  });
+
+  it('adds no listener on the host once closed', () => {
+    const { api } = fakeHostApi();
+    const transport = createInjectedTransport(api);
+    transport.close();
+    transport.close();
+    transport.on('localeChanged', vi.fn());
+    expect(api.on).not.toHaveBeenCalled();
   });
 });

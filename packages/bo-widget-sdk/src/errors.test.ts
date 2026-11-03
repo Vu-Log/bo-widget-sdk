@@ -52,11 +52,22 @@ describe('fromWireError', () => {
     expect(error).toMatchObject({ reason: 'not-installed', status: 404 });
   });
 
-  it.each([
-    ['an unknown code', { code: 'BOOM', message: 'm' }],
-    ['no code', { message: 'm' }],
-  ])('turns %s into INTERNAL', (_label, wire) => {
-    expect(fromWireError(wire, 'getContext').code).toBe('INTERNAL');
+  it('turns an unknown code into INTERNAL, keeping it as the reason', () => {
+    expect(fromWireError({ code: 'RATE_LIMITED', message: 'm' }, 'getContext')).toMatchObject({
+      code: 'INTERNAL',
+      reason: 'RATE_LIMITED',
+    });
+  });
+
+  it('prefers the reason of the answer to an unknown code', () => {
+    expect(fromWireError({ code: 'NEW', reason: 'quota' }, 'getContext').reason).toBe('quota');
+  });
+
+  it('turns an answer without code into INTERNAL without reason', () => {
+    expect(fromWireError({ message: 'm' }, 'getContext')).toMatchObject({
+      code: 'INTERNAL',
+      reason: null,
+    });
   });
 
   it('writes a message when the answer has none', () => {
@@ -95,7 +106,14 @@ describe('fromHostError', () => {
     expect(fromHostError(error, 'getApiInfo')).toBe(error);
   });
 
-  it.each([null, undefined, 'boom', new Error('')])(
+  it('keeps the text of a string thrown by the host', () => {
+    expect(fromHostError('boom', 'getContext')).toMatchObject({
+      code: 'INTERNAL',
+      message: 'boom',
+    });
+  });
+
+  it.each([null, undefined, '', new Error('')])(
     'turns %j into a generic INTERNAL error',
     (value) => {
       expect(fromHostError(value, 'getContext')).toMatchObject({

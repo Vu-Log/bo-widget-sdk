@@ -130,13 +130,14 @@ describe('connect', () => {
   it('runs the same widget code as a Web Component and in an iframe', async () => {
     const backOffice = fakeBackOffice();
 
-    const element = { vulogBo: backOffice.hostApi };
-    const asWebComponent = await runWidget(await connect(element));
+    const webComponentClient = await connect({ vulogBo: backOffice.hostApi });
+    const asWebComponent = await runWidget(webComponentClient);
 
     vi.stubGlobal('window', {
       parent: backOffice.parentWindow(['apiInfo', 'accessToken', 'navigate']),
     });
-    const inIframe = await runWidget(await connect());
+    const iframeClient = await connect();
+    const inIframe = await runWidget(iframeClient);
 
     for (const result of [asWebComponent, inIframe]) {
       expect(result.fleetId).toBe('FLEET-1');
@@ -162,6 +163,93 @@ describe('connect', () => {
     expect(iframeCall?.[0]).toBe(`${BASE_URL}api/v1/fleets/FLEET-1/vehicles`);
     expect(new Headers(webComponentCall?.[1]?.headers).get('Authorization')).toBeNull();
     expect(new Headers(iframeCall?.[1]?.headers).get('Authorization')).toBe('Bearer token');
+
+    for (const client of [webComponentClient, iframeClient]) {
+      client.disconnect();
+      await expect(client.getContext()).rejects.toMatchObject({ code: 'DISCONNECTED' });
+    }
+  });
+
+  it('disconnects the same way in both modes: no event, pending and later requests rejected', async () => {
+    const backOffice = fakeBackOffice();
+    let release: () => void = () => {};
+    backOffice.hostApi.getTheme = () =>
+      new Promise((resolve) => {
+        release = () => resolve({ palette: {}, typography: {}, mode: 'light' });
+      });
+    vi.stubGlobal('window', { parent: backOffice.parentWindow([]) });
+    for (const bo of [await connect({ vulogBo: backOffice.hostApi }), await connect()]) {
+      const listener = vi.fn();
+      bo.on('fleetChanged', listener);
+      const pending = bo.getTheme();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      bo.disconnect();
+      release();
+      backOffice.emit('fleetChanged', { fleetId: 'FLEET-2' });
+      await expect(pending).rejects.toMatchObject({ code: 'DISCONNECTED' });
+      await expect(bo.getContext()).rejects.toMatchObject({ code: 'DISCONNECTED' });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      expect(listener).not.toHaveBeenCalled();
+    }
+  });
+
+  it('renews the token through the real port after a 401', async () => {
+    const backOffice = fakeBackOffice();
+    let issued = 0;
+    backOffice.hostApi.getAccessToken = async () => ({
+      accessToken: `token-${++issued}`,
+      expiresAt: Date.now() + 3_600_000,
+    });
+    fetchMock
+      .mockResolvedValueOnce(new Response('', { status: 401 }))
+      .mockResolvedValueOnce(new Response('ok'));
+    vi.stubGlobal('window', { parent: backOffice.parentWindow(['apiInfo', 'accessToken']) });
+    const bo = await connect();
+    const response = await bo.authFetch('api/v1/me');
+    expect(response.status).toBe(200);
+    const authorizations = fetchMock.mock.calls.map(([, init]) =>
+      new Headers(init?.headers).get('Authorization'),
+    );
+    expect(authorizations).toEqual(['Bearer token-1', 'Bearer token-2']);
+    bo.disconnect();
+  });
+
+  it('rejects a request with TIMEOUT after requestTimeout', async () => {
+    const parent = {
+      postMessage(_hello: unknown, _origin: string, [port]: MessagePort[]) {
+        port?.postMessage({ type: 'welcome', protocolVersion: 2, grantedPermissions: [] });
+      },
+    };
+    vi.stubGlobal('window', { parent });
+    const bo = await connect(null, { requestTimeout: 10 });
+    await expect(bo.getContext()).rejects.toMatchObject({ code: 'TIMEOUT' });
+    bo.disconnect();
+  });
+
+  it.each([0, -1, Number.NaN, '10' as unknown as number])(
+    'rejects a timeout option of %j with a TypeError',
+    async (value) => {
+      vi.stubGlobal('window', { parent: { postMessage: () => {} } });
+      await expect(connect(null, { requestTimeout: value })).rejects.toThrow(TypeError);
+      await expect(connect(null, { handshakeTimeout: value })).rejects.toThrow(/handshakeTimeout/);
+    },
+  );
+
+  it('caps an Infinity timeout instead of firing at once', async () => {
+    const backOffice = fakeBackOffice();
+    vi.stubGlobal('window', { parent: backOffice.parentWindow([]) });
+    const bo = await connect(null, { handshakeTimeout: Infinity, requestTimeout: Infinity });
+    await expect(bo.getContext()).resolves.toMatchObject({ fleetId: 'FLEET-1' });
+    bo.disconnect();
+  });
+
+  it('rejects an element whose vulogBo is not a back office API', async () => {
+    vi.stubGlobal('window', { parent: { postMessage: vi.fn() } });
+    await expect(connect({ vulogBo: { getContext: () => null } })).rejects.toMatchObject({
+      code: 'INTERNAL',
+      reason: 'invalid-host-api',
+    });
+    expect(window.parent.postMessage).not.toHaveBeenCalled();
   });
 
   it('prefers the injected API over postMessage', async () => {
@@ -172,6 +260,7 @@ describe('connect', () => {
     const bo = await connect({ vulogBo: backOffice.hostApi });
     expect(bo).toMatchObject({ mode: 'webcomponent', grantedPermissions: null });
     expect(postMessage).not.toHaveBeenCalled();
+    bo.disconnect();
   });
 
   it('falls back to postMessage when the element has no injected API', async () => {
@@ -249,7 +338,8 @@ describe('connect', () => {
   });
 
   it('delegates every request to the transport', async () => {
-    const bo = await connect({ vulogBo: fakeBackOffice().hostApi });
+    const backOffice = fakeBackOffice();
+    const bo = await connect({ vulogBo: backOffice.hostApi });
     await expect(bo.getCurrentUser()).resolves.toMatchObject({ id: 'u1' });
     await expect(bo.getApiInfo()).resolves.toMatchObject({ apiKey: 'api-key' });
     await expect(bo.getAccessToken()).resolves.toMatchObject({ accessToken: 'token' });
@@ -259,5 +349,7 @@ describe('connect', () => {
     const listener = vi.fn();
     bo.on('userChanged', listener);
     bo.off('userChanged', listener);
+    backOffice.emit('userChanged', { id: 'u2' });
+    expect(listener).not.toHaveBeenCalled();
   });
 });

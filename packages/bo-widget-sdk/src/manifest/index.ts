@@ -25,7 +25,7 @@ export const WIDGET_VERSION_PATTERN =
 /** A widget id: lowercase letters and digits, joined by single hyphens (`fleet-report`). */
 export const WIDGET_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/** A widget id is a DNS label: 63 characters at most (RFC 1035). */
+/** A widget id is 63 characters at most, the length limit of a DNS label. */
 export const WIDGET_ID_MAX_LENGTH = 63;
 
 /** A widget version (see {@link WIDGET_VERSION_PATTERN}). */
@@ -77,7 +77,7 @@ export const WIDGET_RUNTIME_ENTRIES = {
   iframe: 'index.html',
 } as const satisfies Record<(typeof WIDGET_RUNTIME_TYPES)[number], string>;
 
-/** Protocol requests a widget may be granted; the others need no permission. */
+/** Permissions a widget may declare; the requests that need none are always served. */
 export const WIDGET_PERMISSIONS = ['accessToken', 'apiInfo', 'navigate', 'notify'] as const;
 
 /** Value types of an installation setting, which pick the input of the settings form. */

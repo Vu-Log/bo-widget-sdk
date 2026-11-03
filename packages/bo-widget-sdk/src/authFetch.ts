@@ -1,10 +1,16 @@
 import { BoError } from './errors.js';
 import type { AuthFetch, BoAccessToken, BoApiInfo, BoMode, BoRequests } from './types.js';
 
-/** A token is renewed this long before it expires, so that a request never leaves with an expired one. */
+/** A token is renewed when it expires within this delay, so that a request does not leave with a token about to expire. */
 export const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
 type AuthSource = Pick<BoRequests, 'getApiInfo' | 'getAccessToken'> & { readonly mode: BoMode };
+
+/** Where a call goes: the Vulog API, with its key, or a third-party API (`vulogApiKey: null`). */
+interface Destination {
+  url: string;
+  vulogApiKey: string | null;
+}
 
 const isAbsoluteUrl = (value: string): boolean => {
   try {
@@ -15,7 +21,44 @@ const isAbsoluteUrl = (value: string): boolean => {
   }
 };
 
-const withTrailingSlash = (url: string): string => (url.endsWith('/') ? url : `${url}/`);
+/** `baseUrl` in the canonical form of `URL`, ending with `/`, so that resolved URLs can be compared with it. */
+const toBase = (baseUrl: string): string => {
+  const { href } = new URL(baseUrl);
+  return href.endsWith('/') ? href : `${href}/`;
+};
+
+const checkApiInfo = (info: unknown): BoApiInfo => {
+  const { baseUrl, apiKey } = (info ?? {}) as Partial<BoApiInfo>;
+  if (
+    typeof baseUrl === 'string' &&
+    isAbsoluteUrl(baseUrl) &&
+    typeof apiKey === 'string' &&
+    apiKey
+  ) {
+    return { baseUrl, apiKey };
+  }
+  throw new BoError(
+    'INTERNAL',
+    'getApiInfo: the back office answered no usable baseUrl and apiKey',
+    {
+      reason: 'invalid-api-info',
+    },
+  );
+};
+
+const checkToken = (result: unknown): BoAccessToken => {
+  const { accessToken, expiresAt } = (result ?? {}) as Partial<BoAccessToken>;
+  if (typeof accessToken !== 'string' || !accessToken) {
+    throw new BoError('INTERNAL', 'getAccessToken: the back office answered no token', {
+      reason: 'invalid-token',
+    });
+  }
+  // An expiry that is not a number is unknown: the token is used, but not kept in cache.
+  return { accessToken, expiresAt: Number.isFinite(expiresAt) ? (expiresAt as number) : null };
+};
+
+/** Answers to `getApiInfo` meaning that no URL is a Vulog API one: every absolute URL is then a third-party API. */
+const NO_API_INFO: readonly string[] = ['FORBIDDEN', 'UNKNOWN_TYPE'];
 
 /**
  * Builds the `authFetch` of a client (see `BoClient.authFetch`).
@@ -25,15 +68,18 @@ const withTrailingSlash = (url: string): string => (url.endsWith('/') ? url : `$
  */
 export const createAuthFetch = (source: AuthSource): AuthFetch => {
   let apiInfo: Promise<BoApiInfo> | null = null;
-  let apiInfoForbidden = false;
+  let apiInfoRefused = false;
   let token: BoAccessToken | null = null;
   let tokenRequest: Promise<BoAccessToken> | null = null;
 
   const getApiInfo = (): Promise<BoApiInfo> => {
-    apiInfo ??= source.getApiInfo().catch((error: unknown) => {
-      apiInfo = null;
-      throw error;
-    });
+    apiInfo ??= source
+      .getApiInfo()
+      .then(checkApiInfo)
+      .catch((error: unknown) => {
+        apiInfo = null;
+        throw error;
+      });
     return apiInfo;
   };
 
@@ -47,6 +93,7 @@ export const createAuthFetch = (source: AuthSource): AuthFetch => {
     if (isFresh(token)) return Promise.resolve(token);
     tokenRequest ??= source
       .getAccessToken()
+      .then(checkToken)
       .then((result) => {
         // A token whose expiry is unknown is not kept: it is asked for again on the next call.
         token = result.expiresAt === null ? null : result;
@@ -58,43 +105,39 @@ export const createAuthFetch = (source: AuthSource): AuthFetch => {
     return tokenRequest;
   };
 
-  /** Tells where `input` goes: the Vulog API (resolved URL) or a third-party API. */
-  const resolve = async (input: string): Promise<{ url: string; apiKey: string | null }> => {
+  const resolve = async (input: string): Promise<Destination> => {
     if (!isAbsoluteUrl(input)) {
       const { baseUrl, apiKey } = await getApiInfo();
-      const base = withTrailingSlash(baseUrl);
+      const base = toBase(baseUrl);
       const url = new URL(base + input.replace(/^\/+/, '')).href;
       if (!url.startsWith(base)) {
         throw new TypeError(`authFetch: "${input}" resolves outside the Vulog API base URL`);
       }
-      return { url, apiKey };
+      return { url, vulogApiKey: apiKey };
     }
     const url = new URL(input).href;
-    let info: BoApiInfo | null = null;
-    if (!apiInfoForbidden) {
-      try {
-        info = await getApiInfo();
-      } catch (error) {
-        // Without the `apiInfo` permission, no URL is a Vulog API one: it is a third-party API.
-        if (!(error instanceof BoError && error.code === 'FORBIDDEN')) throw error;
-        apiInfoForbidden = true;
-      }
+    if (apiInfoRefused) return { url, vulogApiKey: null };
+    let info: BoApiInfo;
+    try {
+      info = await getApiInfo();
+    } catch (error) {
+      if (!(error instanceof BoError && NO_API_INFO.includes(error.code))) throw error;
+      apiInfoRefused = true;
+      return { url, vulogApiKey: null };
     }
-    if (info && url.startsWith(withTrailingSlash(info.baseUrl))) {
-      return { url, apiKey: info.apiKey };
-    }
-    return { url, apiKey: null };
+    return { url, vulogApiKey: url.startsWith(toBase(info.baseUrl)) ? info.apiKey : null };
   };
 
   return async (input, init) => {
-    const { url, apiKey } = await resolve(String(input));
-    const isVulogApi = apiKey !== null;
+    if (typeof input !== 'string' && !(input instanceof URL)) {
+      throw new TypeError('authFetch: input must be a string or a URL, not a Request');
+    }
+    const { url, vulogApiKey } = await resolve(String(input));
     const headers = new Headers(init?.headers);
-    if (isVulogApi) headers.set('X-API-Key', apiKey);
-
-    // As a Web Component, the back office service worker adds the token to Vulog API calls.
-    if (isVulogApi && source.mode === 'webcomponent') {
-      return fetch(url, { ...init, headers });
+    if (vulogApiKey !== null) {
+      headers.set('X-API-Key', vulogApiKey);
+      // As a Web Component, the back office service worker adds the token to Vulog API calls.
+      if (source.mode === 'webcomponent') return fetch(url, { ...init, headers });
     }
 
     const send = async (renew: boolean): Promise<Response> => {
@@ -104,6 +147,9 @@ export const createAuthFetch = (source: AuthSource): AuthFetch => {
       return fetch(url, { ...init, headers: signed });
     };
     const response = await send(false);
-    return response.status === 401 ? send(true) : response;
+    if (response.status !== 401) return response;
+    // The first answer is dropped: release its body before asking again with a new token.
+    await response.body?.cancel().catch(() => {});
+    return send(true);
   };
 };

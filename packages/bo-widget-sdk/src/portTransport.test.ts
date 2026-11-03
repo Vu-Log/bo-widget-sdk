@@ -99,18 +99,43 @@ describe('openPortTransport: handshake', () => {
     });
   });
 
-  it('keeps only the string permissions of welcome, frozen', async () => {
-    const { target } = fakeParent((port) => welcome(port, { grantedPermissions: ['notify', 42] }));
+  it('freezes the permissions of welcome', async () => {
+    const { target } = fakeParent((port) => welcome(port, { grantedPermissions: ['notify'] }));
     const transport = await open(options(target));
     expect(transport.grantedPermissions).toEqual(['notify']);
     expect(Object.isFrozen(transport.grantedPermissions)).toBe(true);
   });
 
-  it('reads a welcome without permissions nor version as none, protocol 2', async () => {
-    const { target } = fakeParent((port) => port.postMessage({ type: 'welcome' }));
-    const transport = await open(options(target));
-    expect(transport.grantedPermissions).toEqual([]);
-    expect(transport.protocolVersion).toBe(2);
+  it.each([
+    ['without protocolVersion', { type: 'welcome', grantedPermissions: [] }],
+    ['without grantedPermissions', { type: 'welcome', protocolVersion: 2 }],
+    [
+      'with a non-string permission',
+      { type: 'welcome', protocolVersion: 2, grantedPermissions: ['notify', 42] },
+    ],
+  ])('rejects a welcome %s as invalid-welcome', async (_label, message) => {
+    const { target } = fakeParent((port) => port.postMessage(message));
+    await expect(openPortTransport(options(target))).rejects.toMatchObject({
+      code: 'INTERNAL',
+      reason: 'invalid-welcome',
+    });
+  });
+
+  it('rejects with DISCONNECTED when the back office closes the port before welcome', async () => {
+    const { target } = fakeParent((port) => port.close());
+    await expect(
+      openPortTransport(options(target, { handshakeTimeout: 5_000 })),
+    ).rejects.toMatchObject({
+      code: 'DISCONNECTED',
+    });
+  });
+
+  it('ignores a handshake message other than welcome or error', async () => {
+    const { target } = fakeParent((port) => {
+      port.postMessage({ type: 'hola' });
+      welcome(port);
+    });
+    await expect(open(options(target))).resolves.toMatchObject({ mode: 'iframe' });
   });
 
   it('ignores other messages until welcome', async () => {
@@ -230,11 +255,77 @@ describe('openPortTransport: requests', () => {
     await expect(transport.getContext()).rejects.toMatchObject({ code: 'DISCONNECTED' });
   });
 
-  it('rejects with INTERNAL when the payload cannot be cloned', async () => {
+  it('rejects with INVALID_PAYLOAD when the payload cannot be cloned', async () => {
     const { target } = servingParent(() => undefined);
     const transport = await open(options(target));
     const payload = { path: 'x', fn: () => {} } as unknown as { path: string };
-    await expect(transport.navigate(payload)).rejects.toMatchObject({ code: 'INTERNAL' });
+    await expect(transport.navigate(payload)).rejects.toMatchObject({ code: 'INVALID_PAYLOAD' });
+  });
+
+  it('names the request in a failed answer without message', async () => {
+    const { target } = servingParent((request) => ({ id: request.id, ok: false, error: {} }));
+    await expect((await open(options(target))).getTheme()).rejects.toMatchObject({
+      code: 'INTERNAL',
+      message: 'getTheme: the back office failed',
+    });
+  });
+
+  it.each([
+    ['without ok', (id: string) => ({ id, result: 1 })],
+    ['ok: false without error', (id: string) => ({ id, ok: false })],
+  ])('rejects an answer %s as malformed-answer', async (_label, answer) => {
+    const { target } = servingParent((request) => answer(request.id));
+    await expect((await open(options(target))).getContext()).rejects.toMatchObject({
+      code: 'INTERNAL',
+      reason: 'malformed-answer',
+    });
+  });
+
+  it('rejects pending and later requests with DISCONNECTED when the back office closes the port', async () => {
+    const { target, getPort } = servingParent(() => undefined);
+    const transport = await open(options(target, { requestTimeout: 5_000 }));
+    const pending = transport.getSettings();
+    getPort()?.close();
+    await expect(pending).rejects.toMatchObject({
+      code: 'DISCONNECTED',
+      message: 'getSettings: the back office closed the connection',
+    });
+    await expect(transport.getContext()).rejects.toMatchObject({ code: 'DISCONNECTED' });
+  });
+
+  it('rejects the pending requests when an answer cannot be read', async () => {
+    const channels: MessageChannel[] = [];
+    const RealChannel = MessageChannel;
+    vi.stubGlobal(
+      'MessageChannel',
+      class extends RealChannel {
+        constructor() {
+          super();
+          channels.push(this);
+        }
+      },
+    );
+    try {
+      const { target } = servingParent(() => undefined);
+      const transport = await open(options(target, { requestTimeout: 5_000 }));
+      const pending = transport.getContext();
+      channels[0]?.port1.dispatchEvent(new MessageEvent('messageerror'));
+      await expect(pending).rejects.toMatchObject({ code: 'INTERNAL', reason: 'messageerror' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('ignores an answer that arrives after its timeout', async () => {
+    const held: { id: string }[] = [];
+    const { target, getPort } = servingParent((request) => {
+      held.push(request);
+      return undefined;
+    });
+    const transport = await open(options(target, { requestTimeout: 20 }));
+    await expect(transport.getContext()).rejects.toMatchObject({ code: 'TIMEOUT' });
+    getPort()?.postMessage({ id: held[0]?.id, ok: true, result: 'late' });
+    await new Promise((resolve) => setTimeout(resolve, 10));
   });
 });
 
@@ -285,11 +376,29 @@ describe('openPortTransport: events', () => {
     }
   });
 
-  it('adds no listener once closed', async () => {
-    const { target } = servingParent(() => undefined);
+  it('delivers no event once closed, even to a listener added after', async () => {
+    const { target, getPort } = servingParent(() => undefined);
     const transport = await open(options(target));
+    const before = vi.fn();
+    transport.on('localeChanged', before);
+    const boPort = getPort();
     transport.close();
     transport.close();
-    expect(() => transport.on('localeChanged', vi.fn())).not.toThrow();
+    const after = vi.fn();
+    transport.on('localeChanged', after);
+    boPort?.postMessage({ type: 'event', name: 'localeChanged', data: { locale: 'fr' } });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(before).not.toHaveBeenCalled();
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it('ignores an event whose name is not a string', async () => {
+    const { target, getPort } = servingParent(() => undefined);
+    const transport = await open(options(target));
+    const listener = vi.fn();
+    transport.on('localeChanged', listener);
+    getPort()?.postMessage({ type: 'event', name: 42, data: {} });
+    getPort()?.postMessage({ type: 'event', name: 'localeChanged', data: { locale: 'fr' } });
+    await vi.waitFor(() => expect(listener).toHaveBeenCalledTimes(1));
   });
 });
