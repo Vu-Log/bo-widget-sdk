@@ -116,7 +116,7 @@ afterEach(() => {
 /** Widget code, written once: it must behave the same in both modes. */
 const runWidget = async (bo: BoClient) => {
   const { fleetId } = await bo.getContext();
-  const response = await bo.authFetch(`fleets/${fleetId}/vehicles`);
+  const response = await bo.authFetch(`fleetmanager/public/fleets/${fleetId}/vehicles`);
   const locales: unknown[] = [];
   const stop = bo.on('localeChanged', ({ locale }) => locales.push(locale));
   const settingsError = await bo.getSettings().catch((error: unknown) => error);
@@ -159,8 +159,8 @@ describe('connect', () => {
     expect(inIframe.locales).toEqual(['fr']);
 
     const [webComponentCall, iframeCall] = fetchMock.mock.calls;
-    expect(webComponentCall?.[0]).toBe(`${BASE_URL}fleets/FLEET-1/vehicles`);
-    expect(iframeCall?.[0]).toBe(`${BASE_URL}fleets/FLEET-1/vehicles`);
+    expect(webComponentCall?.[0]).toBe(`${BASE_URL}fleetmanager/public/fleets/FLEET-1/vehicles`);
+    expect(iframeCall?.[0]).toBe(`${BASE_URL}fleetmanager/public/fleets/FLEET-1/vehicles`);
     expect(new Headers(webComponentCall?.[1]?.headers).get('Authorization')).toBeNull();
     expect(new Headers(iframeCall?.[1]?.headers).get('Authorization')).toBe('Bearer token');
 

@@ -105,7 +105,7 @@ const toClient = (transport: BoTransport): BoClient => {
  *   async connectedCallback() {
  *     this.bo = await connect(this);
  *     const { fleetId } = await this.bo.getContext();
- *     const response = await this.bo.authFetch(`fleets/${fleetId}/vehicles`);
+ *     const response = await this.bo.authFetch(`fleetmanager/public/fleets/${fleetId}/vehicles`);
  *     const root = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
  *     root.textContent = `${(await response.json()).length} vehicles`;
  *   }

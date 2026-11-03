@@ -16,7 +16,7 @@ You are writing or changing a **Vulog back office (BO) widget**: a page the BO s
 1. **Web Component: export the class, never call `customElements.define`**, and never register other custom elements globally. The BO registers the class under a tag it chooses. Do not assume the tag name: use `this`.
 2. Mount the UI in `connectedCallback`, clean up everything in `disconnectedCallback`: call `bo.disconnect()`, remove listeners and timers, unmount the framework root. `connectedCallback` can run again when the element is moved: reuse `this.shadowRoot`, and expect `disconnectedCallback` to run before `connect()` resolves.
 3. Keep styles in the Shadow DOM (`this.shadowRoot ?? this.attachShadow({ mode: 'open' })`). Never inject CSS into `document.head`.
-4. Call Vulog APIs with `bo.authFetch('fleets/...')`, a path relative to `baseUrl`, the BO admin API, which already ends with `/boapi/proxy/`: never prefix the path with `boapi/proxy/`. Example: ``bo.authFetch(`fleets/${fleetId}/vehicles?page=0`)`` (`GET /boapi/proxy/fleets/{fleetId}/vehicles`, paginated, at most 2000 vehicles per page). The BO service worker only adds the token under that prefix: other Vulog APIs (`/apiv5/`) are not covered. Do not build URLs from `getApiInfo()` by hand, do not add `Authorization` or `X-API-Key` yourself, and do not call `getAccessToken()` for Vulog APIs.
+4. Call Vulog APIs with `bo.authFetch('<service>/...')`, a path relative to `baseUrl`, the BO admin API, which already ends with `/boapi/proxy/`: never prefix the path with `boapi/proxy/`. In the Vulog API reference (swagger), a route may declare its own server, such as `https://java-{region}.vulog.com/boapi/proxy/fleetmanager/public` for `GET /fleets/{fleetId}/vehicles`: the path to pass is the part of that server after `/boapi/proxy/`, followed by the route, here ``bo.authFetch(`fleetmanager/public/fleets/${fleetId}/vehicles?page=0`)`` (paginated, at most 2000 vehicles per page). The BO service worker only adds the token under `/boapi/proxy/`: other Vulog APIs (`/apiv5/`) are not covered. Do not build URLs from `getApiInfo()` by hand, do not add `Authorization` or `X-API-Key` yourself, and do not call `getAccessToken()` for Vulog APIs.
 5. Use `getAccessToken()` or `authFetch(absoluteUrl)` only for a third-party backend that expects the Vulog token. The widget needs the `accessToken` permission.
 6. Navigate with `bo.navigate({ path })`, never with `window.location` or `history`: `'/app/...'` is a BO route under the current fleet, `'details/1'` is relative to the widget's view.
 7. Show feedback with `bo.notify({ message, severity })` (`success`, `info`, `warning`, `error`).
@@ -79,7 +79,9 @@ import { connect } from '@vulog/bo-widget-sdk';
 
 const bo = await connect(null, { widgetId: 'fleet-report' });
 const { fleetId } = await bo.getContext();
-const vehicles = await (await bo.authFetch(`fleets/${fleetId}/vehicles?page=0`)).json();
+const vehicles = await (
+  await bo.authFetch(`fleetmanager/public/fleets/${fleetId}/vehicles?page=0`)
+).json();
 await bo.resize({ height: document.body.scrollHeight });
 ```
 
