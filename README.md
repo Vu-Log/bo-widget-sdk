@@ -62,14 +62,16 @@ The CI (`.github/workflows/ci.yml`) runs on every pull request and push to `main
 
 Releases are automated by [changesets](https://changesets.dev) in `.github/workflows/release.yml`, on every push to `main`:
 
-1. While changesets are pending, after format check, lint, typecheck, tests with coverage and the npm credentials check pass, the workflow opens or updates a **Version Packages** pull request (version bumps and changelogs).
-2. Merging that pull request builds and checks the packages (`check:package`), then publishes the new versions to npm under the `latest` tag, with provenance, and creates the GitHub releases.
+1. While changesets are pending, after format check, lint, typecheck and tests with coverage pass, the workflow opens or updates a **Version Packages** pull request (version bumps and changelogs).
+2. Merging that pull request builds and checks the packages (`check:package`), then publishes the new versions to npm under the `latest` tag (or `next`, see below), with provenance, and creates the GitHub releases.
 
 The workflow is skipped while the repository is private.
 
-### Before the first release
+Publication uses [npm trusted publishing](https://docs.npmjs.com/trusted-publishers): npm authenticates the workflow through OpenID Connect, so no npm token is stored in the repository.
 
-- `NPM_TOKEN` secret: an npm token allowed to publish to the `@vulog` scope. The workflow stops on `npm whoami` without it.
+### Repository setup
+
+- On npmjs, for every published package: Settings > Trusted Publisher > GitHub Actions, with `Vu-Log` / `bo-widget-sdk`, the `release.yml` workflow and `npm publish` allowed.
 - `RELEASE_GITHUB_TOKEN` secret: a fine-grained personal access token (contents and pull requests: write). Pull requests opened with the default token do not trigger CI, so without it the Version Packages pull request is not checked (the workflow then logs a warning).
 - Settings > Actions > General: allow GitHub Actions to create and approve pull requests (needed when `RELEASE_GITHUB_TOKEN` is not set).
 - Protect `main`: pull request required, with the `Lint, test and build` and `Publish dry-run (next)` checks.

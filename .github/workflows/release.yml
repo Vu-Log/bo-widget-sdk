@@ -34,12 +34,6 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:coverage
-      # Token-based publication: drop this step together with NPM_TOKEN if moving to npm trusted
-      # publishing.
-      - name: Check npm credentials
-        run: npm whoami
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Check the release GitHub token
         run: |
           if [ -z "$RELEASE_GITHUB_TOKEN" ]; then
@@ -54,6 +48,7 @@ jobs:
           github-token: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
           publish-script: npm run release
           create-github-releases: true
+        # npm trusted publishing: npm authenticates this workflow through OIDC (`id-token: write`),
+        # no npm token is involved.
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
