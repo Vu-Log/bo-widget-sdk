@@ -367,3 +367,16 @@ describe('authFetch: answers of the back office', () => {
     expect(lastCall()).toMatchObject({ apiKey: null, authorization: 'Bearer t1' });
   });
 });
+
+describe('authFetch: stream body', () => {
+  it('returns the 401 instead of retrying a stream body, which cannot be sent twice', async () => {
+    fetchMock.mockResolvedValue(new Response('', { status: 401 }));
+    const body = new ReadableStream();
+    const response = await createAuthFetch(source('iframe', [token('a'), token('b')]))('x', {
+      method: 'POST',
+      body,
+    });
+    expect(response.status).toBe(401);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});

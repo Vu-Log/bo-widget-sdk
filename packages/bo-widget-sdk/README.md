@@ -93,7 +93,7 @@ const response = await bo.authFetch(`api/v1/fleets/${fleetId}/vehicles`, { metho
 | Path relative to the Vulog API (`api/v1/...`), or URL under `baseUrl` | `X-API-Key`, plus `Authorization: Bearer` in an iframe (as a Web Component, the BO service worker adds it) | `apiInfo`, plus `accessToken` in an iframe |
 | Any other absolute URL (your own backend)                             | `Authorization: Bearer` only, never the API key                                                            | `accessToken`                              |
 
-When the SDK adds the token, it keeps it in cache while its expiry is known, renews it on the next call once it expires within a minute, shares one request between concurrent calls, and retries a `401` once with a new token. A `ReadableStream` body cannot be sent twice: use a string, `Blob` or `FormData` body when a retry may happen. A Vulog API call as a Web Component is not retried: the BO service worker owns its token.
+When the SDK adds the token, it keeps it in cache while its expiry is known, renews it on the next call once it expires within a minute, shares one request between concurrent calls, and retries a `401` once with a new token. A `ReadableStream` body cannot be sent twice: its `401` is returned without retry, so prefer a string, `Blob` or `FormData` body. A Vulog API call as a Web Component is not retried: the BO service worker owns its token.
 
 To tell a Vulog URL from a third-party one, the SDK asks for the API info once; without the `apiInfo` permission, every absolute URL is a third-party API.
 

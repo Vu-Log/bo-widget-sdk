@@ -37,6 +37,8 @@ const readTimeout = (name: string, value: number | undefined, fallback: number):
 };
 
 const toClient = (transport: BoTransport): BoClient => {
+  const authFetch = createAuthFetch(transport);
+  let disconnected = false;
   const client: BoClient = {
     mode: transport.mode,
     protocolVersion: transport.protocolVersion,
@@ -55,8 +57,17 @@ const toClient = (transport: BoTransport): BoClient => {
       return () => transport.off(name, listener);
     },
     off: (name, listener) => transport.off(name, listener),
-    authFetch: createAuthFetch(transport),
-    disconnect: () => transport.close(),
+    // Its cache would otherwise keep sending authenticated calls after `disconnect`.
+    authFetch: (input, init) =>
+      disconnected
+        ? Promise.reject(
+            new BoError('DISCONNECTED', 'authFetch: the connection to the back office is closed'),
+          )
+        : authFetch(input, init),
+    disconnect: () => {
+      disconnected = true;
+      transport.close();
+    },
   };
   return Object.freeze(client);
 };
@@ -71,11 +82,10 @@ const toClient = (transport: BoTransport): BoClient => {
  *
  * Either way, the returned client has the same API, so the widget's code is the same.
  *
- * @param element - The widget's custom element, or nothing in an iframe.
  * An element without `vulogBo` inside an iframe falls back to the iframe channel.
  *
  * @param element - The widget's custom element, or nothing in an iframe.
- * @param options - Options of the iframe channel; ignored for a Web Component.
+ * @param options - Options of the iframe channel; ignored for a Web Component, but validated.
  * @returns The connected client.
  * @throws {TypeError} When a timeout option is not a positive number.
  * @throws {BoError} `DISCONNECTED` when the widget is neither given the injected API nor in an
@@ -110,6 +120,17 @@ export const connect = async (
   element?: object | null,
   options: ConnectOptions = {},
 ): Promise<BoClient> => {
+  // Validated in both modes, so that a wrong option fails the same way wherever the widget runs.
+  const handshakeTimeout = readTimeout(
+    'handshakeTimeout',
+    options.handshakeTimeout,
+    DEFAULT_HANDSHAKE_TIMEOUT,
+  );
+  const requestTimeout = readTimeout(
+    'requestTimeout',
+    options.requestTimeout,
+    DEFAULT_REQUEST_TIMEOUT,
+  );
   const injected = (element as { vulogBo?: unknown } | null | undefined)?.vulogBo;
   if (isInjectedHostApi(injected)) return toClient(createInjectedTransport(injected));
   if (injected !== undefined && injected !== null) {
@@ -134,12 +155,8 @@ export const connect = async (
     targetOrigin: options.targetOrigin ?? '*',
     widgetId: options.widgetId ?? null,
     widgetVersion: options.widgetVersion ?? null,
-    handshakeTimeout: readTimeout(
-      'handshakeTimeout',
-      options.handshakeTimeout,
-      DEFAULT_HANDSHAKE_TIMEOUT,
-    ),
-    requestTimeout: readTimeout('requestTimeout', options.requestTimeout, DEFAULT_REQUEST_TIMEOUT),
+    handshakeTimeout,
+    requestTimeout,
   });
   return toClient(transport);
 };

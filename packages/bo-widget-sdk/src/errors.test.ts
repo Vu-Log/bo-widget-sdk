@@ -124,3 +124,18 @@ describe('fromHostError', () => {
     },
   );
 });
+
+describe('fromHostError and fromWireError: edge cases', () => {
+  it('keeps a code of the envelope thrown by the host, as on the port', () => {
+    const hostError = Object.assign(new Error('no'), { code: 'FORBIDDEN', status: 403 });
+    expect(fromHostError(hostError, 'getApiInfo')).toMatchObject({
+      code: 'FORBIDDEN',
+      reason: null,
+      status: 403,
+    });
+  });
+
+  it('falls back to the unknown code when the reason is empty', () => {
+    expect(fromWireError({ code: 'NEW', reason: '' }, 'getContext').reason).toBe('NEW');
+  });
+});

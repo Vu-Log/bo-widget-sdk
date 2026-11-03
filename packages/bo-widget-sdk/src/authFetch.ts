@@ -1,4 +1,4 @@
-import { BoError } from './errors.js';
+import { BoError, type BoErrorCode } from './errors.js';
 import type { AuthFetch, BoAccessToken, BoApiInfo, BoMode, BoRequests } from './types.js';
 
 /** A token is renewed when it expires within this delay, so that a request does not leave with a token about to expire. */
@@ -58,7 +58,7 @@ const checkToken = (result: unknown): BoAccessToken => {
 };
 
 /** Answers to `getApiInfo` meaning that no URL is a Vulog API one: every absolute URL is then a third-party API. */
-const NO_API_INFO: readonly string[] = ['FORBIDDEN', 'UNKNOWN_TYPE'];
+const NO_API_INFO: readonly BoErrorCode[] = ['FORBIDDEN', 'UNKNOWN_TYPE'];
 
 /**
  * Builds the `authFetch` of a client (see `BoClient.authFetch`).
@@ -147,7 +147,8 @@ export const createAuthFetch = (source: AuthSource): AuthFetch => {
       return fetch(url, { ...init, headers: signed });
     };
     const response = await send(false);
-    if (response.status !== 401) return response;
+    // A stream body is consumed by the first call: it cannot be sent again.
+    if (response.status !== 401 || init?.body instanceof ReadableStream) return response;
     // The first answer is dropped: release its body before asking again with a new token.
     await response.body?.cancel().catch(() => {});
     return send(true);

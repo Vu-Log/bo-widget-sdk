@@ -53,8 +53,8 @@ const disconnected = (request: string): BoError =>
 export const createInjectedTransport = (hostApi: InjectedHostApi): BoTransport => {
   // Listeners added through this transport, so that `close` removes them from the host API.
   const listeners = new Map<string, Set<Listener>>();
-  // Rejects of the requests in flight, called by `close`.
-  const pending = new Set<(error: BoError) => void>();
+  // Rejects of the requests in flight, with their name, called by `close`.
+  const pending = new Map<(error: BoError) => void, HostRequest>();
   let closed = false;
 
   const call =
@@ -70,7 +70,7 @@ export const createInjectedTransport = (hostApi: InjectedHostApi): BoTransport =
           reject(new BoError('UNKNOWN_TYPE', `${request}: not served by this back office`));
           return;
         }
-        pending.add(reject);
+        pending.set(reject, request);
         Promise.resolve()
           .then(() => method.call(hostApi, payload))
           .then(resolve, (error: unknown) => reject(fromHostError(error, request)))
@@ -107,10 +107,21 @@ export const createInjectedTransport = (hostApi: InjectedHostApi): BoTransport =
     close() {
       if (closed) return;
       closed = true;
-      for (const [name, set] of listeners) for (const listener of set) hostApi.off(name, listener);
-      listeners.clear();
-      for (const reject of pending) reject(disconnected('Request'));
+      for (const [reject, request] of pending) reject(disconnected(request));
       pending.clear();
+      // A failing `off` (back office bug) must not keep the other listeners attached.
+      for (const [name, set] of listeners) {
+        for (const listener of set) {
+          try {
+            hostApi.off(name, listener);
+          } catch (error) {
+            queueMicrotask(() => {
+              throw error;
+            });
+          }
+        }
+      }
+      listeners.clear();
     },
   };
 };

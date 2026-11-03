@@ -159,7 +159,8 @@ export interface BoClient extends BoRequests {
    */
   readonly grantedPermissions: readonly string[] | null;
   /**
-   * Calls `listener` on each `name` event the back office pushes.
+   * Calls `listener` on each `name` event the back office pushes. A listener added twice is called
+   * once; after `disconnect`, nothing is added.
    *
    * @returns A function that removes the listener.
    */
@@ -180,8 +181,8 @@ export interface BoClient extends BoRequests {
    * A relative path is resolved under `baseUrl`, leading `/` ignored; one that resolves outside it
    * is refused. Whenever the SDK adds the `Bearer` header, the token is cached while its expiry is
    * known, renewed on the next call once it expires within a minute, shared by concurrent calls,
-   * and a `401` is retried once with a new token (the body of the request must be sendable twice:
-   * not a `ReadableStream`). A Vulog API call as a Web Component is not retried: the back office
+   * and a `401` is retried once with a new token (a `ReadableStream` body cannot be sent twice:
+   * its `401` is returned without retry). A Vulog API call as a Web Component is not retried: the back office
    * service worker owns its token.
    *
    * @throws {BoError} From `getApiInfo` or `getAccessToken` (`FORBIDDEN`, `INTERNAL` with reason

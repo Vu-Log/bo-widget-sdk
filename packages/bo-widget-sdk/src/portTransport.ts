@@ -68,6 +68,8 @@ export const openPortTransport = (options: PortTransportOptions): Promise<BoTran
   let handshakeDone = false;
   // Set while the handshake is pending, so that `close` can reject it.
   let rejectHandshake: ((error: BoError) => void) | null = null;
+  // Set while the handshake is pending: rejects it and closes the port.
+  let failHandshake: ((error: BoError) => void) | null = null;
 
   const rejectPending = (error: (type: string) => BoError): void => {
     for (const { type, reject, timer } of pending.values()) {
@@ -94,8 +96,17 @@ export const openPortTransport = (options: PortTransportOptions): Promise<BoTran
     close('the back office closed the connection');
   }
 
-  // An answer that cannot be deserialized has no readable id: every pending request may be it.
+  // A message that cannot be deserialized has no readable id or type: it may be the welcome, any
+  // pending answer, or an event, so the handshake or every pending request is rejected.
   function onMessageError(): void {
+    if (!handshakeDone) {
+      failHandshake?.(
+        new BoError('INTERNAL', 'hello: unreadable answer from the back office', {
+          reason: 'messageerror',
+        }),
+      );
+      return;
+    }
     rejectPending(
       (type) =>
         new BoError('INTERNAL', `${type}: unreadable answer from the back office`, {
@@ -107,6 +118,8 @@ export const openPortTransport = (options: PortTransportOptions): Promise<BoTran
   const dispatchEvent = (name: unknown, data: unknown): void => {
     if (typeof name !== 'string') return;
     for (const listener of [...(listeners.get(name) ?? [])]) {
+      // A listener may disconnect the widget: the next ones must not run.
+      if (closed) return;
       try {
         listener(data);
       } catch (error) {
@@ -198,10 +211,13 @@ export const openPortTransport = (options: PortTransportOptions): Promise<BoTran
 
     const fail = (error: BoError): void => {
       rejectHandshake = null;
+      failHandshake = null;
       clearTimeout(timer);
       close();
       reject(error);
     };
+
+    failHandshake = fail;
 
     onHandshake = (message) => {
       if (message.type === 'error') {
@@ -223,6 +239,7 @@ export const openPortTransport = (options: PortTransportOptions): Promise<BoTran
         return;
       }
       rejectHandshake = null;
+      failHandshake = null;
       clearTimeout(timer);
       handshakeDone = true;
       resolve({

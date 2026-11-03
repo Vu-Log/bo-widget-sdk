@@ -88,7 +88,7 @@ export const fromWireError = (error: WireError | undefined, request: string): Bo
   // A code from a newer back office is kept as the reason, so that it is not lost.
   const fallbackReason = !known && typeof error?.code === 'string' ? error.code : null;
   return new BoError(code, message, {
-    reason: typeof error?.reason === 'string' ? error.reason : fallbackReason,
+    reason: typeof error?.reason === 'string' && error.reason ? error.reason : fallbackReason,
     status: typeof error?.status === 'number' ? error.status : null,
   });
 };
@@ -96,7 +96,8 @@ export const fromWireError = (error: WireError | undefined, request: string): Bo
 /**
  * Builds the {@link BoError} of an error thrown by the API the back office injects into a Web
  * Component: its `code` becomes `reason`, except `invalid-payload`, which becomes the
- * `INVALID_PAYLOAD` code, as on the port. Any other error becomes `INTERNAL`.
+ * `INVALID_PAYLOAD` code, and a code of the envelope (`FORBIDDEN`…), which is kept, as on the
+ * port. Any other error becomes `INTERNAL`.
  */
 export const fromHostError = (error: unknown, request: string): BoError => {
   if (error instanceof BoError) return error;
@@ -112,6 +113,13 @@ export const fromHostError = (error: unknown, request: string): BoError => {
         ? error
         : `${request}: the back office failed`;
   if (code === 'invalid-payload') return new BoError('INVALID_PAYLOAD', text, { cause: error });
+  // A code of the envelope (a host that already speaks it) keeps its meaning, as on the port.
+  if (isErrorCode(code)) {
+    return new BoError(code, text, {
+      status: typeof status === 'number' ? status : null,
+      cause: error,
+    });
+  }
   return new BoError('INTERNAL', text, {
     reason: typeof code === 'string' ? code : null,
     status: typeof status === 'number' ? status : null,

@@ -402,3 +402,41 @@ describe('openPortTransport: events', () => {
     await vi.waitFor(() => expect(listener).toHaveBeenCalledTimes(1));
   });
 });
+
+describe('openPortTransport: edge cases', () => {
+  it('rejects the handshake at once when the welcome cannot be read', async () => {
+    const channels: MessageChannel[] = [];
+    const RealChannel = MessageChannel;
+    vi.stubGlobal(
+      'MessageChannel',
+      class extends RealChannel {
+        constructor() {
+          super();
+          channels.push(this);
+        }
+      },
+    );
+    try {
+      const { target } = fakeParent(() => {
+        channels[0]?.port1.dispatchEvent(new MessageEvent('messageerror'));
+      });
+      await expect(
+        openPortTransport(options(target, { handshakeTimeout: 5_000 })),
+      ).rejects.toMatchObject({ code: 'INTERNAL', reason: 'messageerror' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('stops dispatching an event once a listener disconnects', async () => {
+    const { target, getPort } = servingParent(() => undefined);
+    const transport = await open(options(target));
+    const next = vi.fn();
+    const first = vi.fn(() => transport.close());
+    transport.on('fleetChanged', first);
+    transport.on('fleetChanged', next);
+    getPort()?.postMessage({ type: 'event', name: 'fleetChanged', data: {} });
+    await vi.waitFor(() => expect(first).toHaveBeenCalled());
+    expect(next).not.toHaveBeenCalled();
+  });
+});

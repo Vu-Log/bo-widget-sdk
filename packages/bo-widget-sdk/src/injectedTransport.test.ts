@@ -228,4 +228,42 @@ describe('createInjectedTransport', () => {
     transport.on('localeChanged', vi.fn());
     expect(api.on).not.toHaveBeenCalled();
   });
+  it('names the request it rejects on close', async () => {
+    const { api } = fakeHostApi({
+      getSettings: vi.fn(() => new Promise(() => {})) as NonNullable<
+        InjectedHostApi['getSettings']
+      >,
+    });
+    const transport = createInjectedTransport(api);
+    const pending = transport.getSettings();
+    await Promise.resolve();
+    transport.close();
+    await expect(pending).rejects.toThrow(/^getSettings: /);
+  });
+
+  it('keeps closing when the host off throws, and rethrows its error', async () => {
+    const thrown: unknown[] = [];
+    const onError = (error: unknown) => thrown.push(error);
+    process.on('uncaughtException', onError);
+    try {
+      const failure = new Error('off failed');
+      const { api, listeners } = fakeHostApi();
+      const realOff = api.off;
+      let calls = 0;
+      api.off = vi.fn((name, listener) => {
+        calls += 1;
+        if (calls === 1) throw failure;
+        realOff(name, listener);
+      });
+      const transport = createInjectedTransport(api);
+      transport.on('localeChanged', vi.fn());
+      transport.on('fleetChanged', vi.fn());
+      transport.close();
+      expect(api.off).toHaveBeenCalledTimes(2);
+      expect(listeners.get('fleetChanged')?.size).toBe(0);
+      await vi.waitFor(() => expect(thrown).toEqual([failure]));
+    } finally {
+      process.off('uncaughtException', onError);
+    }
+  });
 });

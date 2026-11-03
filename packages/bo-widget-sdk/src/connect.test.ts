@@ -353,3 +353,21 @@ describe('connect', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 });
+
+describe('connect: same contract in both modes', () => {
+  it('rejects authFetch with DISCONNECTED after disconnect, even with a warm cache', async () => {
+    const backOffice = fakeBackOffice();
+    vi.stubGlobal('window', { parent: backOffice.parentWindow(['apiInfo', 'accessToken']) });
+    for (const bo of [await connect({ vulogBo: backOffice.hostApi }), await connect()]) {
+      await bo.authFetch('api/v1/me');
+      bo.disconnect();
+      await expect(bo.authFetch('api/v1/me')).rejects.toMatchObject({ code: 'DISCONNECTED' });
+    }
+  });
+
+  it('validates the timeout options as a Web Component too', async () => {
+    await expect(
+      connect({ vulogBo: fakeBackOffice().hostApi }, { requestTimeout: -1 }),
+    ).rejects.toThrow(TypeError);
+  });
+});
