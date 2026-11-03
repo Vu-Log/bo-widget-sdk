@@ -14,7 +14,7 @@ This SDK is maintained by Vulog. Pull requests from forks are welcome but review
 
 A pull request is merged only when:
 
-- a maintainer (see [`.github/CODEOWNERS`](.github/CODEOWNERS)) approved it;
+- a maintainer (see [`.github/CODEOWNERS`](.github/CODEOWNERS)) reviewed and merged it: only maintainers can merge;
 - the CI is green: format, lint, typecheck, tests with coverage, build and package checks. Maintainers approve the CI run of a first-time contributor before it starts;
 - it contains a changeset when it changes a published package (`npm run changeset`);
 - new or changed code is covered by tests, colocated with the code (`feature.ts` → `feature.test.ts`).
