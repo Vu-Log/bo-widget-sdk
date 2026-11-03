@@ -6,10 +6,10 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=22.12"
+    "node": "^22.13 || ^24 || >=26"
   },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspaces",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -20,9 +20,11 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "npm run build && changeset publish",
-    "release:next:dry": "changeset version --snapshot next && npm run build && npm publish --workspaces --tag next --dry-run"
+    "release:next:dry": "changeset version --snapshot next && npm run build && npm publish --workspaces --tag next --dry-run",
+    "check:package": "npm run check:package --workspaces"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@changesets/cli": "^3.0.3",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.19.2",
@@ -31,6 +33,7 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.14.0",
     "prettier": "^3.9.10",
+    "publint": "^0.3.25",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",
     "vitest": "^5.1.0"

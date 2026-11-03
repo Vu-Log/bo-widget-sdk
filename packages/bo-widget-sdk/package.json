@@ -36,6 +36,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check:package": "publint --strict && attw --pack . --profile esm-only && node --input-type=module -e \"const m = await import('@vulog/bo-widget-sdk'); if (Object.keys(m).length === 0) throw new Error('@vulog/bo-widget-sdk: no export resolved from dist');\""
   }
 }

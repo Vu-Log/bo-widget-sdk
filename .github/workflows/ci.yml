@@ -28,6 +28,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run build
+      - run: npm run check:package
 
   publish-dry-run:
     name: Publish dry-run (next)
@@ -40,6 +41,16 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # Versions the packages as `x.y.z-next-<timestamp>` in this throwaway checkout, then packs them
-      # without uploading anything to npm.
-      - run: npm run release:next:dry
+      # `changeset version --snapshot` exits with an error when no changeset is pending and in
+      # pre-release mode: only pack the current versions in those cases.
+      - name: Publish dry-run
+        run: |
+          if [ -f .changeset/pre.json ]; then
+            echo "::notice::Pre-release mode: snapshot skipped, packing the current versions"
+            npm run build && npm pack --workspaces --dry-run
+          elif ! find .changeset -maxdepth 1 -name '*.md' ! -name README.md | grep -q .; then
+            echo "::notice::No pending changeset: snapshot skipped, packing the current versions"
+            npm run build && npm pack --workspaces --dry-run
+          else
+            npm run release:next:dry
+          fi
