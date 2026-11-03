@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: Lint, test and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+      - run: npm run check:package
+
+  publish-dry-run:
+    name: Publish dry-run (next)
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # `changeset version --snapshot` exits with an error when no changeset is pending, or in
+      # pre-release mode: only pack the current versions in those cases.
+      - name: Publish dry-run
+        run: |
+          if [ -f .changeset/pre.json ]; then
+            echo "::notice::Pre-release mode: snapshot skipped, packing the current versions"
+            npm run build && npm pack --workspaces --dry-run
+          elif ! find .changeset -maxdepth 1 -name '*.md' ! -name README.md | grep -q .; then
+            echo "::notice::No pending changeset: snapshot skipped, packing the current versions"
+            npm run build && npm pack --workspaces --dry-run
+          else
+            npm run release:next:dry
+          fi
