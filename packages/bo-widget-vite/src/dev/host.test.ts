@@ -108,6 +108,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe('startFakeBo as a Web Component', () => {
@@ -352,6 +353,49 @@ describe('startFakeBo as an iframe', () => {
       error: { code: 'INTERNAL', reason: 'unsupported-version' },
     });
     expect(document.querySelector('.bo-log .error')?.textContent).toMatch(/hello for protocol 3/);
+  });
+
+  it('logs once each kind of message from the widget page that is not a hello', async () => {
+    await startFakeBo(iframeConfig());
+
+    hello({ protocol: 'other' });
+    hello({ protocol: 'other' });
+    hello({ type: 'getContext' });
+
+    const warnings = [...document.querySelectorAll('.bo-log .warning')].map(
+      (line) => line.textContent,
+    );
+    expect(warnings).toEqual([
+      'ignored a message from the widget page: no protocol "vulog-bo"',
+      'ignored a message from the widget page: type getContext on the window: requests go on the MessagePort of the hello',
+    ]);
+  });
+
+  it('says when the loaded widget page sends no hello', async () => {
+    vi.useFakeTimers();
+    await startFakeBo(iframeConfig());
+    const frame = document.querySelector('iframe') as HTMLIFrameElement;
+
+    frame.dispatchEvent(new Event('load'));
+    vi.advanceTimersByTime(5000);
+
+    expect(document.querySelector('.bo-log .warning')?.textContent).toMatch(
+      /no hello from the widget page 5 s after it loaded: does it call connect\(\) of the SDK\?/,
+    );
+  });
+
+  it('does not complain once the hello arrived', async () => {
+    vi.useFakeTimers();
+    await startFakeBo(iframeConfig());
+    const frame = document.querySelector('iframe') as HTMLIFrameElement;
+    const { port1, port2 } = new MessageChannel();
+
+    frame.dispatchEvent(new Event('load'));
+    hello({}, [port2]);
+    vi.advanceTimersByTime(5000);
+
+    expect(document.querySelector('.bo-log .warning')).toBeNull();
+    port1.close();
   });
 
   it('logs a hello without MessagePort', async () => {

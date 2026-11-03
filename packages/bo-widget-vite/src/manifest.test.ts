@@ -190,6 +190,27 @@ describe('buildManifest', () => {
     ]);
   });
 
+  it('refuses dev.context fields of the wrong type', () => {
+    expect(
+      issuesOf({
+        name: 'Report',
+        dev: { context: { basename: 42, locale: null, fleetId: 7, currency: 'EUR' } as never },
+      }),
+    ).toEqual([
+      'dev.context.basename: must be a string',
+      'dev.context.fleetId: must be a string or null',
+    ]);
+  });
+
+  it('accepts a mock key whose path has spaces', () => {
+    expect(() =>
+      buildManifest({ name: 'Report', dev: { responses: { 'GET files/my report.pdf': {} } } }, pkg),
+    ).not.toThrow();
+    expect(issuesOf({ name: 'Report', dev: { responses: { 'GET  leading': {} } } })).toEqual([
+      expect.stringMatching(/^dev\.responses\.GET {2}leading: /),
+    ]);
+  });
+
   it('refuses dev options that are not an object', () => {
     expect(issuesOf({ name: 'Report', dev: [] as never })).toEqual(['dev: must be an object']);
   });
@@ -241,9 +262,11 @@ describe('buildManifest', () => {
     ]);
   });
 
-  it('refuses a missing id', () => {
+  it('refuses a missing id, saying where to set it', () => {
     expect(issuesOf({ name: 'Report' }, { version: '1.0.0' })).toEqual([
-      expect.stringMatching(/^id: /),
+      expect.stringMatching(
+        /^id \(from the package\.json name, or set id in widget\.config\.ts\): /,
+      ),
     ]);
   });
 

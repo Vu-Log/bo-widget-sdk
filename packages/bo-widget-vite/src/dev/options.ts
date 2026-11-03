@@ -44,7 +44,12 @@ const DEV_KEYS: readonly string[] = [
   'responses',
 ] satisfies (keyof WidgetDevOptions)[];
 
-const MOCK_KEY_PATTERN = /^(?:GET|HEAD|POST|PUT|PATCH|DELETE) [^/?\s][^?\s]*$/;
+// The path is URL-decoded before lookup: it may contain spaces, but not start with one.
+const MOCK_KEY_PATTERN = /^(?:GET|HEAD|POST|PUT|PATCH|DELETE) [^/?\s][^?]*$/;
+
+/** Fields of `dev.context` the fake back office reads as strings. */
+const CONTEXT_STRING_KEYS = ['basename', 'boVersion'];
+const CONTEXT_NULLABLE_STRING_KEYS = ['fleetId', 'host', 'locale', 'timezone', 'currency'];
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -66,6 +71,20 @@ export const devOptionsIssues = (dev: unknown): string[] => {
   for (const key of ['context', 'user', 'settings', 'responses']) {
     if (dev[key] !== undefined && !isPlainObject(dev[key]))
       issues.push(`dev.${key}: must be an object`);
+  }
+  if (isPlainObject(dev.context)) {
+    const { context } = dev;
+    for (const key of CONTEXT_STRING_KEYS) {
+      if (context[key] !== undefined && typeof context[key] !== 'string') {
+        issues.push(`dev.context.${key}: must be a string`);
+      }
+    }
+    for (const key of CONTEXT_NULLABLE_STRING_KEYS) {
+      const value = context[key];
+      if (value !== undefined && value !== null && typeof value !== 'string') {
+        issues.push(`dev.context.${key}: must be a string or null`);
+      }
+    }
   }
   if (isPlainObject(dev.responses)) {
     for (const key of Object.keys(dev.responses)) {

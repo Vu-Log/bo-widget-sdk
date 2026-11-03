@@ -128,10 +128,18 @@ const resolveRoute = (basename: string, path: string): string =>
   path.startsWith('/') ? path : `${basename.replace(/\/+$/, '')}/${path}`;
 
 /** JSON of a result for the log, with the access token masked: the log is on screen. */
-const forLog = (value: unknown): string =>
-  JSON.stringify(value, (key, item: unknown) =>
-    key === 'accessToken' && typeof item === 'string' ? `${item.slice(0, 6)}…` : item,
-  );
+const forLog = (value: unknown): string => {
+  try {
+    return (
+      JSON.stringify(value, (key, item: unknown) =>
+        key === 'accessToken' && typeof item === 'string' ? `${item.slice(0, 6)}…` : item,
+      ) ?? String(value)
+    );
+  } catch {
+    // Circular, or a BigInt: both can be posted on a port.
+    return String(value);
+  }
+};
 
 /**
  * The state and the requests of the fake back office, without the page around it.
@@ -314,7 +322,7 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
     port.onmessage = async (event: MessageEvent) => {
       const message: unknown = event.data;
       if (!isRecord(message) || !('id' in message)) {
-        ui.log(`ignored a message without id: ${JSON.stringify(message)}`, 'warning');
+        ui.log(`ignored a message without id: ${forLog(message)}`, 'warning');
         return;
       }
       const response = await answer(message.type, message.payload);
@@ -434,6 +442,9 @@ const isElementClass = (value: unknown): value is CustomElementConstructor =>
 /** Loads the widget entry module (`import()` of the entry, from the dev server). */
 export type WidgetLoader = () => Promise<{ default?: unknown }>;
 
+/** Time to wait for the `hello` of a loaded widget page before saying it is missing. */
+const HELLO_WAIT_MS = 5000;
+
 /** Displays an iframe widget and serves the port of each `hello` its page posts. */
 const startIframe = (
   config: FakeBoConfig,
@@ -443,14 +454,46 @@ const startIframe = (
   const { ui, content } = page;
   const frame = element('iframe', { src: config.widgetUrl, title: config.widget.name });
   let closePort: (() => void) | null = null;
+  let helloTimer: ReturnType<typeof setTimeout> | undefined;
+  const ignored = new Set<string>();
+  /** Logs once each kind of message from the widget page that is not a hello. */
+  const ignore = (kind: string): void => {
+    if (ignored.has(kind)) return;
+    ignored.add(kind);
+    ui.log(`ignored a message from the widget page: ${kind}`, 'warning');
+  };
+  frame.addEventListener('load', () => {
+    clearTimeout(helloTimer);
+    helloTimer = setTimeout(() => {
+      ui.log(
+        `no hello from the widget page ${HELLO_WAIT_MS / 1000} s after it loaded: does it call connect() of the SDK?`,
+        'warning',
+      );
+    }, HELLO_WAIT_MS);
+    // Same origin: the widget's own errors are shown in the log too.
+    const view = frame.contentWindow;
+    view?.addEventListener('error', (event: ErrorEvent) =>
+      ui.log(`widget error: ${String(event.error ?? event.message)}`, 'error'),
+    );
+    view?.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) =>
+      ui.log(`widget unhandled rejection: ${String(event.reason)}`, 'error'),
+    );
+  });
   globalThis.addEventListener('message', (event: MessageEvent) => {
     const data: unknown = event.data;
     // A page left behind (removed iframe) no longer answers.
     if (!frame.isConnected || event.source !== frame.contentWindow) return;
     if (!isRecord(data) || data.protocol !== 'vulog-bo') {
+      ignore('no protocol "vulog-bo"');
       return;
     }
-    if (data.type !== 'hello') return;
+    if (data.type !== 'hello') {
+      ignore(
+        `type ${String(data.type)} on the window: requests go on the MessagePort of the hello`,
+      );
+      return;
+    }
+    clearTimeout(helloTimer);
     const port = event.ports[0];
     if (!port) {
       ui.log('hello without MessagePort: post it in the transfer list', 'error');
@@ -492,7 +535,9 @@ const startWebComponent = async (
   try {
     widgetClass = (await load?.())?.default;
   } catch (error) {
-    page.fail(`${name}: the entry failed to load: ${String(error)}`);
+    page.fail(
+      `${name}: the entry failed to load: ${String(error)} (the vite terminal or overlay shows the cause)`,
+    );
     console.error(error);
     return;
   }
@@ -519,7 +564,8 @@ const startWebComponent = async (
 
 /**
  * Starts the fake back office on the current page and displays the widget. Errors the widget
- * throws later (constructor, `connectedCallback`, rejected promises) are shown in the log too.
+ * throws later (constructor, `connectedCallback`, rejected promises, or those of its iframe page)
+ * are shown in the log too.
  *
  * @param config - Fixtures and widget identity from the dev server.
  * @param load - Loads the widget entry, whose default export is the element class (Web Component

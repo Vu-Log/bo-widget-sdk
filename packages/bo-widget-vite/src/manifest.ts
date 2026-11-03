@@ -153,9 +153,9 @@ export const buildManifest = (
     fromPackage.add('description');
   }
   let id = config.id;
-  if (id === undefined && typeof packageJson.name === 'string') {
-    id = unscoped(packageJson.name);
+  if (id === undefined) {
     fromPackage.add('id');
+    if (typeof packageJson.name === 'string') id = unscoped(packageJson.name);
   }
   const manifest = {
     manifestVersion: 1,

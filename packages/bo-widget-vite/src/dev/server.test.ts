@@ -21,6 +21,8 @@ import {
   FAKE_BO_PATH,
   fakeBoConfig,
   fakeBoModule,
+  forwardedHeaders,
+  isCrossSite,
   jwtExpiresAt,
   resolveDevMode,
   tokenWarnings,
@@ -101,6 +103,36 @@ describe('resolveDevMode', () => {
     );
   });
 
+  it('refuses an API URL with credentials', () => {
+    expect(() =>
+      resolveDevMode('token', { ...TOKEN_ENV, BO_WIDGET_API_URL: 'https://u:p@api.example.com/' }),
+    ).toThrow(/must not contain credentials/);
+  });
+
+  it('shows the API URL it cannot parse', () => {
+    expect(() =>
+      resolveDevMode('token', { ...TOKEN_ENV, BO_WIDGET_API_URL: '"api.example.com"' }),
+    ).toThrow('BO_WIDGET_API_URL is not a valid URL: ""api.example.com""');
+  });
+
+  it('trims the API key and the URL pasted with spaces', () => {
+    expect(
+      resolveDevMode('token', {
+        ...TOKEN_ENV,
+        BO_WIDGET_API_KEY: ' real-key\r',
+        BO_WIDGET_API_URL: ' https://api.example.com/boapi/proxy/ ',
+      }),
+    ).toMatchObject({
+      env: { apiKey: 'real-key', apiUrl: 'https://api.example.com/boapi/proxy/' },
+    });
+  });
+
+  it.each([['   '], ['Bearer'], ['Bearer   ']])('counts the token %j as missing', (token) => {
+    expect(() => resolveDevMode('token', { ...TOKEN_ENV, BO_WIDGET_TOKEN: token })).toThrow(
+      /set BO_WIDGET_TOKEN \(/,
+    );
+  });
+
   it('keeps the API URL in its canonical form, the prefix the proxy checks', () => {
     const resolved = resolveDevMode('token', {
       ...TOKEN_ENV,
@@ -121,6 +153,73 @@ describe('resolveDevMode', () => {
 
   it('refuses an unknown mode', () => {
     expect(() => resolveDevMode('proxy' as 'token', {})).toThrow(/unknown dev\.mode "proxy"/);
+  });
+});
+
+describe('isCrossSite', () => {
+  it.each([
+    ['same-origin', {}, false],
+    ['none', {}, false],
+    ['same-site', {}, true],
+    ['cross-site', {}, true],
+  ])('trusts Sec-Fetch-Site %s', (site, extra, expected) => {
+    expect(isCrossSite({ headers: { 'sec-fetch-site': site, ...extra } })).toBe(expected);
+  });
+
+  it('trusts a same-origin Sec-Fetch-Site behind a proxy that rewrites Host', () => {
+    expect(
+      isCrossSite({
+        headers: {
+          'sec-fetch-site': 'same-origin',
+          origin: 'https://tunnel.example',
+          host: 'localhost:5173',
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('compares Origin with :authority over HTTP/2, without Sec-Fetch-Site', () => {
+    expect(
+      isCrossSite({
+        headers: { origin: 'https://localhost:5173', ':authority': 'localhost:5173' },
+      }),
+    ).toBe(false);
+    expect(
+      isCrossSite({ headers: { origin: 'https://evil.example', ':authority': 'localhost:5173' } }),
+    ).toBe(true);
+  });
+
+  it('lets a call without Origin nor Sec-Fetch-Site through (curl, the dev server itself)', () => {
+    expect(isCrossSite({ headers: { host: 'localhost:5173' } })).toBe(false);
+  });
+});
+
+describe('forwardedHeaders', () => {
+  it('drops HTTP/2 pseudo-headers, cookies and origin, and adds the Bearer token', () => {
+    const headers = forwardedHeaders(
+      {
+        ':method': 'GET',
+        ':path': '/x',
+        ':authority': 'localhost:5173',
+        cookie: 'session=1',
+        origin: 'https://localhost:5173',
+        'x-api-key': 'key',
+        accept: ['application/json', 'text/plain'] as unknown as string,
+      },
+      'token',
+    );
+
+    expect(Object.fromEntries(headers)).toEqual({
+      accept: 'application/json, text/plain',
+      authorization: 'Bearer token',
+      'x-api-key': 'key',
+    });
+  });
+
+  it('keeps the Authorization the widget sends', () => {
+    expect(forwardedHeaders({ authorization: 'Bearer mine' }, 'token').get('authorization')).toBe(
+      'Bearer mine',
+    );
   });
 });
 
@@ -228,8 +327,9 @@ describe('fakeBoModule', () => {
 
     expect(code).toContain('import { startFakeBo } from "/pkg/host.js";');
     expect(code).toContain(
-      `startFakeBo(${JSON.stringify(config)}, () => import("/app/src/main.ts"));`,
+      `startFakeBo(${JSON.stringify(config)}, () => import("/app/src/main.ts")).catch(`,
     );
+    expect(code).toContain('Fake back office failed to start');
   });
 
   it('imports no entry for an iframe', () => {
@@ -244,7 +344,7 @@ describe('fakeBoModule', () => {
     );
 
     expect(code).not.toContain('import(');
-    expect(code).toMatch(/startFakeBo\(\{.*\}\);$/);
+    expect(code).toMatch(/startFakeBo\(\{.*\}\)\.catch\(/);
   });
 });
 
@@ -487,7 +587,7 @@ describe('fake back office dev server', () => {
     vi.stubEnv('BO_WIDGET_TOKEN', 'real-token');
     vi.stubEnv('BO_WIDGET_API_URL', api.url);
     vi.stubEnv('BO_WIDGET_API_KEY', 'real-key');
-    const { origin } = await serve({ name: 'Fleet report' });
+    const { origin, warn } = await serve({ name: 'Fleet report' });
 
     // `/admin` would resolve at the root of the API host, `//evil.example/x` on another host.
     const responses = await Promise.all(
@@ -496,6 +596,9 @@ describe('fake back office dev server', () => {
 
     expect(responses.map((response) => response.status)).toEqual([400, 400]);
     expect(api.received).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('/admin is outside BO_WIDGET_API_URL'),
+    );
   });
 
   it('answers 502 when the Vulog API cannot be reached', async () => {
@@ -599,7 +702,7 @@ describe('fake back office dev server', () => {
   it('refuses the calls of a page from another origin', async () => {
     const api = await upstream();
     stubTokenEnv(api.url);
-    const { origin } = await serve({ name: 'Fleet report' });
+    const { origin, warn } = await serve({ name: 'Fleet report' });
     const { host } = new URL(origin);
 
     const statuses = await Promise.all([
@@ -615,6 +718,9 @@ describe('fake back office dev server', () => {
 
     expect(statuses).toEqual([403, 403, 403, 403, 200]);
     expect(api.received).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('from another origin (https://evil.example)'),
+    );
   });
 
   it('never forwards a path with encoded dot segments outside the API base URL', async () => {
@@ -687,9 +793,11 @@ describe('fake back office dev server', () => {
     status = 302;
     expect((await fetch(`${origin}${FAKE_API_PATH}y`, { redirect: 'manual' })).status).toBe(302);
 
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('401 from the API. Has BO_WIDGET_TOKEN expired?'),
-    );
+    expect((await fetch(`${origin}${FAKE_API_PATH}y`, { redirect: 'manual' })).status).toBe(302);
+    status = 401;
+    await fetch(`${origin}${FAKE_API_PATH}z`);
+    const hints = warn.mock.calls.filter(([message]) => message.includes('401 from the API'));
+    expect(hints).toEqual([[expect.stringContaining('Has BO_WIDGET_TOKEN expired?')]]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('the API redirects (302)'));
   });
 

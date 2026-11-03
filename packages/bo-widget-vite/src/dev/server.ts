@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { BoContext, BoCurrentUser, BoSettings } from '@vulog/bo-widget-sdk';
@@ -60,12 +60,15 @@ const canonicalApiUrl = (value: string): string => {
   try {
     url = new URL(value);
   } catch {
-    throw new Error(`Fake back office: BO_WIDGET_API_URL is not a valid URL`);
+    throw new Error(`Fake back office: BO_WIDGET_API_URL is not a valid URL: "${value}"`);
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw new Error(
       `Fake back office: BO_WIDGET_API_URL must be an http(s) URL, not ${url.protocol}`,
     );
+  }
+  if (url.username || url.password) {
+    throw new Error('Fake back office: BO_WIDGET_API_URL must not contain credentials');
   }
   if (url.search || url.hash) {
     throw new Error('Fake back office: BO_WIDGET_API_URL must have no query nor hash');
@@ -92,9 +95,15 @@ export const resolveDevMode = (
   const mode = requested ?? (env.BO_WIDGET_TOKEN ? 'token' : 'mock');
   if (mode === 'mock') return { mode };
   if (mode !== 'token') throw new Error(`Fake back office: unknown dev.mode "${String(mode)}"`);
-  const missing = ['BO_WIDGET_TOKEN', 'BO_WIDGET_API_URL', 'BO_WIDGET_API_KEY'].filter(
-    (name) => !env[name],
-  );
+  const token = (env.BO_WIDGET_TOKEN ?? '').trim().replace(/^Bearer(?:\s+|$)/i, '');
+  const apiKey = (env.BO_WIDGET_API_KEY ?? '').trim();
+  const apiUrl = (env.BO_WIDGET_API_URL ?? '').trim();
+  const values: Record<string, string> = {
+    BO_WIDGET_TOKEN: token,
+    BO_WIDGET_API_URL: apiUrl,
+    BO_WIDGET_API_KEY: apiKey,
+  };
+  const missing = Object.keys(values).filter((name) => !values[name]);
   if (missing.length > 0) {
     throw new Error(
       `Fake back office in token mode: set ${missing.join(', ')} (in .env.local or the shell). ` +
@@ -103,11 +112,7 @@ export const resolveDevMode = (
   }
   return {
     mode,
-    env: {
-      token: (env.BO_WIDGET_TOKEN as string).trim().replace(/^Bearer\s+/i, ''),
-      apiUrl: canonicalApiUrl(env.BO_WIDGET_API_URL as string),
-      apiKey: env.BO_WIDGET_API_KEY as string,
-    },
+    env: { token, apiUrl: canonicalApiUrl(apiUrl), apiKey },
   };
 };
 
@@ -199,7 +204,10 @@ export const fakeBoModule = (
 ): string =>
   [
     `import { startFakeBo } from ${JSON.stringify(hostModule)};`,
-    `startFakeBo(${JSON.stringify(config)}${entry ? `, () => import(${JSON.stringify(entry)})` : ''});`,
+    `startFakeBo(${JSON.stringify(config)}${entry ? `, () => import(${JSON.stringify(entry)})` : ''}).catch((error) => {`,
+    '  console.error(error);',
+    '  document.body.textContent = `Fake back office failed to start: ${error}`;',
+    '});',
   ].join('\n');
 
 const FAKE_BO_HTML = `<!doctype html>
@@ -240,6 +248,8 @@ const isSkippedResponseHeader = (name: string): boolean =>
   [
     'connection',
     'keep-alive',
+    'proxy-connection',
+    'upgrade',
     'transfer-encoding',
     'content-encoding',
     'content-length',
@@ -250,10 +260,13 @@ const isSkippedResponseHeader = (name: string): boolean =>
  * True when the call comes from a page of another origin: the proxy adds the developer's token, so
  * only the fake back office and the widget page, both served by this server, may use it.
  */
-const isCrossSite = (req: IncomingMessage): boolean => {
+export const isCrossSite = (req: Pick<IncomingMessage, 'headers'>): boolean => {
+  // Set by every current browser, and not settable by a page.
   const site = req.headers['sec-fetch-site'];
-  if (site !== undefined && site !== 'same-origin' && site !== 'none') return true;
-  const { origin, host } = req.headers;
+  if (site !== undefined) return site !== 'same-origin' && site !== 'none';
+  const { origin } = req.headers;
+  // HTTP/2 (`server.https`) has no `Host` header, only `:authority`.
+  const host = req.headers.host ?? req.headers[':authority'];
   if (origin === undefined) return false;
   try {
     return new URL(origin).host !== host;
@@ -262,12 +275,26 @@ const isCrossSite = (req: IncomingMessage): boolean => {
   }
 };
 
+/**
+ * Headers of a call forwarded to the API: the browser's, without hop-by-hop ones, cookies, origin
+ * nor HTTP/2 pseudo-headers (`:method`, `:path`…), with `Authorization: Bearer` when absent.
+ */
+export const forwardedHeaders = (incoming: IncomingHttpHeaders, token: string): Headers => {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(incoming)) {
+    if (value === undefined || name.startsWith(':') || SKIPPED_REQUEST_HEADERS.has(name)) continue;
+    headers.set(name, Array.isArray(value) ? value.join(', ') : value);
+  }
+  if (!headers.has('authorization')) headers.set('authorization', `Bearer ${token}`);
+  return headers;
+};
+
 /** The reason behind a `fetch` failure: Node puts it in `cause` (`ECONNREFUSED`, `ENOTFOUND`…). */
 const fetchFailure = (error: unknown): string => {
-  const cause = (error as { cause?: { code?: unknown; message?: unknown } }).cause;
+  const cause = (error as { cause?: { code?: unknown; message?: unknown } } | null)?.cause;
   if (typeof cause?.code === 'string') return cause.code;
   if (typeof cause?.message === 'string') return cause.message;
-  return (error as Error).message;
+  return error instanceof Error ? error.message : String(error);
 };
 
 /**
@@ -283,18 +310,15 @@ const proxyToApi = async (
   search: string,
   env: TokenModeEnv,
   logger: Logger,
+  warnOnce: (key: string, message: string) => void,
 ): Promise<void> => {
   const target = new URL(`${path}${search}`, env.apiUrl);
   if (!target.href.startsWith(env.apiUrl)) {
+    warnOnce(`outside ${path}`, `[bo-widget] ${path} is outside BO_WIDGET_API_URL: not forwarded.`);
     sendJson(res, 400, { error: 'outside-api', message: `${path} is outside the API base URL` });
     return;
   }
-  const headers = new Headers();
-  for (const [name, value] of Object.entries(req.headers)) {
-    if (value === undefined || SKIPPED_REQUEST_HEADERS.has(name)) continue;
-    headers.set(name, Array.isArray(value) ? value.join(', ') : value);
-  }
-  if (!headers.has('authorization')) headers.set('authorization', `Bearer ${env.token}`);
+  const headers = forwardedHeaders(req.headers, env.token);
   const method = req.method ?? 'GET';
   const hasBody = method !== 'GET' && method !== 'HEAD';
   let response: Response;
@@ -306,6 +330,11 @@ const proxyToApi = async (
       ...(hasBody ? { body: Readable.toWeb(req) as ReadableStream, duplex: 'half' } : {}),
     } as RequestInit);
   } catch (error) {
+    // The browser gave up its upload: there is nobody to answer.
+    if (req.destroyed) {
+      res.destroy();
+      return;
+    }
     const reason = fetchFailure(error);
     logger.error(
       `[bo-widget] ${method} ${target.pathname}: cannot reach ${target.origin} (${reason}). Check BO_WIDGET_API_URL and your network.`,
@@ -317,7 +346,8 @@ const proxyToApi = async (
     return;
   }
   if (response.status === 401) {
-    logger.warn(
+    warnOnce(
+      '401',
       `[bo-widget] ${method} ${target.pathname}: 401 from the API. Has BO_WIDGET_TOKEN expired? Paste a new one and restart vite.`,
     );
   } else if (response.status >= 300 && response.status < 400) {
@@ -381,7 +411,13 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
       );
     }
   }
-  const missedMocks = new Set<string>();
+  const warned = new Set<string>();
+  /** Logs a warning the first time only, so that a polling widget does not flood the terminal. */
+  const warnOnce = (key: string, message: string): void => {
+    if (warned.has(key)) return;
+    warned.add(key);
+    logger.warn(message);
+  };
 
   const answerMock = (res: ServerResponse, method: string, path: string): void => {
     const key = `${method} ${path}`;
@@ -389,13 +425,11 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
       sendJson(res, 200, options.responses[key]);
       return;
     }
-    if (!missedMocks.has(key)) {
-      missedMocks.add(key);
-      const known = Object.keys(options.responses);
-      logger.warn(
-        `[bo-widget] Mock mode: no response for "${key}"${known.length > 0 && known.length <= 10 ? ` (known: ${known.join(', ')})` : ''}.`,
-      );
-    }
+    const known = Object.keys(options.responses);
+    warnOnce(
+      `mock ${key}`,
+      `[bo-widget] Mock mode: no response for "${key}"${known.length > 0 && known.length <= 10 ? ` (known: ${known.join(', ')})` : ''}.`,
+    );
     sendJson(res, 404, {
       error: 'mock-not-found',
       message: `Fake back office (mock mode): no response for "${key}". Add it to dev.responses in the widget configuration.`,
@@ -426,6 +460,11 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
       return;
     }
     if (isCrossSite(req)) {
+      const from = req.headers.origin ?? req.headers['sec-fetch-site'] ?? 'unknown';
+      warnOnce(
+        `cross-site ${String(from)}`,
+        `[bo-widget] Refused a call of the local Vulog API from another origin (${String(from)}).`,
+      );
       sendJson(res, 403, {
         error: 'cross-site',
         message: 'The local Vulog API only answers the pages of this dev server.',
@@ -434,7 +473,7 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
     }
     const rawPath = pathname.slice(FAKE_API_PATH.length);
     if (resolved.mode === 'token') {
-      proxyToApi(req, res, rawPath, url.search, resolved.env, logger).catch(next);
+      proxyToApi(req, res, rawPath, url.search, resolved.env, logger, warnOnce).catch(next);
       return;
     }
     let path: string;
