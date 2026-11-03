@@ -84,6 +84,10 @@ npx changeset pre exit         # back to stable releases
 
 Commit `.changeset/pre.json` (and later `.changeset/pre/`). `pre exit` marks the pre-release mode as ending: the next Version Packages pull request removes these files and releases stable versions.
 
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for issues and pull requests, and [SECURITY.md](SECURITY.md) to report a vulnerability.
+
 ## License
 
 [MIT](LICENSE) © Vulog
