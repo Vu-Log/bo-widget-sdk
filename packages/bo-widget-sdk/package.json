@@ -1,0 +1,41 @@
+{
+  "name": "@vulog/bo-widget-sdk",
+  "version": "0.0.0",
+  "description": "Framework-agnostic client for widgets embedded in the Vulog back office.",
+  "license": "MIT",
+  "author": "Vulog",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vu-Log/bo-widget-sdk.git",
+    "directory": "packages/bo-widget-sdk"
+  },
+  "homepage": "https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-sdk#readme",
+  "bugs": "https://github.com/Vu-Log/bo-widget-sdk/issues",
+  "keywords": [
+    "vulog",
+    "back-office",
+    "widget",
+    "sdk"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  }
+}
