@@ -28,18 +28,29 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci
-      # This workflow runs in parallel with CI: never publish a commit that does not pass the checks.
+      # This workflow runs in parallel with CI: never publish a commit that fails its checks. The
+      # package check (publint, attw, dist import) runs in the publish script, after the build.
+      - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
+      # Token-based publication: drop this step together with NPM_TOKEN if moving to npm trusted
+      # publishing.
       - name: Check npm credentials
         run: npm whoami
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Check the release GitHub token
+        run: |
+          if [ -z "$RELEASE_GITHUB_TOKEN" ]; then
+            echo "::warning::RELEASE_GITHUB_TOKEN is not set: the Version Packages pull request will not trigger CI"
+          fi
+        env:
+          RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
       - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          # Pull requests opened with the default token do not trigger CI: use a GitHub App or
-          # fine-grained token so that the Version Packages pull request is checked.
+          # Pull requests opened with the default token do not trigger CI: use a fine-grained
+          # personal access token so that the Version Packages pull request is checked.
           github-token: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
           publish-script: npm run release
           create-github-releases: true

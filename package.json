@@ -19,7 +19,7 @@
     "format:check": "prettier --check .",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "npm run build && changeset publish",
+    "release": "npm run build && npm run check:package && changeset publish",
     "release:next:dry": "changeset version --snapshot next && npm run build && npm publish --workspaces --tag next --dry-run",
     "check:package": "npm run check:package --workspaces"
   },

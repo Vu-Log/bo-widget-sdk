@@ -41,7 +41,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # `changeset version --snapshot` exits with an error when no changeset is pending and in
+      # `changeset version --snapshot` exits with an error when no changeset is pending, or in
       # pre-release mode: only pack the current versions in those cases.
       - name: Publish dry-run
         run: |
