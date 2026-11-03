@@ -16,6 +16,7 @@ import {
   fakeBoModule,
   installFakeBo,
   resolveDevMode,
+  type ResolvedDevMode,
 } from './dev/server.js';
 import { BoWidgetConfigError, buildManifest, type WidgetConfig } from './manifest.js';
 
@@ -29,6 +30,22 @@ const FAKE_BO_MODULE_ID = '\0bo-widget:fake-bo';
 const hostModule = (): string => {
   const compiled = fileURLToPath(new URL('./dev/host.js', import.meta.url));
   return existsSync(compiled) ? compiled : compiled.replace(/\.js$/, '.ts');
+};
+
+/**
+ * The `process.env` defines Vite applies to an app build and skips in library mode: a widget
+ * bundles its dependencies, and React or MUI read `process.env.NODE_ENV` at runtime.
+ */
+const processEnvDefines = (nodeEnv: string): Record<string, string> => {
+  const value = JSON.stringify(nodeEnv);
+  return {
+    'process.env': '{}',
+    'global.process.env': '{}',
+    'globalThis.process.env': '{}',
+    'process.env.NODE_ENV': value,
+    'global.process.env.NODE_ENV': value,
+    'globalThis.process.env.NODE_ENV': value,
+  };
 };
 
 /**
@@ -55,11 +72,22 @@ const readPackageJson = (root: string): Record<string, unknown> => {
       `package.json not found in ${root}: the widget version comes from it`,
     ]);
   }
+  let text: string;
   try {
-    return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+    text = readFileSync(path, 'utf8');
+  } catch (error) {
+    throw new BoWidgetConfigError([`cannot read ${path}: ${(error as Error).message}`]);
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
   } catch (error) {
     throw new BoWidgetConfigError([`${path} is not valid JSON: ${(error as Error).message}`]);
   }
+  if (typeof json !== 'object' || json === null || Array.isArray(json)) {
+    throw new BoWidgetConfigError([`${path} must contain a JSON object`]);
+  }
+  return json as Record<string, unknown>;
 };
 
 /**
@@ -71,14 +99,20 @@ const readPackageJson = (root: string): Record<string, unknown> => {
  * - Web Component (default): builds the `entry` in library mode as `index.js`, an ES module whose
  *   default export must be the element class (the build fails otherwise). Iframe: builds
  *   `index.html` as a regular app.
- * - Warns on every `customElements.define`: the back office registers the class itself.
+ * - Warns, once per module (dependencies included), on each `customElements.define`: the back
+ *   office registers the class itself.
+ * - Web Component build: defines `process.env.NODE_ENV`, which library mode leaves as is, since
+ *   the widget bundles its dependencies (React reads it).
  * - In dev, serves a fake back office on `/__bo-widget/` that displays the widget, in mock mode
  *   or, with `BO_WIDGET_TOKEN`, against a real Vulog API.
  *
  * @param config - The widget configuration, usually imported from `widget.config.ts`.
  * @returns The plugin, to add to `plugins` in `vite.config.ts`.
  * @throws {BoWidgetConfigError} When Vite resolves its configuration, for an invalid widget
- * configuration or a missing `package.json`.
+ * configuration or a missing or invalid `package.json`.
+ * @throws {Error} When the dev server starts in token mode without its `BO_WIDGET_*` variables;
+ * the build fails when the entry has no default export, the iframe build has no `index.html`, or
+ * the icon is not in the bundle.
  *
  * @example
  * ```ts
@@ -96,14 +130,14 @@ export const boWidget = (config: WidgetConfig): Plugin => {
   let manifest: WidgetManifest;
   let entry: string;
   let requestedBase: string | undefined;
-  let devMode: ReturnType<typeof resolveDevMode> | undefined;
+  let devMode: ResolvedDevMode | undefined;
   const warned = new Set<string>();
   const hostModuleId = normalizePath(hostModule());
 
   return {
     name: '@vulog/bo-widget-vite',
 
-    config(userConfig, { command }) {
+    config(userConfig, { command, mode }) {
       const root = resolve(userConfig.root ?? process.cwd());
       entry = resolve(root, config.entry ?? DEFAULT_ENTRY);
       requestedBase = userConfig.base;
@@ -118,6 +152,9 @@ export const boWidget = (config: WidgetConfig): Plugin => {
               build: {
                 lib: { entry, formats: ['es' as const], fileName: () => 'index.js' },
               },
+              ...(userConfig.define?.['process.env.NODE_ENV'] === undefined
+                ? { define: processEnvDefines(process.env.NODE_ENV || mode) }
+                : {}),
             }
           : {}),
       };
@@ -140,6 +177,15 @@ export const boWidget = (config: WidgetConfig): Plugin => {
         'BO_WIDGET_',
       );
       devMode = resolveDevMode(config.dev?.mode, env);
+      const settingKeys = new Set(manifest.settings.map((setting) => setting.key));
+      const unknownSettings = Object.keys(config.dev?.settings ?? {}).filter(
+        (key) => !settingKeys.has(key),
+      );
+      if (unknownSettings.length > 0) {
+        server.config.logger.warn(
+          `[bo-widget] dev.settings ${unknownSettings.join(', ')}: not declared in settings, the back office would never send them.`,
+        );
+      }
       installFakeBo(server, { runtime, responses: config.dev?.responses ?? {}, resolved: devMode });
     },
 
@@ -204,7 +250,7 @@ export const boWidget = (config: WidgetConfig): Plugin => {
       if (
         icon &&
         !bundle[icon] &&
-        !existsSync(resolve(options.dir ?? resolvedConfig.build.outDir, icon))
+        !existsSync(resolve(resolvedConfig.root, options.dir ?? resolvedConfig.build.outDir, icon))
       ) {
         this.error(
           `[bo-widget] icon "${icon}" is not in the bundle: put it in ${relative(resolvedConfig.root, resolvedConfig.publicDir) || 'public'}/.`,

@@ -1,6 +1,7 @@
 /**
  * A call to `customElements.define`, also through `window.`, `globalThis.` or `?.`. A widget never
- * registers its class: the back office does, under a tag of its own.
+ * registers its class: the back office does, under a tag of its own. The check is textual: it may
+ * also flag a comment or a string, and misses a bracket access (`customElements['define']`).
  */
 const DEFINE_CALL = /\bcustomElements\s*(?:\?\.|\.)\s*define\s*\(/g;
 

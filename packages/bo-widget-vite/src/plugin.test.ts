@@ -53,6 +53,7 @@ const readManifest = async (root: string): Promise<unknown> =>
   JSON.parse(await readFile(join(root, 'dist', MANIFEST_FILE), 'utf8'));
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -155,10 +156,48 @@ describe('boWidget build', () => {
     );
   });
 
-  it('fails when an iframe widget has no index.html', async () => {
-    const root = await project({ 'src/main.ts': ELEMENT_ENTRY });
+  it('fails when an iframe widget is not built as index.html', async () => {
+    const root = await project({
+      'widget.html':
+        '<!doctype html><html><body><script type="module" src="/src/main.ts"></script></body></html>',
+      'src/main.ts': "document.body.append('Report');",
+    });
 
-    await expect(buildWidget(root, { name: 'Report', runtime: 'iframe' })).rejects.toThrow();
+    await expect(
+      buildWidget(
+        root,
+        { name: 'Report', runtime: 'iframe' },
+        { build: { rollupOptions: { input: join(root, 'widget.html') } } },
+      ),
+    ).rejects.toThrow(/the build did not produce index\.html/);
+  });
+
+  it('replaces process.env.NODE_ENV in a Web Component, whose dependencies are bundled', async () => {
+    // Vitest sets NODE_ENV to "test"; unset, the mode of the build applies, as in an app build.
+    vi.stubEnv('NODE_ENV', '');
+    const root = await project({
+      'src/main.ts': `${ELEMENT_ENTRY}\nexport const env = process.env.NODE_ENV;\n`,
+    });
+
+    await buildWidget(root, { name: 'Report' });
+
+    const code = await readFile(join(root, 'dist/index.js'), 'utf8');
+    expect(code).not.toContain('process.env');
+    expect(code).toContain('"production"');
+  });
+
+  it('keeps a process.env.NODE_ENV the project defines', async () => {
+    const root = await project({
+      'src/main.ts': `${ELEMENT_ENTRY}\nexport const env = process.env.NODE_ENV;\n`,
+    });
+
+    await buildWidget(
+      root,
+      { name: 'Report' },
+      { define: { 'process.env.NODE_ENV': JSON.stringify('staging') } },
+    );
+
+    expect(await readFile(join(root, 'dist/index.js'), 'utf8')).toContain('"staging"');
   });
 
   it('fails on an invalid configuration, before building', async () => {
@@ -177,6 +216,17 @@ describe('boWidget build', () => {
 
     await expect(buildWidget(root, { name: 'Report' })).rejects.toThrow(/package\.json not found/);
   });
+
+  it.each(['null', '[]', '"fleet-report"'])(
+    'fails on a package.json that is %s',
+    async (content) => {
+      const root = await project({ 'src/main.ts': ELEMENT_ENTRY, 'package.json': content });
+
+      await expect(buildWidget(root, { name: 'Report' })).rejects.toThrow(
+        /must contain a JSON object/,
+      );
+    },
+  );
 
   it('fails on an unreadable package.json', async () => {
     const root = await project({ 'src/main.ts': ELEMENT_ENTRY, 'package.json': '{ nope' });

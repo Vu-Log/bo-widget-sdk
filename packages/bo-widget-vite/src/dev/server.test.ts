@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto';
-import { createServer as createHttpServer, type IncomingHttpHeaders, type Server } from 'node:http';
+import {
+  createServer as createHttpServer,
+  request,
+  type IncomingHttpHeaders,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from 'node:http';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -16,6 +23,7 @@ import {
   fakeBoModule,
   jwtExpiresAt,
   resolveDevMode,
+  tokenWarnings,
   widgetTag,
 } from './server.js';
 
@@ -82,14 +90,53 @@ describe('resolveDevMode', () => {
     );
   });
 
-  it.each(['not a url', 'ftp://api.example.com/'])('refuses the API URL %s', (url) => {
+  it.each([
+    ['not a url', /BO_WIDGET_API_URL is not a valid URL/],
+    ['ftp://api.example.com/', /BO_WIDGET_API_URL must be an http\(s\) URL, not ftp:/],
+    ['https://api.example.com/boapi/proxy/?a=1', /must have no query nor hash/],
+    ['https://api.example.com/boapi/proxy/#x', /must have no query nor hash/],
+  ])('refuses the API URL %s', (url, message) => {
     expect(() => resolveDevMode('token', { ...TOKEN_ENV, BO_WIDGET_API_URL: url })).toThrow(
-      /BO_WIDGET_API_URL must be an http\(s\) URL/,
+      message,
     );
+  });
+
+  it('keeps the API URL in its canonical form, the prefix the proxy checks', () => {
+    const resolved = resolveDevMode('token', {
+      ...TOKEN_ENV,
+      BO_WIDGET_API_URL: 'https://API.Example.com:443/boapi/proxy',
+    });
+
+    expect(resolved).toMatchObject({ env: { apiUrl: 'https://api.example.com/boapi/proxy/' } });
+  });
+
+  it('removes a Bearer prefix and spaces pasted with the token', () => {
+    const resolved = resolveDevMode('token', {
+      ...TOKEN_ENV,
+      BO_WIDGET_TOKEN: ' Bearer abc.def.ghi \n',
+    });
+
+    expect(resolved).toMatchObject({ env: { token: 'abc.def.ghi' } });
   });
 
   it('refuses an unknown mode', () => {
     expect(() => resolveDevMode('proxy' as 'token', {})).toThrow(/unknown dev\.mode "proxy"/);
+  });
+});
+
+describe('tokenWarnings', () => {
+  it('says nothing for a JWT that has not expired', () => {
+    expect(tokenWarnings(jwt({ exp: 2_000 }), 1_000_000)).toEqual([]);
+  });
+
+  it('warns about a token that is not a JWT with an expiry', () => {
+    expect(tokenWarnings('opaque')).toEqual([expect.stringMatching(/not a JWT with an expiry/)]);
+  });
+
+  it('warns about an expired token, with its expiry', () => {
+    expect(tokenWarnings(jwt({ exp: 1_000 }), 2_000_000)).toEqual([
+      expect.stringMatching(/expired at 1970-01-01T00:16:40\.000Z: paste a new one/),
+    ]);
   });
 });
 
@@ -180,8 +227,9 @@ describe('fakeBoModule', () => {
     const code = fakeBoModule('/pkg/host.js', config, '/app/src/main.ts');
 
     expect(code).toContain('import { startFakeBo } from "/pkg/host.js";');
-    expect(code).toContain('import Widget from "/app/src/main.ts";');
-    expect(code).toContain(`startFakeBo(${JSON.stringify(config)}, Widget);`);
+    expect(code).toContain(
+      `startFakeBo(${JSON.stringify(config)}, () => import("/app/src/main.ts"));`,
+    );
   });
 
   it('imports no entry for an iframe', () => {
@@ -195,7 +243,7 @@ describe('fakeBoModule', () => {
       null,
     );
 
-    expect(code).not.toContain('import Widget');
+    expect(code).not.toContain('import(');
     expect(code).toMatch(/startFakeBo\(\{.*\}\);$/);
   });
 });
@@ -228,6 +276,8 @@ describe('fake back office dev server', () => {
   const serve = async (config: WidgetConfig, files?: Record<string, string>) => {
     const root = await project(files);
     const customLogger = createLogger('silent');
+    const warn = vi.spyOn(customLogger, 'warn');
+    const error = vi.spyOn(customLogger, 'error');
     const server: ViteDevServer = await createServer({
       root,
       configFile: false,
@@ -240,28 +290,56 @@ describe('fake back office dev server', () => {
     await server.listen();
     const { port } = server.httpServer?.address() as AddressInfo;
     const origin = `http://localhost:${port}`;
-    return { server, origin, customLogger };
+    return { server, origin, customLogger, warn, error };
   };
 
   /** An HTTP server standing for the Vulog API, recording what it receives. */
-  const upstream = async () => {
+  const upstream = async (
+    answer: (res: ServerResponse) => void = (res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('X-Upstream', 'yes');
+      res.end(JSON.stringify({ vehicles: 3 }));
+    },
+  ) => {
     const received: { url: string; method: string; headers: IncomingHttpHeaders; body: string }[] =
       [];
-    const server: Server = createHttpServer((req, res) => {
+    const server: Server = createHttpServer((req: IncomingMessage, res) => {
       let body = '';
       req.on('data', (chunk: Buffer) => (body += chunk.toString()));
       req.on('end', () => {
         received.push({ url: req.url ?? '', method: req.method ?? '', headers: req.headers, body });
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('X-Upstream', 'yes');
-        res.end(JSON.stringify({ vehicles: 3 }));
+        answer(res);
       });
     });
     await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
-    servers.push({ close: () => new Promise<void>((done) => server.close(() => done())) });
+    servers.push({
+      close: () =>
+        new Promise<void>((done) => {
+          server.closeAllConnections();
+          server.close(() => done());
+        }),
+    });
     const { port } = server.address() as AddressInfo;
     return { url: `http://127.0.0.1:${port}/boapi/proxy/`, received };
   };
+
+  const stubTokenEnv = (apiUrl: string, token = 'real-token') => {
+    vi.stubEnv('BO_WIDGET_TOKEN', token);
+    vi.stubEnv('BO_WIDGET_API_URL', apiUrl);
+    vi.stubEnv('BO_WIDGET_API_KEY', 'real-key');
+  };
+
+  /** Sends a raw request, so that the path and headers reach the server as written (fetch normalizes them). */
+  const rawGet = (origin: string, path: string, headers: Record<string, string> = {}) =>
+    new Promise<number>((done, fail) => {
+      const { hostname, port } = new URL(origin);
+      request({ hostname, port, path, headers }, (res) => {
+        res.resume();
+        done(res.statusCode ?? 0);
+      })
+        .on('error', fail)
+        .end();
+    });
 
   it('serves the fake back office page, which loads its module', async () => {
     const { origin } = await serve({ name: 'Fleet report' });
@@ -321,7 +399,7 @@ describe('fake back office dev server', () => {
     expect(await response.text()).toContain('widget page');
     const module = await (await fetch(`${origin}${FAKE_BO_MODULE_URL}`)).text();
     expect(module).toContain('"runtime":"iframe"');
-    expect(module).not.toContain('import Widget');
+    expect(module).not.toContain('/src/main.ts');
   });
 
   it('answers the Vulog API calls with the mock responses', async () => {
@@ -455,11 +533,31 @@ describe('fake back office dev server', () => {
     );
   });
 
-  it('warns when the token mode is exposed on the network', async () => {
+  it.each([
+    ['token mode, host: true', true, true],
+    ['token mode, a LAN address', '0.0.0.0', true],
+    ['token mode, localhost', 'localhost', false],
+  ])('warns when the token mode is exposed on the network: %s', async (_label, host, warns) => {
     const api = await upstream();
-    vi.stubEnv('BO_WIDGET_TOKEN', 'real-token');
-    vi.stubEnv('BO_WIDGET_API_URL', api.url);
-    vi.stubEnv('BO_WIDGET_API_KEY', 'real-key');
+    stubTokenEnv(api.url, jwt({ exp: 4_000_000_000 }));
+    const root = await project();
+    const customLogger = createLogger('silent');
+    const warn = vi.spyOn(customLogger, 'warn');
+    const server = await createServer({
+      root,
+      configFile: false,
+      customLogger,
+      server: { host, ws: false },
+      plugins: [boWidget({ name: 'Fleet report' })],
+    });
+    servers.push(server);
+
+    expect(warn.mock.calls.some(([message]) => message.includes('anyone on the network'))).toBe(
+      warns,
+    );
+  });
+
+  it('does not warn about the network in mock mode', async () => {
     const root = await project();
     const customLogger = createLogger('silent');
     const warn = vi.spyOn(customLogger, 'warn');
@@ -472,6 +570,202 @@ describe('fake back office dev server', () => {
     });
     servers.push(server);
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('anyone on the network'));
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('warns at startup about a token that is not a JWT, and about ignored mock responses', async () => {
+    const api = await upstream();
+    stubTokenEnv(api.url, 'opaque-token');
+
+    const { warn } = await serve({
+      name: 'Fleet report',
+      dev: { responses: { 'GET x': [] } },
+    });
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('BO_WIDGET_TOKEN is not a JWT'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('dev.responses are ignored'));
+  });
+
+  it('warns about dev settings the manifest does not declare', async () => {
+    const { warn } = await serve({
+      name: 'Fleet report',
+      settings: [{ key: 'currency', type: 'string' }],
+      dev: { settings: { currency: 'EUR', curency: 'CAD' } },
+    });
+
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/dev\.settings curency: not declared/));
+  });
+
+  it('refuses the calls of a page from another origin', async () => {
+    const api = await upstream();
+    stubTokenEnv(api.url);
+    const { origin } = await serve({ name: 'Fleet report' });
+    const { host } = new URL(origin);
+
+    const statuses = await Promise.all([
+      rawGet(origin, `${FAKE_API_PATH}x`, { 'Sec-Fetch-Site': 'cross-site' }),
+      rawGet(origin, `${FAKE_API_PATH}x`, { 'Sec-Fetch-Site': 'same-site' }),
+      rawGet(origin, `${FAKE_API_PATH}x`, { Origin: 'https://evil.example' }),
+      rawGet(origin, `${FAKE_API_PATH}x`, { Origin: 'not a url' }),
+      rawGet(origin, `${FAKE_API_PATH}x`, {
+        Origin: `http://${host}`,
+        'Sec-Fetch-Site': 'same-origin',
+      }),
+    ]);
+
+    expect(statuses).toEqual([403, 403, 403, 403, 200]);
+    expect(api.received).toHaveLength(1);
+  });
+
+  it('never forwards a path with encoded dot segments outside the API base URL', async () => {
+    const api = await upstream();
+    stubTokenEnv(api.url);
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const statuses = await Promise.all([
+      rawGet(origin, `${FAKE_API_PATH}%2e%2e/admin`),
+      rawGet(origin, `${FAKE_API_PATH}a/%2E%2E/%2E%2E/y`),
+    ]);
+
+    expect(statuses.every((status) => status !== 200)).toBe(true);
+    expect(api.received).toEqual([]);
+  });
+
+  it('forwards to an API URL given without trailing slash', async () => {
+    const api = await upstream();
+    stubTokenEnv(api.url.replace(/\/$/, ''));
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const response = await fetch(`${origin}${FAKE_API_PATH}fleets`);
+
+    expect(response.status).toBe(200);
+    expect(api.received[0]?.url).toBe('/boapi/proxy/fleets');
+  });
+
+  it("drops the API's CORS headers and keeps each cookie", async () => {
+    const api = await upstream((res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Set-Cookie', ['a=1', 'b=2']);
+      res.end('{}');
+    });
+    stubTokenEnv(api.url);
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const response = await fetch(`${origin}${FAKE_API_PATH}x`);
+
+    expect(response.headers.get('access-control-allow-origin')).toBeNull();
+    expect(response.headers.get('access-control-allow-credentials')).toBeNull();
+    expect(response.headers.getSetCookie()).toEqual(['a=1', 'b=2']);
+  });
+
+  it('forwards a response without body', async () => {
+    const api = await upstream((res) => {
+      res.statusCode = 204;
+      res.end();
+    });
+    stubTokenEnv(api.url);
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const response = await fetch(`${origin}${FAKE_API_PATH}x`, { method: 'DELETE' });
+
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe('');
+  });
+
+  it('hints at an expired token on a 401, and warns on a redirect', async () => {
+    let status = 401;
+    const api = await upstream((res) => {
+      res.statusCode = status;
+      if (status === 302) res.setHeader('Location', 'https://login.example/');
+      res.end();
+    });
+    stubTokenEnv(api.url);
+    const { origin, warn } = await serve({ name: 'Fleet report' });
+
+    expect((await fetch(`${origin}${FAKE_API_PATH}x`)).status).toBe(401);
+    status = 302;
+    expect((await fetch(`${origin}${FAKE_API_PATH}y`, { redirect: 'manual' })).status).toBe(302);
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('401 from the API. Has BO_WIDGET_TOKEN expired?'),
+    );
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('the API redirects (302)'));
+  });
+
+  it('survives an API response that breaks off, and logs it', async () => {
+    const api = await upstream((res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Length': '1000' });
+      res.write('{"partial":');
+      setTimeout(() => res.socket?.destroy(), 20);
+    });
+    stubTokenEnv(api.url);
+    const { origin, error } = await serve({ name: 'Fleet report' });
+
+    const broken = await fetch(`${origin}${FAKE_API_PATH}x`)
+      .then((response) => response.text())
+      .catch((caught: unknown) => caught);
+
+    expect(broken).toBeInstanceOf(Error);
+    await vi.waitFor(() =>
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('the API response broke off')),
+    );
+    // The dev server is still up.
+    expect((await fetch(`${origin}${FAKE_BO_PATH}`)).status).toBe(200);
+  });
+
+  it('logs why the API cannot be reached', async () => {
+    // A port that was free a moment ago: nothing listens on it.
+    const probe = createHttpServer();
+    await new Promise<void>((done) => probe.listen(0, '127.0.0.1', done));
+    const { port } = probe.address() as AddressInfo;
+    await new Promise<void>((done) => probe.close(() => done()));
+    stubTokenEnv(`http://127.0.0.1:${port}/boapi/proxy/`);
+    const { origin, error } = await serve({ name: 'Fleet report' });
+
+    const response = await fetch(`${origin}${FAKE_API_PATH}x`);
+
+    expect(await response.json()).toEqual({
+      error: 'proxy-failed',
+      message: expect.stringContaining('ECONNREFUSED'),
+    });
+    expect(error).toHaveBeenCalledWith(
+      expect.stringMatching(/cannot reach .*\(ECONNREFUSED\)\. Check BO_WIDGET_API_URL/),
+    );
+  });
+
+  it('warns once about a missing mock response, listing the known ones', async () => {
+    const { origin, warn } = await serve({
+      name: 'Fleet report',
+      dev: { responses: { 'GET fleets': [] } },
+    });
+
+    await fetch(`${origin}${FAKE_API_PATH}vehicles`);
+    await fetch(`${origin}${FAKE_API_PATH}vehicles`);
+
+    const warnings = warn.mock.calls.filter(([message]) => message.includes('no response for'));
+    expect(warnings).toEqual([
+      [expect.stringContaining('no response for "GET vehicles" (known: GET fleets)')],
+    ]);
+  });
+
+  it('answers 400 to a malformed path in mock mode', async () => {
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    expect(await rawGet(origin, `${FAKE_API_PATH}%E0%A4%A`)).toBe(400);
+  });
+
+  it('prints the fake back office URL on the network address when there is no local one', async () => {
+    const { server, customLogger } = await serve({ name: 'Fleet report' });
+    const info = vi.spyOn(customLogger, 'info');
+    server.resolvedUrls = { local: [], network: ['http://192.168.1.10:5173/'] };
+
+    server.printUrls();
+
+    expect(info).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Fake back office (mock mode): http://192.168.1.10:5173/__bo-widget/',
+      ),
+    );
   });
 });

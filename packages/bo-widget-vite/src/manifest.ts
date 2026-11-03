@@ -6,7 +6,7 @@ import {
   type WidgetManifestInput,
   type WidgetPermission,
 } from '@vulog/bo-widget-sdk/manifest';
-import type { WidgetDevOptions } from './dev/options.js';
+import { devOptionsIssues, type WidgetDevOptions } from './dev/options.js';
 
 /** How the back office runs the widget: Web Component (default) or iframe. */
 export type WidgetRuntime = keyof typeof WIDGET_RUNTIME_ENTRIES;
@@ -78,28 +78,29 @@ export class BoWidgetConfigError extends Error {
   constructor(issues: readonly string[]) {
     super(`Invalid widget configuration:\n${issues.map((issue) => `  - ${issue}`).join('\n')}`);
     this.name = 'BoWidgetConfigError';
-    this.issues = issues;
+    this.issues = Object.freeze([...issues]);
   }
 }
 
 /** `@vulog/fleet-report` → `fleet-report`. */
 const unscoped = (name: string): string => name.replace(/^@[^/]+\//, '');
 
-/** Reads the npm `author` field: `"Name <email> (url)"` or `{ name, email }`. */
-const parseAuthor = (author: unknown): WidgetConfig['author'] => {
+/** Reads the npm `author` field: `"Name <email> (url)"` or `{ name, email }`; `error` when it cannot. */
+const parseAuthor = (author: unknown): { author?: WidgetConfig['author']; error?: string } => {
+  if (author === undefined || author === '') return {};
   if (typeof author === 'string') {
     const match = /^\s*([^<(]*?)\s*(?:<([^>]*)>)?\s*(?:\([^)]*\))?\s*$/.exec(author);
     const name = match?.[1];
-    if (!name) return undefined;
+    if (!name) return { error: `"${author}" is not understood` };
     const email = match[2]?.trim();
-    return email ? { name, email } : { name };
+    return { author: email ? { name, email } : { name } };
   }
   if (typeof author === 'object' && author !== null) {
     const { name, email } = author as { name?: unknown; email?: unknown };
-    if (typeof name !== 'string' || !name.trim()) return undefined;
-    return typeof email === 'string' && email ? { name, email } : { name };
+    if (typeof name !== 'string' || !name.trim()) return { error: 'has no name' };
+    return { author: typeof email === 'string' && email ? { name, email } : { name } };
   }
-  return undefined;
+  return { error: 'must be a string or an object' };
 };
 
 /**
@@ -109,8 +110,9 @@ const parseAuthor = (author: unknown): WidgetConfig['author'] => {
  * @param config - The widget configuration (`widget.config.ts`).
  * @param packageJson - The parsed `package.json` of the widget.
  * @returns The manifest, defaults applied, as written to `widget.json`.
- * @throws {BoWidgetConfigError} When the configuration has an unknown key or the manifest is
- * invalid (one issue per problem, with its path, e.g. `version: Must be a semantic version…`).
+ * @throws {BoWidgetConfigError} When the configuration is not an object, has an unknown key (also
+ * inside `dev`), or the manifest is invalid: one issue per problem, with its path and, for a value
+ * taken from `package.json`, where it came from (e.g. `version (from package.json): Must be…`).
  *
  * @example
  * ```ts
@@ -123,7 +125,7 @@ export const buildManifest = (
   packageJson: WidgetPackageJson,
 ): WidgetManifest => {
   if (typeof config !== 'object' || config === null) {
-    throw new BoWidgetConfigError(['the widget configuration must be an object']);
+    throw new BoWidgetConfigError(['(root): the widget configuration must be an object']);
   }
   const unknownKeys = Object.keys(config).filter((key) => !CONFIG_KEYS.includes(key));
   if (unknownKeys.length > 0) {
@@ -131,14 +133,33 @@ export const buildManifest = (
   }
 
   const runtime = config.runtime ?? 'webcomponent';
-  const author = config.author ?? parseAuthor(packageJson.author);
-  const description =
-    config.description ??
-    (typeof packageJson.description === 'string' ? packageJson.description : undefined);
+  const issues = devOptionsIssues(config.dev);
+  if (runtime === 'iframe' && config.entry !== undefined) {
+    issues.push('entry: an iframe widget is built from index.html, remove entry');
+  }
+  const fromPackage = new Set<string>(['version']);
+  let author = config.author;
+  if (author === undefined) {
+    const parsed = parseAuthor(packageJson.author);
+    if (parsed.error) {
+      issues.push(`author (from package.json): ${parsed.error}, set author in widget.config.ts`);
+    }
+    author = parsed.author;
+    fromPackage.add('author');
+  }
+  let description = config.description;
+  if (description === undefined && typeof packageJson.description === 'string') {
+    description = packageJson.description;
+    fromPackage.add('description');
+  }
+  let id = config.id;
+  if (id === undefined && typeof packageJson.name === 'string') {
+    id = unscoped(packageJson.name);
+    fromPackage.add('id');
+  }
   const manifest = {
     manifestVersion: 1,
-    id:
-      config.id ?? (typeof packageJson.name === 'string' ? unscoped(packageJson.name) : undefined),
+    id,
     name: config.name,
     ...(description === undefined ? {} : { description }),
     version: packageJson.version,
@@ -159,14 +180,18 @@ export const buildManifest = (
 
   const result = publishedWidgetManifestSchema.safeParse(manifest);
   if (!result.success) {
-    throw new BoWidgetConfigError(
-      result.error.issues.map((issue) => {
-        const path = issue.path.join('.');
-        // `version` is the only field read from package.json alone: say where to fix it.
-        const where = path === 'version' ? ' (from package.json)' : '';
-        return `${path || '(root)'}${where}: ${issue.message}`;
-      }),
-    );
+    for (const issue of result.error.issues) {
+      const path = issue.path.join('.');
+      const field = String(issue.path[0] ?? '');
+      // Say where to fix a value taken from package.json.
+      const where = fromPackage.has(field)
+        ? field === 'id'
+          ? ' (from the package.json name, or set id in widget.config.ts)'
+          : ' (from package.json)'
+        : '';
+      issues.push(`${path || '(root)'}${where}: ${issue.message}`);
+    }
   }
+  if (!result.success || issues.length > 0) throw new BoWidgetConfigError(issues);
   return result.data;
 };

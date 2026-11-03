@@ -4,7 +4,8 @@
  * `vulogBo`) or in an iframe (`hello` / `welcome` handshake and `MessagePort`), and answers its
  * requests with the dev fixtures.
  *
- * Runs in the browser. It imports nothing: what it needs from Node comes in {@link FakeBoConfig}.
+ * Runs in the browser. It imports nothing at runtime (type imports only): what it needs from Node
+ * comes in {@link FakeBoConfig}.
  *
  * @packageDocumentation
  */
@@ -17,18 +18,20 @@ import type {
   BoEventName,
   BoNavigatePayload,
   BoNotifyPayload,
+  BoNotifySeverity,
   BoResizePayload,
   BoSettings,
   BoTheme,
 } from '@vulog/bo-widget-sdk';
+import type { WidgetManifest, WidgetPermission } from '@vulog/bo-widget-sdk/manifest';
 import type { FakeBoMode } from './options.js';
 
 /** What the dev server passes to the fake back office (JSON). */
 export interface FakeBoConfig {
   mode: FakeBoMode;
-  runtime: 'webcomponent' | 'iframe';
+  runtime: WidgetManifest['runtime']['type'];
   protocolVersion: number;
-  widget: { id: string; name: string; version: string; permissions: string[] };
+  widget: { id: string; name: string; version: string; permissions: readonly WidgetPermission[] };
   /** Tag the Web Component is registered under. */
   tag: string;
   /** URL of the widget page (iframe). */
@@ -47,21 +50,24 @@ export interface FakeBoConfig {
 /** What the fake back office shows: requests log, snackbars, route and iframe height. */
 export interface FakeBoUi {
   log(message: string, level?: 'info' | 'warning' | 'error'): void;
-  notify(message: string, severity: string): void;
+  notify(message: string, severity: BoNotifySeverity): void;
   navigate(path: string): void;
   resize(height: number | null): void;
 }
 
-/** Error the back office API throws, with the codes of the real one (`no-token`, `invalid-payload`…). */
+/** Codes of the errors the back office API throws, which the SDK turns into `reason`. */
+export type WidgetHostErrorCode = 'invalid-payload' | 'no-token';
+
+/** Error the back office API throws, with the codes of the real one. */
 export class WidgetHostError extends Error {
-  readonly code: string;
+  readonly code: WidgetHostErrorCode;
   readonly status: number | null;
 
-  constructor(code: string, message: string, status: number | null = null) {
+  constructor(code: WidgetHostErrorCode, message: string, status: number | null = null) {
     super(message);
     this.name = 'WidgetHostError';
     this.code = code;
-    this.status = status;
+    this.status = Number.isInteger(status) ? status : null;
   }
 }
 
@@ -79,14 +85,14 @@ type HandlerName =
   | 'resize';
 
 /** Permission each request needs; the others are always served. */
-const REQUIRED_PERMISSION: Partial<Record<HandlerName, string>> = {
+const REQUIRED_PERMISSION: Partial<Record<HandlerName, WidgetPermission>> = {
   getApiInfo: 'apiInfo',
   getAccessToken: 'accessToken',
   navigate: 'navigate',
   notify: 'notify',
 };
 
-const NOTIFY_SEVERITIES = ['success', 'info', 'warning', 'error'];
+const NOTIFY_SEVERITIES: readonly BoNotifySeverity[] = ['success', 'info', 'warning', 'error'];
 
 const THEMES: Record<'light' | 'dark', BoTheme> = {
   light: {
@@ -121,12 +127,19 @@ const invalidPayload = (message: string): WidgetHostError =>
 const resolveRoute = (basename: string, path: string): string =>
   path.startsWith('/') ? path : `${basename.replace(/\/+$/, '')}/${path}`;
 
+/** JSON of a result for the log, with the access token masked: the log is on screen. */
+const forLog = (value: unknown): string =>
+  JSON.stringify(value, (key, item: unknown) =>
+    key === 'accessToken' && typeof item === 'string' ? `${item.slice(0, 6)}…` : item,
+  );
+
 /**
  * The state and the requests of the fake back office, without the page around it.
  *
  * @param config - Fixtures and widget identity from the dev server.
  * @param ui - What the page shows.
- * @returns The handlers of both modes, and the events the page pushes.
+ * @returns The API to inject into a Web Component, the server of an iframe port, and the events
+ * the page pushes.
  */
 export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
   const listeners = new Map<string, Set<Listener>>();
@@ -188,7 +201,7 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
     },
   };
 
-  const missingPermission = (type: HandlerName): string | null => {
+  const missingPermission = (type: HandlerName): WidgetPermission | null => {
     const permission = REQUIRED_PERMISSION[type];
     return permission && !config.widget.permissions.includes(permission) ? permission : null;
   };
@@ -201,6 +214,7 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
         listener(structuredClone(data));
       } catch (error) {
         ui.log(`listener of ${name} failed: ${String(error)}`, 'error');
+        console.error(error);
       }
     }
     for (const port of ports) port.postMessage({ type: 'event', name, data });
@@ -224,7 +238,7 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
         }
         try {
           const result = await handlers[type](payload);
-          ui.log(`${type} → ${JSON.stringify(result)}`);
+          ui.log(`${type} → ${forLog(result)}`);
           return result;
         } catch (error) {
           ui.log(`${type} failed: ${(error as Error).message}`, 'error');
@@ -283,6 +297,8 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
                 },
         };
       }
+      // A bug of the fake back office itself: keep its stack in the console.
+      console.error(error);
       return { ok: false, error: { code: 'INTERNAL', message: String(error) } };
     }
   };
@@ -297,15 +313,18 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
     ports.add(port);
     port.onmessage = async (event: MessageEvent) => {
       const message: unknown = event.data;
-      if (!isRecord(message) || !('id' in message)) return;
+      if (!isRecord(message) || !('id' in message)) {
+        ui.log(`ignored a message without id: ${JSON.stringify(message)}`, 'warning');
+        return;
+      }
       const response = await answer(message.type, message.payload);
-      const level = response.ok ? 'info' : 'error';
       ui.log(
-        `${String(message.type)} → ${JSON.stringify(response.ok ? response.result : response.error)}`,
-        level,
+        `${String(message.type)} → ${forLog(response.ok ? response.result : response.error)}`,
+        response.ok ? 'info' : 'error',
       );
       if (ports.has(port)) port.postMessage({ id: message.id, ...response });
     };
+    port.onmessageerror = () => ui.log('a message from the widget could not be read', 'error');
     port.postMessage({
       type: 'welcome',
       protocolVersion: config.protocolVersion,
@@ -355,7 +374,7 @@ const element = <K extends keyof HTMLElementTagNameMap>(
   props: Partial<HTMLElementTagNameMap[K]> = {},
 ): HTMLElementTagNameMap[K] => Object.assign(document.createElement(tag), props);
 
-/** Builds the page of the fake back office around `content`. */
+/** Builds the page of the fake back office (bar, content zone, log, snackbars) and returns its parts. */
 const createPage = (config: FakeBoConfig) => {
   document.title = `${config.widget.name} · fake back office`;
   document.head.append(element('style', { textContent: STYLES }));
@@ -401,46 +420,86 @@ const createPage = (config: FakeBoConfig) => {
       if (frame) frame.style.height = height === null ? '100%' : `${height}px`;
     },
   };
-  return { ui, content, locale, theme };
+  /** Shows an error in the content zone and the log. */
+  const fail = (message: string): void => {
+    content.append(element('div', { className: 'bo-error', textContent: message }));
+    ui.log(message, 'error');
+  };
+  return { ui, fail, content, locale, theme };
 };
 
 const isElementClass = (value: unknown): value is CustomElementConstructor =>
   typeof value === 'function' && value.prototype instanceof HTMLElement;
 
-/**
- * Starts the fake back office on the current page and displays the widget.
- *
- * @param config - Fixtures and widget identity from the dev server.
- * @param widgetClass - Default export of the widget entry (Web Component only).
- */
-export const startFakeBo = (config: FakeBoConfig, widgetClass?: unknown): void => {
-  const { ui, content, locale, theme } = createPage(config);
-  const backOffice = createFakeBackOffice(config, ui);
-  locale.addEventListener('change', () => backOffice.setLocale(locale.value));
-  theme.addEventListener('click', () => {
-    theme.textContent = `Theme: ${backOffice.toggleTheme()}`;
-  });
+/** Loads the widget entry module (`import()` of the entry, from the dev server). */
+export type WidgetLoader = () => Promise<{ default?: unknown }>;
 
-  if (config.runtime === 'iframe') {
-    const frame = element('iframe', { src: config.widgetUrl, title: config.widget.name });
-    let closePort: (() => void) | null = null;
-    globalThis.addEventListener('message', (event: MessageEvent) => {
-      const data: unknown = event.data;
-      if (event.source !== frame.contentWindow || !isRecord(data)) return;
-      if (data.protocol !== 'vulog-bo' || data.type !== 'hello' || !event.ports[0]) return;
-      // The widget page reloaded (HMR): only its new port is served.
-      closePort?.();
-      ui.log(`hello from ${String(data.widgetId ?? config.widget.id)}`);
-      closePort = backOffice.servePort(event.ports[0]);
-    });
-    content.append(frame);
+/** Displays an iframe widget and serves the port of each `hello` its page posts. */
+const startIframe = (
+  config: FakeBoConfig,
+  page: ReturnType<typeof createPage>,
+  backOffice: ReturnType<typeof createFakeBackOffice>,
+): void => {
+  const { ui, content } = page;
+  const frame = element('iframe', { src: config.widgetUrl, title: config.widget.name });
+  let closePort: (() => void) | null = null;
+  globalThis.addEventListener('message', (event: MessageEvent) => {
+    const data: unknown = event.data;
+    // A page left behind (removed iframe) no longer answers.
+    if (!frame.isConnected || event.source !== frame.contentWindow) return;
+    if (!isRecord(data) || data.protocol !== 'vulog-bo') {
+      return;
+    }
+    if (data.type !== 'hello') return;
+    const port = event.ports[0];
+    if (!port) {
+      ui.log('hello without MessagePort: post it in the transfer list', 'error');
+      return;
+    }
+    if (data.version !== config.protocolVersion) {
+      ui.log(
+        `hello for protocol ${String(data.version)}, this back office serves ${config.protocolVersion}`,
+        'error',
+      );
+      port.postMessage({
+        type: 'error',
+        error: {
+          code: 'INTERNAL',
+          reason: 'unsupported-version',
+          message: `Unsupported protocol version ${String(data.version)}`,
+        },
+      });
+      port.close();
+      return;
+    }
+    // The widget page reloaded (full reload in dev): only its new port is served.
+    closePort?.();
+    ui.log(`hello from ${String(data.widgetId ?? config.widget.id)}`);
+    closePort = backOffice.servePort(port);
+  });
+  content.append(frame);
+};
+
+/** Registers the widget class under its tag, injects the API and displays the element. */
+const startWebComponent = async (
+  config: FakeBoConfig,
+  page: ReturnType<typeof createPage>,
+  backOffice: ReturnType<typeof createFakeBackOffice>,
+  load: WidgetLoader | undefined,
+): Promise<void> => {
+  const name = `${config.widget.id}@${config.widget.version}`;
+  let widgetClass: unknown;
+  try {
+    widgetClass = (await load?.())?.default;
+  } catch (error) {
+    page.fail(`${name}: the entry failed to load: ${String(error)}`);
+    console.error(error);
     return;
   }
-
   if (!isElementClass(widgetClass)) {
-    const message = `${config.widget.id}@${config.widget.version}: the default export of the entry is not an HTMLElement class`;
-    content.append(element('div', { className: 'bo-error', textContent: message }));
-    ui.log(message, 'error');
+    page.fail(
+      `${name}: the default export of the entry is not an HTMLElement class (got ${typeof widgetClass}): export default class extends HTMLElement { … }`,
+    );
     return;
   }
   try {
@@ -449,12 +508,41 @@ export const startFakeBo = (config: FakeBoConfig, widgetClass?: unknown): void =
     widget.dataset.widgetId = config.widget.id;
     widget.dataset.widgetVersion = config.widget.version;
     widget.vulogBo = backOffice.createHostApi();
-    content.append(widget);
+    page.content.append(widget);
   } catch (error) {
     // `define` throws when the class is already registered under another tag (the widget called
     // customElements.define itself).
-    const message = `${config.widget.id}@${config.widget.version}: cannot display the widget: ${String(error)}`;
-    content.append(element('div', { className: 'bo-error', textContent: message }));
-    ui.log(message, 'error');
+    page.fail(`${name}: cannot display the widget: ${String(error)}`);
+    console.error(error);
   }
+};
+
+/**
+ * Starts the fake back office on the current page and displays the widget. Errors the widget
+ * throws later (constructor, `connectedCallback`, rejected promises) are shown in the log too.
+ *
+ * @param config - Fixtures and widget identity from the dev server.
+ * @param load - Loads the widget entry, whose default export is the element class (Web Component
+ * only).
+ * @returns Once the widget is displayed, or its error shown.
+ */
+export const startFakeBo = async (config: FakeBoConfig, load?: WidgetLoader): Promise<void> => {
+  const page = createPage(config);
+  const backOffice = createFakeBackOffice(config, page.ui);
+  page.locale.addEventListener('change', () => backOffice.setLocale(page.locale.value));
+  page.theme.addEventListener('click', () => {
+    page.theme.textContent = `Theme: ${backOffice.toggleTheme()}`;
+  });
+  globalThis.addEventListener('error', (event: ErrorEvent) =>
+    page.ui.log(`uncaught error: ${String(event.error ?? event.message)}`, 'error'),
+  );
+  globalThis.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) =>
+    page.ui.log(`unhandled rejection: ${String(event.reason)}`, 'error'),
+  );
+
+  if (config.runtime === 'iframe') {
+    startIframe(config, page, backOffice);
+    return;
+  }
+  await startWebComponent(config, page, backOffice, load);
 };

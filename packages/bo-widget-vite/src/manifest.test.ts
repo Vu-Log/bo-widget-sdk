@@ -96,13 +96,118 @@ describe('buildManifest', () => {
     expect(buildManifest({ name: 'Report' }, { ...pkg, author }).author).toEqual(expected);
   });
 
+  it('has no author when package.json has none or an empty one', () => {
+    expect(buildManifest({ name: 'Report' }, pkg).author).toBeUndefined();
+    expect(buildManifest({ name: 'Report' }, { ...pkg, author: '' }).author).toBeUndefined();
+  });
+
   it.each([
-    ['an empty string', ''],
-    ['an email only', '<dev@acme.example>'],
-    ['an object without name', { email: 'dev@acme.example' }],
-    ['a number', 42],
-  ])('ignores a package.json author given as %s', (_label, author) => {
-    expect(buildManifest({ name: 'Report' }, { ...pkg, author }).author).toBeUndefined();
+    ['an email only', '<dev@acme.example>', /"<dev@acme.example>" is not understood/],
+    ['an unclosed email', 'Jane <jane@acme.example', /is not understood/],
+    ['an object without name', { email: 'dev@acme.example' }, /has no name/],
+    ['a number', 42, /must be a string or an object/],
+  ])(
+    'refuses a package.json author given as %s, saying where to set it',
+    (_label, author, reason) => {
+      expect(issuesOf({ name: 'Report' }, { ...pkg, author })).toEqual([
+        expect.stringMatching(
+          new RegExp(
+            `^author \\(from package\\.json\\): .*${reason.source}.*set author in widget\\.config\\.ts$`,
+          ),
+        ),
+      ]);
+    },
+  );
+
+  it('ignores the package.json author when the config has one', () => {
+    expect(
+      buildManifest({ name: 'Report', author: { name: 'ACME' } }, { ...pkg, author: 42 }).author,
+    ).toEqual({
+      name: 'ACME',
+    });
+  });
+
+  it('says that an invalid id comes from the package.json name', () => {
+    expect(issuesOf({ name: 'Report' }, { name: '@acme/Fleet_Report', version: '1.0.0' })).toEqual([
+      expect.stringMatching(
+        /^id \(from the package\.json name, or set id in widget\.config\.ts\): /,
+      ),
+    ]);
+    expect(issuesOf({ id: 'Fleet_Report', name: 'Report' })).toEqual([
+      expect.stringMatching(/^id: /),
+    ]);
+  });
+
+  it('says that an invalid description comes from package.json', () => {
+    expect(issuesOf({ name: 'Report' }, { ...pkg, description: ' ' })).toEqual([
+      'description (from package.json): Must not be empty',
+    ]);
+  });
+
+  it('refuses an entry for an iframe widget', () => {
+    expect(issuesOf({ name: 'Report', runtime: 'iframe', entry: 'src/main.ts' })).toEqual([
+      'entry: an iframe widget is built from index.html, remove entry',
+    ]);
+  });
+
+  it('accepts valid dev options, which stay out of the manifest', () => {
+    const manifest = buildManifest(
+      {
+        name: 'Report',
+        entry: 'src/widget.ts',
+        dev: {
+          mode: 'mock',
+          context: { locale: 'fr' },
+          settings: { currency: 'EUR' },
+          responses: { 'GET fleetmanager/public/fleets/F1/vehicles': [] },
+        },
+      },
+      pkg,
+    );
+
+    expect(manifest).not.toHaveProperty('dev');
+    expect(manifest).not.toHaveProperty('entry');
+  });
+
+  it('refuses an unknown key, an unknown mode and malformed mock keys in dev', () => {
+    const issues = issuesOf({
+      name: 'Report',
+      dev: {
+        respones: {},
+        mode: 'proxy',
+        user: 'dev',
+        responses: { 'get fleets': [], 'GET /fleets': [], 'GET fleets?page=1': [] },
+      } as never,
+    });
+
+    expect(issues).toEqual([
+      'dev.respones: unknown configuration key',
+      'dev.mode: must be "mock" or "token"',
+      'dev.user: must be an object',
+      expect.stringMatching(/^dev\.responses\.get fleets: must be "<METHOD> <path>"/),
+      expect.stringMatching(/^dev\.responses\.GET \/fleets: /),
+      expect.stringMatching(/^dev\.responses\.GET fleets\?page=1: /),
+    ]);
+  });
+
+  it('refuses dev options that are not an object', () => {
+    expect(issuesOf({ name: 'Report', dev: [] as never })).toEqual(['dev: must be an object']);
+  });
+
+  it('reports the dev issues with the manifest issues', () => {
+    expect(issuesOf({ name: '', dev: { mode: 'x' as 'mock' } })).toEqual([
+      'dev.mode: must be "mock" or "token"',
+      expect.stringMatching(/^name: /),
+    ]);
+  });
+
+  it('freezes the issues of the error', () => {
+    const issues = ['a: b'];
+    const error = new BoWidgetConfigError(issues);
+    issues.push('c: d');
+
+    expect(error.issues).toEqual(['a: b']);
+    expect(Object.isFrozen(error.issues)).toBe(true);
   });
 
   it('prefers the config over package.json', () => {
@@ -123,7 +228,7 @@ describe('buildManifest', () => {
 
   it('refuses a configuration that is not an object', () => {
     expect(issuesOf(null as unknown as WidgetConfig)).toEqual([
-      'the widget configuration must be an object',
+      '(root): the widget configuration must be an object',
     ]);
   });
 

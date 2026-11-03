@@ -14,4 +14,4 @@ export {
   type WidgetRuntime,
 } from './manifest.js';
 export { FAKE_BO_PATH } from './dev/server.js';
-export type { FakeBoMode, WidgetDevOptions } from './dev/options.js';
+export type { FakeBoMode, MockMethod, MockResponseKey, WidgetDevOptions } from './dev/options.js';

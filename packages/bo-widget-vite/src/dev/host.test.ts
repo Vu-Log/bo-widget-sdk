@@ -60,6 +60,9 @@ const fakeUi = () => ({
   resize: vi.fn<FakeBoUi['resize']>(),
 });
 
+/** A loader of the widget entry, as the dev server generates it. */
+const load = (value: unknown) => async () => ({ default: value });
+
 const flush = () => new Promise((done) => setTimeout(done, 0));
 
 /** A widget class that connects with the real SDK and exposes its client. */
@@ -104,7 +107,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('startFakeBo as a Web Component', () => {
@@ -112,7 +115,7 @@ describe('startFakeBo as a Web Component', () => {
     const config = fakeConfig();
     const { Widget, client } = widgetClass();
 
-    startFakeBo(config, Widget);
+    await startFakeBo(config, load(Widget));
 
     const element = document.querySelector(config.tag) as HTMLElement;
     expect(element).toBeInstanceOf(Widget);
@@ -139,7 +142,7 @@ describe('startFakeBo as a Web Component', () => {
     const fetchMock = vi.fn(async () => new Response('[]'));
     vi.stubGlobal('fetch', fetchMock);
     const { Widget, client } = widgetClass();
-    startFakeBo(fakeConfig(), Widget);
+    await startFakeBo(fakeConfig(), load(Widget));
     const bo = await client();
 
     await bo.authFetch('fleetmanager/public/fleets/DEV-FLEET/vehicles');
@@ -156,7 +159,7 @@ describe('startFakeBo as a Web Component', () => {
 
   it('shows the route asked by navigate, and a snackbar for notify', async () => {
     const { Widget, client } = widgetClass();
-    startFakeBo(fakeConfig(), Widget);
+    await startFakeBo(fakeConfig(), load(Widget));
     const bo = await client();
 
     expect(await bo.navigate({ path: 'details/1' })).toEqual({
@@ -171,7 +174,7 @@ describe('startFakeBo as a Web Component', () => {
 
   it('pushes localeChanged and themeChanged from the bar', async () => {
     const { Widget, client } = widgetClass();
-    startFakeBo(fakeConfig(), Widget);
+    await startFakeBo(fakeConfig(), load(Widget));
     const bo = await client();
     const locales: unknown[] = [];
     const themes: unknown[] = [];
@@ -192,7 +195,7 @@ describe('startFakeBo as a Web Component', () => {
 
   it('rejects an external URL to navigate with INVALID_PAYLOAD', async () => {
     const { Widget, client } = widgetClass();
-    startFakeBo(fakeConfig(), Widget);
+    await startFakeBo(fakeConfig(), load(Widget));
     const bo = await client();
 
     await expect(bo.navigate({ path: 'https://evil.example' })).rejects.toMatchObject({
@@ -204,7 +207,10 @@ describe('startFakeBo as a Web Component', () => {
 
   it('serves a request the manifest does not allow, with a warning, as the back office does', async () => {
     const { Widget, client } = widgetClass();
-    startFakeBo(fakeConfig({ widget: { ...fakeConfig().widget, permissions: [] } }), Widget);
+    await startFakeBo(
+      fakeConfig({ widget: { ...fakeConfig().widget, permissions: [] } }),
+      load(Widget),
+    );
     const bo = await client();
 
     await bo.notify({ message: 'Hi' });
@@ -214,28 +220,170 @@ describe('startFakeBo as a Web Component', () => {
     );
   });
 
-  it('shows an error when the default export is not an element class', () => {
-    startFakeBo(fakeConfig(), { not: 'a class' });
+  it('shows an error when the default export is not an element class', async () => {
+    await startFakeBo(fakeConfig(), load({ not: 'a class' }));
 
     expect(document.querySelector('.bo-error')?.textContent).toMatch(
-      /default export of the entry is not an HTMLElement class/,
+      /default export of the entry is not an HTMLElement class \(got object\)/,
     );
   });
 
-  it('shows an error when the widget registered its class itself', () => {
+  it('shows an error when the entry has no default export', async () => {
+    await startFakeBo(fakeConfig(), async () => ({}));
+
+    expect(document.querySelector('.bo-error')?.textContent).toMatch(/\(got undefined\)/);
+  });
+
+  it('shows an error when the entry fails to load', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await startFakeBo(fakeConfig(), async () => {
+      throw new SyntaxError('Unexpected token');
+    });
+
+    expect(document.querySelector('.bo-error')?.textContent).toMatch(
+      /the entry failed to load: SyntaxError: Unexpected token/,
+    );
+    expect(consoleError).toHaveBeenCalled();
+  });
+
+  it('shows an error when the widget registered its class itself', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     class SelfRegistered extends HTMLElement {}
     customElements.define(`self-registered-${tagCount}`, SelfRegistered);
 
-    startFakeBo(fakeConfig(), SelfRegistered);
+    await startFakeBo(fakeConfig(), load(SelfRegistered));
 
     expect(document.querySelector('.bo-error')?.textContent).toMatch(/cannot display the widget/);
   });
+
+  it('displays the widget again when the page reruns with the tag already defined', async () => {
+    const config = fakeConfig();
+    const { Widget } = widgetClass();
+    await startFakeBo(config, load(Widget));
+
+    await startFakeBo(config, load(Widget));
+
+    expect(document.querySelectorAll(config.tag)).toHaveLength(1);
+    expect(document.querySelector('.bo-error')).toBeNull();
+  });
+
+  it('masks the access token in the log', async () => {
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig({ accessToken: 'secret-token-value' }), load(Widget));
+    const bo = await client();
+
+    expect((await bo.getAccessToken()).accessToken).toBe('secret-token-value');
+
+    const log = document.querySelector('.bo-log')?.textContent ?? '';
+    expect(log).toContain('getAccessToken');
+    expect(log).not.toContain('secret-token-value');
+  });
+
+  it('shows the errors the widget throws later in the log', async () => {
+    await startFakeBo(fakeConfig(), load(widgetClass().Widget));
+
+    window.dispatchEvent(new ErrorEvent('error', { error: new Error('render failed') }));
+
+    expect(document.querySelector('.bo-log .error')?.textContent).toMatch(
+      /uncaught error: Error: render failed/,
+    );
+  });
 });
 
+const iframeConfig = (overrides: Partial<FakeBoConfig> = {}) =>
+  fakeConfig({ runtime: 'iframe', ...overrides });
+
+/** Posts a `hello` from the widget iframe, as the SDK does. */
+const hello = (data: Record<string, unknown> = {}, ports?: MessagePort[]) => {
+  const frame = document.querySelector('iframe') as HTMLIFrameElement;
+  window.dispatchEvent(
+    new MessageEvent('message', {
+      data: { protocol: 'vulog-bo', version: 2, type: 'hello', ...data },
+      source: frame.contentWindow,
+      ports: ports ?? [],
+    }),
+  );
+};
+
+/** Collects what the back office posts on a port. */
+const collect = (port: MessagePort): unknown[] => {
+  const received: unknown[] = [];
+  port.onmessage = (event) => received.push(event.data);
+  return received;
+};
+
 describe('startFakeBo as an iframe', () => {
+  it('serves only the port of the last hello after the widget page reloads', async () => {
+    await startFakeBo(iframeConfig());
+    const first = new MessageChannel();
+    const second = new MessageChannel();
+    const firstReceived = collect(first.port1);
+    const secondReceived = collect(second.port1);
+    hello({}, [first.port2]);
+    await vi.waitFor(() => expect(firstReceived).toHaveLength(1));
+
+    hello({}, [second.port2]);
+    await vi.waitFor(() => expect(secondReceived).toHaveLength(1));
+    const select = document.querySelector('select') as HTMLSelectElement;
+    select.value = 'fr';
+    select.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(secondReceived).toHaveLength(2));
+
+    expect(firstReceived).toHaveLength(1);
+    expect(secondReceived[1]).toEqual({
+      type: 'event',
+      name: 'localeChanged',
+      data: { locale: 'fr' },
+    });
+    second.port1.close();
+  });
+
+  it('answers a hello for another protocol version with an error', async () => {
+    await startFakeBo(iframeConfig());
+    const { port1, port2 } = new MessageChannel();
+    const received = collect(port1);
+
+    hello({ version: 3 }, [port2]);
+    await vi.waitFor(() => expect(received).toHaveLength(1));
+
+    expect(received[0]).toMatchObject({
+      type: 'error',
+      error: { code: 'INTERNAL', reason: 'unsupported-version' },
+    });
+    expect(document.querySelector('.bo-log .error')?.textContent).toMatch(/hello for protocol 3/);
+  });
+
+  it('logs a hello without MessagePort', async () => {
+    await startFakeBo(iframeConfig());
+
+    hello();
+
+    expect(document.querySelector('.bo-log .error')?.textContent).toMatch(
+      /hello without MessagePort/,
+    );
+  });
+
+  it('resizes the iframe on resize', async () => {
+    await startFakeBo(iframeConfig());
+    const { port1, port2 } = new MessageChannel();
+    const received = collect(port1);
+    hello({}, [port2]);
+
+    port1.postMessage({ id: '1', type: 'resize', payload: { height: 480 } });
+    await vi.waitFor(() => expect(received).toHaveLength(2));
+    const frame = document.querySelector('iframe') as HTMLIFrameElement;
+    expect(frame.style.height).toBe('480px');
+
+    port1.postMessage({ id: '2', type: 'resize', payload: { height: null } });
+    await vi.waitFor(() => expect(received).toHaveLength(3));
+    expect(frame.style.height).toBe('100%');
+    port1.close();
+  });
+
   it('displays the widget page in an iframe and serves the port of its hello', async () => {
-    const config = fakeConfig({ runtime: 'iframe' });
-    startFakeBo(config);
+    const config = iframeConfig();
+    await startFakeBo(config);
     const frame = document.querySelector('iframe') as HTMLIFrameElement;
     expect(frame.getAttribute('src')).toBe('/');
     const { port1, port2 } = new MessageChannel();
@@ -260,7 +408,7 @@ describe('startFakeBo as an iframe', () => {
   });
 
   it('ignores a hello from another window', async () => {
-    startFakeBo(fakeConfig({ runtime: 'iframe' }));
+    await startFakeBo(iframeConfig());
     const { port1, port2 } = new MessageChannel();
     const received = vi.fn();
     port1.onmessage = received;
@@ -333,19 +481,23 @@ describe('createFakeBackOffice on the iframe port', () => {
     client.disconnect();
   });
 
-  it('answers an unknown request with UNKNOWN_TYPE, and a failure with INTERNAL', async () => {
-    const config = fakeConfig({ runtime: 'iframe' });
-    const backOffice = createFakeBackOffice(config, fakeUi());
+  it('answers an unknown request with UNKNOWN_TYPE, and logs a message without id', async () => {
+    const ui = fakeUi();
+    const backOffice = createFakeBackOffice(fakeConfig({ runtime: 'iframe' }), ui);
     const { port1, port2 } = new MessageChannel();
-    const answers: unknown[] = [];
-    port1.onmessage = (event) => answers.push(event.data);
+    const answers = collect(port1);
     backOffice.servePort(port2);
 
     port1.postMessage({ id: '1', type: 'getSecrets' });
-    // `structuredClone` cannot clone a function: the handler throws a non-host error.
     port1.postMessage({ id: '2', type: 'navigate', payload: { path: 'ok' } });
     port1.postMessage('not a request');
     await vi.waitFor(() => expect(answers).toHaveLength(3));
+    await vi.waitFor(() =>
+      expect(ui.log).toHaveBeenCalledWith(
+        expect.stringMatching(/ignored a message without id/),
+        'warning',
+      ),
+    );
 
     expect(answers).toEqual([
       expect.objectContaining({ type: 'welcome' }),
@@ -356,6 +508,23 @@ describe('createFakeBackOffice on the iframe port', () => {
       },
       { id: '2', ok: true, result: { path: '/widgets/fleet-report/ok' } },
     ]);
+    port1.close();
+  });
+
+  it('answers a failure of the fake back office itself with INTERNAL', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // `structuredClone` cannot clone a function: getSettings throws a DataCloneError.
+    const config = fakeConfig({ runtime: 'iframe', settings: { broken: () => {} } });
+    const backOffice = createFakeBackOffice(config, fakeUi());
+    const { port1, port2 } = new MessageChannel();
+    const answers = collect(port1);
+    backOffice.servePort(port2);
+
+    port1.postMessage({ id: '1', type: 'getSettings' });
+    await vi.waitFor(() => expect(answers).toHaveLength(2));
+
+    expect(answers[1]).toMatchObject({ id: '1', ok: false, error: { code: 'INTERNAL' } });
+    expect(consoleError).toHaveBeenCalled();
     port1.close();
   });
 
@@ -388,6 +557,7 @@ describe('createFakeBackOffice host API', () => {
   });
 
   it('keeps calling the other listeners when one throws, and logs it', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const ui = fakeUi();
     const backOffice = createFakeBackOffice(fakeConfig(), ui);
     const api = backOffice.createHostApi();
