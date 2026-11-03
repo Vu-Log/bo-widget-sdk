@@ -24,19 +24,27 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./manifest": {
+      "types": "./dist/manifest/index.d.ts",
+      "default": "./dist/manifest/index.js"
+    },
     "./package.json": "./package.json"
   },
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
     "src",
-    "!src/**/*.test.ts"
+    "!src/**/*.test.ts",
+    "AGENTS.md"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "check:package": "publint --strict && attw --pack . --profile esm-only && node --input-type=module -e \"const m = await import('@vulog/bo-widget-sdk'); if (Object.keys(m).length === 0) throw new Error('@vulog/bo-widget-sdk: no export resolved from dist');\""
+    "check:package": "publint --strict && attw --pack . --profile esm-only && node --input-type=module -e \"const m = await import('@vulog/bo-widget-sdk'); const s = await import('@vulog/bo-widget-sdk/manifest'); if (typeof m.connect !== 'function' || typeof s.widgetManifestSchema?.safeParse !== 'function') throw new Error('@vulog/bo-widget-sdk: exports not resolved from dist');\""
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
   }
 }
