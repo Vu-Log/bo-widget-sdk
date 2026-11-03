@@ -8,7 +8,7 @@ A BO widget is a page added to the Vulog back office menu, delivered either as a
 
 | Package                                           | Description                                      | Status      |
 | ------------------------------------------------- | ------------------------------------------------ | ----------- |
-| [`@vulog/bo-widget-sdk`](packages/bo-widget-sdk/) | Framework-agnostic client of the widget protocol | Placeholder |
+| [`@vulog/bo-widget-sdk`](packages/bo-widget-sdk/) | Framework-agnostic client of the widget protocol | Pre-release |
 
 More packages (React bindings, Vite plugin, CLI, project generator) will be added here.
 
