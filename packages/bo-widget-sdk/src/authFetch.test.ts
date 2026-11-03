@@ -52,9 +52,9 @@ afterEach(() => {
 describe('authFetch as a Web Component', () => {
   it('prefixes a Vulog API path with baseUrl and adds only X-API-Key', async () => {
     const src = source('webcomponent');
-    await createAuthFetch(src)('api/v1/fleets/F1/vehicles?page=2');
+    await createAuthFetch(src)('fleets/F1/vehicles?page=2');
     expect(lastCall()).toMatchObject({
-      url: `${BASE_URL}api/v1/fleets/F1/vehicles?page=2`,
+      url: `${BASE_URL}fleets/F1/vehicles?page=2`,
       apiKey: 'api-key',
       authorization: null,
     });
@@ -62,24 +62,27 @@ describe('authFetch as a Web Component', () => {
   });
 
   it('reads a leading slash as relative to baseUrl', async () => {
-    await createAuthFetch(source('webcomponent'))('/api/v1/me');
-    expect(lastCall().url).toBe(`${BASE_URL}api/v1/me`);
+    await createAuthFetch(source('webcomponent'))('/fleets/F1/vehicles/V1');
+    expect(lastCall().url).toBe(`${BASE_URL}fleets/F1/vehicles/V1`);
   });
 
   it('accepts an absolute URL under baseUrl as a Vulog API', async () => {
-    await createAuthFetch(source('webcomponent'))(new URL(`${BASE_URL}api/v1/me`));
-    expect(lastCall()).toMatchObject({ url: `${BASE_URL}api/v1/me`, apiKey: 'api-key' });
+    await createAuthFetch(source('webcomponent'))(new URL(`${BASE_URL}fleets/F1/vehicles/V1`));
+    expect(lastCall()).toMatchObject({
+      url: `${BASE_URL}fleets/F1/vehicles/V1`,
+      apiKey: 'api-key',
+    });
   });
 
   it('does not retry a 401 on a Vulog API: the service worker owns the token', async () => {
     fetchMock.mockResolvedValue(new Response('', { status: 401 }));
-    const response = await createAuthFetch(source('webcomponent'))('api/v1/me');
+    const response = await createAuthFetch(source('webcomponent'))('fleets/F1/vehicles/V1');
     expect(response.status).toBe(401);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the caller init and headers', async () => {
-    await createAuthFetch(source('webcomponent'))('api/v1/vehicles', {
+    await createAuthFetch(source('webcomponent'))('fleets/F1/vehicles', {
       method: 'POST',
       body: '{}',
       headers: { 'Content-Type': 'application/json' },
@@ -124,9 +127,9 @@ describe('authFetch as a Web Component', () => {
 
 describe('authFetch in an iframe', () => {
   it('adds X-API-Key and the Bearer token to a Vulog API call', async () => {
-    await createAuthFetch(source('iframe', [token('t1')]))('api/v1/me');
+    await createAuthFetch(source('iframe', [token('t1')]))('fleets/F1/vehicles/V1');
     expect(lastCall()).toMatchObject({
-      url: `${BASE_URL}api/v1/me`,
+      url: `${BASE_URL}fleets/F1/vehicles/V1`,
       apiKey: 'api-key',
       authorization: 'Bearer t1',
     });
@@ -137,7 +140,7 @@ describe('authFetch in an iframe', () => {
       .mockResolvedValueOnce(new Response('', { status: 401 }))
       .mockResolvedValueOnce(new Response('ok'));
     const src = source('iframe', [token('old'), token('new')]);
-    const response = await createAuthFetch(src)('api/v1/me');
+    const response = await createAuthFetch(src)('fleets/F1/vehicles/V1');
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(lastCall(0).authorization).toBe('Bearer old');
@@ -181,7 +184,9 @@ describe('authFetch in an iframe', () => {
   });
 
   it('rejects with the no-token error of the back office, without calling the API', async () => {
-    const error = await createAuthFetch(source('iframe', []))('api/v1/me').catch((e: unknown) => e);
+    const error = await createAuthFetch(source('iframe', []))('fleets/F1/vehicles/V1').catch(
+      (e: unknown) => e,
+    );
     expect(error).toMatchObject({ code: 'INTERNAL', reason: 'no-token' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -199,7 +204,7 @@ describe('authFetch in an iframe', () => {
     const src = source('iframe', [token('t1')]);
     src.getApiInfo.mockRejectedValue(new BoError('FORBIDDEN', 'apiInfo required'));
     const authFetch = createAuthFetch(src);
-    await authFetch(`${BASE_URL}api/v1/me`);
+    await authFetch(`${BASE_URL}fleets/F1/vehicles/V1`);
     await authFetch('https://middleware.example.org/x');
     expect(lastCall(0)).toMatchObject({ apiKey: null, authorization: 'Bearer t1' });
     expect(src.getApiInfo).toHaveBeenCalledTimes(1);
@@ -208,7 +213,9 @@ describe('authFetch in an iframe', () => {
   it('rejects a relative path without the apiInfo permission', async () => {
     const src = source('iframe', [token('t1')]);
     src.getApiInfo.mockRejectedValue(new BoError('FORBIDDEN', 'apiInfo required'));
-    await expect(createAuthFetch(src)('api/v1/me')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(createAuthFetch(src)('fleets/F1/vehicles/V1')).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
   });
 
   it('propagates an API info failure other than FORBIDDEN for an absolute URL', async () => {
@@ -235,8 +242,8 @@ describe('authFetch: URL resolution', () => {
   };
 
   it('joins a relative path to a baseUrl without trailing slash', async () => {
-    await withBase('https://api.example.com/boapi/proxy')('api/v1/me');
-    expect(lastCall().url).toBe(`${BASE_URL}api/v1/me`);
+    await withBase('https://api.example.com/boapi/proxy')('fleets/F1/vehicles/V1');
+    expect(lastCall().url).toBe(`${BASE_URL}fleets/F1/vehicles/V1`);
   });
 
   it('never sends the API key to a sibling path of the base', async () => {
@@ -247,8 +254,11 @@ describe('authFetch: URL resolution', () => {
   });
 
   it('compares URLs with a non-canonical baseUrl', async () => {
-    await withBase('HTTPS://API.EXAMPLE.COM:443/boapi/proxy/')('api/v1/me');
-    expect(lastCall()).toMatchObject({ url: `${BASE_URL}api/v1/me`, apiKey: 'api-key' });
+    await withBase('HTTPS://API.EXAMPLE.COM:443/boapi/proxy/')('fleets/F1/vehicles/V1');
+    expect(lastCall()).toMatchObject({
+      url: `${BASE_URL}fleets/F1/vehicles/V1`,
+      apiKey: 'api-key',
+    });
   });
 
   it('keeps a protocol-relative path under baseUrl', async () => {
@@ -272,7 +282,7 @@ describe('authFetch: 401 retry', () => {
     fetchMock
       .mockResolvedValueOnce(new Response('', { status: 401 }))
       .mockResolvedValueOnce(new Response('ok'));
-    await createAuthFetch(source('iframe', [token('old'), token('new')]))('api/v1/vehicles', {
+    await createAuthFetch(source('iframe', [token('old'), token('new')]))('fleets/F1/vehicles', {
       method: 'POST',
       body: '{"a":1}',
       headers: { 'Content-Type': 'application/json' },
@@ -334,7 +344,7 @@ describe('authFetch: answers of the back office', () => {
   ])('rejects API info with %s as invalid-api-info', async (_label, info) => {
     const src = source('webcomponent');
     src.getApiInfo.mockResolvedValue(info as never);
-    await expect(createAuthFetch(src)('api/v1/me')).rejects.toMatchObject({
+    await expect(createAuthFetch(src)('fleets/F1/vehicles/V1')).rejects.toMatchObject({
       code: 'INTERNAL',
       reason: 'invalid-api-info',
     });

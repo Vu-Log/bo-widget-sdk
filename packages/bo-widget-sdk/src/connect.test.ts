@@ -116,7 +116,7 @@ afterEach(() => {
 /** Widget code, written once: it must behave the same in both modes. */
 const runWidget = async (bo: BoClient) => {
   const { fleetId } = await bo.getContext();
-  const response = await bo.authFetch(`api/v1/fleets/${fleetId}/vehicles`);
+  const response = await bo.authFetch(`fleets/${fleetId}/vehicles`);
   const locales: unknown[] = [];
   const stop = bo.on('localeChanged', ({ locale }) => locales.push(locale));
   const settingsError = await bo.getSettings().catch((error: unknown) => error);
@@ -159,8 +159,8 @@ describe('connect', () => {
     expect(inIframe.locales).toEqual(['fr']);
 
     const [webComponentCall, iframeCall] = fetchMock.mock.calls;
-    expect(webComponentCall?.[0]).toBe(`${BASE_URL}api/v1/fleets/FLEET-1/vehicles`);
-    expect(iframeCall?.[0]).toBe(`${BASE_URL}api/v1/fleets/FLEET-1/vehicles`);
+    expect(webComponentCall?.[0]).toBe(`${BASE_URL}fleets/FLEET-1/vehicles`);
+    expect(iframeCall?.[0]).toBe(`${BASE_URL}fleets/FLEET-1/vehicles`);
     expect(new Headers(webComponentCall?.[1]?.headers).get('Authorization')).toBeNull();
     expect(new Headers(iframeCall?.[1]?.headers).get('Authorization')).toBe('Bearer token');
 
@@ -205,7 +205,7 @@ describe('connect', () => {
       .mockResolvedValueOnce(new Response('ok'));
     vi.stubGlobal('window', { parent: backOffice.parentWindow(['apiInfo', 'accessToken']) });
     const bo = await connect();
-    const response = await bo.authFetch('api/v1/me');
+    const response = await bo.authFetch('fleets/F1/vehicles/V1');
     expect(response.status).toBe(200);
     const authorizations = fetchMock.mock.calls.map(([, init]) =>
       new Headers(init?.headers).get('Authorization'),
@@ -359,9 +359,11 @@ describe('connect: same contract in both modes', () => {
     const backOffice = fakeBackOffice();
     vi.stubGlobal('window', { parent: backOffice.parentWindow(['apiInfo', 'accessToken']) });
     for (const bo of [await connect({ vulogBo: backOffice.hostApi }), await connect()]) {
-      await bo.authFetch('api/v1/me');
+      await bo.authFetch('fleets/F1/vehicles/V1');
       bo.disconnect();
-      await expect(bo.authFetch('api/v1/me')).rejects.toMatchObject({ code: 'DISCONNECTED' });
+      await expect(bo.authFetch('fleets/F1/vehicles/V1')).rejects.toMatchObject({
+        code: 'DISCONNECTED',
+      });
     }
   });
 

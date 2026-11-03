@@ -170,7 +170,8 @@ export interface BoClient extends BoRequests {
   /**
    * `fetch` with the Vulog authentication.
    *
-   * - A relative path (`api/v1/...`) or a URL under `baseUrl` is a Vulog API: the URL is resolved
+   * - A relative path (`fleets/{fleetId}/vehicles`) or a URL under `baseUrl` is a Vulog API: the
+   *   URL is resolved
    *   against `baseUrl` and `X-API-Key` is added (permission `apiInfo`). In an iframe, the
    *   `Authorization: Bearer` header is added too (permission `accessToken`); a Web Component gets
    *   it from the back office service worker.

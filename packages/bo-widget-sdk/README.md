@@ -31,7 +31,7 @@ export default class FleetReport extends HTMLElement {
     const root = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
     this.bo = await connect(this);
     const { fleetId } = await this.bo.getContext();
-    const response = await this.bo.authFetch(`api/v1/fleets/${fleetId}/vehicles`);
+    const response = await this.bo.authFetch(`fleets/${fleetId}/vehicles`);
     root.textContent = `${(await response.json()).length} vehicles`;
   }
 
@@ -85,13 +85,17 @@ Permissions are declared in the widget manifest (`widget.json`). In an iframe, a
 ### `authFetch`
 
 ```ts
-const response = await bo.authFetch(`api/v1/fleets/${fleetId}/vehicles`, { method: 'GET' });
+// GET {baseUrl}fleets/{fleetId}/vehicles, where baseUrl is https://<api host>/boapi/proxy/
+const response = await bo.authFetch(`fleets/${fleetId}/vehicles?page=0`);
+const vehicles = await response.json();
 ```
 
-| Input                                                                 | Headers added                                                                                              | Permissions                                |
-| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| Path relative to the Vulog API (`api/v1/...`), or URL under `baseUrl` | `X-API-Key`, plus `Authorization: Bearer` in an iframe (as a Web Component, the BO service worker adds it) | `apiInfo`, plus `accessToken` in an iframe |
-| Any other absolute URL (your own backend)                             | `Authorization: Bearer` only, never the API key                                                            | `accessToken`                              |
+Paths are relative to `baseUrl`, the BO admin API, which already ends with `/boapi/proxy/`: write `fleets/...`, never `boapi/proxy/fleets/...`. The BO service worker only adds the token to URLs under that prefix, so other Vulog APIs (such as `/apiv5/`) are not authenticated this way.
+
+| Input                                                                    | Headers added                                                                                              | Permissions                                |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Path relative to the BO admin API (`fleets/...`), or URL under `baseUrl` | `X-API-Key`, plus `Authorization: Bearer` in an iframe (as a Web Component, the BO service worker adds it) | `apiInfo`, plus `accessToken` in an iframe |
+| Any other absolute URL (your own backend)                                | `Authorization: Bearer` only, never the API key                                                            | `accessToken`                              |
 
 When the SDK adds the token, it keeps it in cache while its expiry is known, renews it on the next call once it expires within a minute, shares one request between concurrent calls, and retries a `401` once with a new token. A `ReadableStream` body cannot be sent twice: its `401` is returned without retry, so prefer a string, `Blob` or `FormData` body. A Vulog API call as a Web Component is not retried: the BO service worker owns its token.
 
