@@ -34,6 +34,8 @@ const readBundle = async (dir: string, outDir: string): Promise<ZipInputFile[]> 
   try {
     entries = await readdir(dir, { recursive: true, withFileTypes: true });
   } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error;
     throw new BoWidgetCliError(`${dir} does not exist or is not a folder: build the widget first`, {
       cause: error,
     });
@@ -59,12 +61,14 @@ const readBundle = async (dir: string, outDir: string): Promise<ZipInputFile[]> 
 
 /** Writes through a temporary file, so that a failed write never leaves a truncated zip. */
 const writeAtomically = async (file: string, data: Buffer): Promise<void> => {
-  const temporary = `${file}.${process.pid}.tmp`;
+  // Ends with `.zip`, so that a leftover (process killed) is skipped like an earlier zip.
+  const temporary = `${file.slice(0, -'.zip'.length)}.${process.pid}.tmp.zip`;
   try {
     await writeFile(temporary, data);
     await rename(temporary, file);
   } catch (error) {
-    await rm(temporary, { force: true });
+    // The write error is the one to report: a failure to clean up must not replace it.
+    await rm(temporary, { force: true }).catch(() => undefined);
     throw error;
   }
 };

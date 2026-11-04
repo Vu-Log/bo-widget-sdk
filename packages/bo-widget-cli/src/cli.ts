@@ -152,14 +152,18 @@ const describeError = (command: string, error: unknown): string => {
   const expected =
     error instanceof UsageError ||
     error instanceof BoWidgetCliError ||
-    typeof (error as NodeJS.ErrnoException).code === 'string';
+    // A system error (file not found, permission denied…), not an internal ERR_* of Node.js.
+    typeof (error as NodeJS.ErrnoException).syscall === 'string';
   if (expected) return `bo-widget ${command}: ${error.message}`;
   const causes: string[] = [];
-  for (let cause = error.cause; cause !== undefined; cause = (cause as Error).cause) {
+  const seen = new Set<unknown>([error]);
+  // `seen` stops on a cycle of causes, which some libraries create.
+  for (let cause = error.cause; cause !== undefined && !seen.has(cause);) {
+    seen.add(cause);
     causes.push(
       `Caused by: ${cause instanceof Error ? (cause.stack ?? cause.message) : String(cause)}`,
     );
-    if (!(cause instanceof Error)) break;
+    cause = cause instanceof Error ? cause.cause : undefined;
   }
   return [
     `bo-widget ${command}: unexpected error, please report it`,

@@ -121,6 +121,56 @@ describe('packWidget', () => {
     );
   });
 
+  it('leaves out the zip of an earlier pack written into the build folder', async () => {
+    await writeValidBundle();
+
+    expect((await packWidget({ dir: dist, outDir: dist })).ok).toBe(true);
+    const second = await packWidget({ dir: dist, outDir: dist });
+
+    expect(second).toMatchObject({ ok: true, file: join(dist, 'fleet-report-1.2.0.zip') });
+    expect((await readdir(dist)).sort()).toEqual([
+      'assets',
+      'fleet-report-1.2.0.zip',
+      'index.js',
+      'widget.json',
+    ]);
+  });
+
+  it('keeps a .zip of a subfolder, which the validator then refuses', async () => {
+    await writeValidBundle();
+    await write('assets/old.zip', 'x');
+
+    const result = await packWidget({ dir: dist, outDir: dist });
+
+    expect(!result.ok && result.errors.map(({ code }) => code)).toEqual(['forbidden-extension']);
+  });
+
+  it('writes only the zip in the output folder', async () => {
+    await writeValidBundle();
+
+    await packWidget({ dir: dist, outDir: out });
+
+    expect(await readdir(out)).toEqual(['fleet-report-1.2.0.zip']);
+  });
+
+  it('rejects and leaves no temporary file behind when the zip cannot be written', async () => {
+    await writeValidBundle();
+    // The path of the zip is taken by a non-empty folder: the rename fails.
+    await mkdir(join(out, 'fleet-report-1.2.0.zip', 'x'), { recursive: true });
+
+    await expect(packWidget({ dir: dist, outDir: out })).rejects.toThrow();
+    expect(await readdir(out)).toEqual(['fleet-report-1.2.0.zip']);
+  });
+
+  it('rethrows an error other than a missing folder as is', async () => {
+    // Only ENOENT and ENOTDIR mean "build first": a name too long is reported as it is.
+    const tooLong = join(root, 'a'.repeat(300));
+
+    await expect(packWidget({ dir: tooLong, outDir: out })).rejects.toMatchObject({
+      code: 'ENAMETOOLONG',
+    });
+  });
+
   it('throws on a symbolic link, rather than packing what it points to', async () => {
     await writeValidBundle();
     await symlink(join(dist, 'index.js'), join(dist, 'link.js'));

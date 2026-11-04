@@ -22,6 +22,15 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  // A fake vite left running by a failed signal test.
+  const ready = await readFile(join(root, 'ready'), 'utf8').catch(() => '');
+  if (ready) {
+    try {
+      process.kill(Number(ready), 'SIGKILL');
+    } catch {
+      // Already stopped.
+    }
+  }
   await rm(root, { recursive: true, force: true });
 });
 
@@ -118,7 +127,7 @@ describe('runVite', () => {
   it('passes on a SIGTERM received while vite runs, and stops forwarding afterwards', async () => {
     await installFakeVite(
       { vite: 'bin/vite.js' },
-      `require('node:fs').writeFileSync('ready', ''); setInterval(() => {}, 1000);`,
+      `require('node:fs').writeFileSync('ready', String(process.pid)); setInterval(() => {}, 1000);`,
     );
     const listeners = process.listenerCount('SIGTERM');
 

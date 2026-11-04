@@ -276,6 +276,27 @@ describe('runCli', () => {
       expect(err[0]).toContain('Caused by: Error: root cause');
     });
 
+    it('reports an internal error of Node.js as a bug, not as a user error', async () => {
+      io.runVite = vi.fn(async () => {
+        throw Object.assign(new TypeError('bad argument'), { code: 'ERR_INVALID_ARG_TYPE' });
+      });
+
+      expect(await runCli(['dev'], io)).toBe(1);
+      expect(err[0]).toMatch(/^bo-widget dev: unexpected error, please report it\n/);
+    });
+
+    it('stops on a cycle of causes', async () => {
+      const first = new Error('first');
+      const second = new Error('second', { cause: first });
+      Object.assign(first, { cause: second });
+      io.runVite = vi.fn(async () => {
+        throw first;
+      });
+
+      expect(await runCli(['dev'], io)).toBe(1);
+      expect(err[0]?.match(/Caused by:/g)).toHaveLength(1);
+    });
+
     it('prints a value thrown that is not an error', async () => {
       io.runVite = vi.fn(async () => {
         throw 'nope';
