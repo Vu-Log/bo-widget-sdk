@@ -1,6 +1,6 @@
 {
   "name": "@vulog/bo-widget-cli",
-  "version": "0.0.0",
+  "version": "0.1.0-next.0",
   "description": "Command line of Vulog back office widgets: validate and pack the zip to publish, run the fake back office against a real API.",
   "license": "MIT",
   "author": "Vulog",
