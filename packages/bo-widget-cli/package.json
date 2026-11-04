@@ -21,7 +21,7 @@
   "type": "module",
   "sideEffects": false,
   "bin": {
-    "bo-widget": "./dist/bin.js"
+    "bo-widget": "dist/bin.js"
   },
   "exports": {
     ".": {
