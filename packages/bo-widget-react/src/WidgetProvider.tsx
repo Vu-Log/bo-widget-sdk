@@ -77,7 +77,7 @@ const describeError = (error: unknown): string => {
 /** Default `errorFallback`: the reason, in a block the screen readers announce. @internal */
 export const defaultErrorFallback = (error: unknown): ReactNode => (
   <div role="alert" style={{ padding: 16 }}>
-    The widget could not start: {describeError(error)}
+    The widget cannot be displayed: {describeError(error)}
   </div>
 );
 
@@ -145,7 +145,16 @@ export const WidgetProvider = ({
     };
 
     const stops: Array<() => void> = [];
-    const stopAll = () => stops.splice(0).forEach((stop) => stop());
+    // Each listener is removed even when removing another one fails.
+    const stopAll = () => {
+      for (const stop of stops.splice(0)) {
+        try {
+          stop();
+        } catch (error) {
+          logError('cannot remove a back office listener', error);
+        }
+      }
+    };
     try {
       stops.push(client.on('localeChanged', ({ locale }) => updateContext({ locale })));
       stops.push(client.on('fleetChanged', ({ fleetId }) => updateContext({ fleetId })));

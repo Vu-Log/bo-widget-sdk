@@ -1,9 +1,16 @@
 import { Button, createTheme, Dialog, DialogTitle, Menu, MenuItem, Tooltip } from '@mui/material';
+import createCache from '@emotion/cache';
 import { act, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { useBoContext } from './hooks.js';
 import { boTheme, createFakeHostApi } from './testing/fakeHostApi.js';
 import { toCustomElement } from './toCustomElement.js';
+
+// The real cache, with its options recorded.
+vi.mock('@emotion/cache', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@emotion/cache')>();
+  return { default: vi.fn(actual.default) };
+});
 
 beforeAll(() => {
   // React only batches `act` updates in an environment that declares it.
@@ -103,14 +110,14 @@ describe('toCustomElement', () => {
     expect(emotionStyles?.length).toBeGreaterThan(0);
   });
 
-  it('keeps the rules as text even in production mode, so that they survive a move', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
+  it('keeps the Emotion rules as text, so that they survive a move', async () => {
+    // Emotion inserts rules with `insertRule` in its production build (`speedy`), which the
+    // browser drops when the element leaves the document: the cache must opt out explicitly.
     const element = await mount(toCustomElement(() => <Button variant="contained">Save</Button>));
     await waitFor(() => expect(element.shadowRoot?.querySelector('button')).not.toBeNull());
-    vi.unstubAllEnvs();
-    expect(
-      ruleOf(shadowCss(element), defined(element.shadowRoot?.querySelector('button'))),
-    ).not.toBe('');
+    expect(createCache).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'bo-widget', container: element.shadowRoot, speedy: false }),
+    );
   });
 
   it('renders full-screen MUI dialogs into the shadow root, styled and covering the page', async () => {
@@ -233,7 +240,7 @@ describe('toCustomElement', () => {
     });
     const element = await mount(toCustomElement(FleetApp), api);
     await waitFor(() => expect(element.shadowRoot?.querySelector('[role="alert"]')).not.toBeNull());
-    expect(shadowText(element)).toContain('The widget could not start');
+    expect(shadowText(element)).toContain('The widget cannot be displayed');
     expect(shadowText(element)).toContain('session expired (INTERNAL, no-token)');
   });
 
@@ -252,8 +259,8 @@ describe('toCustomElement', () => {
     );
   });
 
-  it('shows the default message when errorFallback itself throws', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('shows the default message, and logs, when errorFallback itself throws', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     const element = await mount(
       toCustomElement(FleetApp, {
         errorFallback: () => {
@@ -264,6 +271,10 @@ describe('toCustomElement', () => {
     );
     await waitFor(() => expect(element.shadowRoot?.querySelector('[role="alert"]')).not.toBeNull());
     expect(shadowText(element)).toContain('vulogBo is not a back office API');
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('errorFallback failed'),
+      expect.any(Error),
+    );
   });
 
   it('applies the theme customization on top of the back office theme, portals kept', async () => {
@@ -275,10 +286,11 @@ describe('toCustomElement', () => {
         </Dialog>
       </>
     );
+    let received: string | undefined;
     const element = await mount(
       toCustomElement(App, {
         customizeTheme: (theme) => {
-          expect(theme.palette.primary.main).toBe('#123456');
+          received = theme.palette.primary.main;
           return createTheme(theme, {
             palette: { primary: { main: '#abcdef' } },
             components: { MuiModal: { defaultProps: { container: document.body } } },
@@ -288,6 +300,7 @@ describe('toCustomElement', () => {
     );
     const shadow = defined(element.shadowRoot);
     await waitFor(() => expect(shadow.querySelector('[role="dialog"]')).not.toBeNull());
+    expect(received).toBe('#123456');
     expect(shadowCss(element)).toContain('#abcdef');
     expect(shadow.querySelector('[data-bo-widget-portals] [role="dialog"]')).not.toBeNull();
   });

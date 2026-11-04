@@ -1,7 +1,31 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createBoMuiTheme, withPortalContainer } from './theme.js';
 
-afterEach(() => vi.restoreAllMocks());
+// Errors the next calls of `createTheme` throw before reaching MUI, to drive the failures that real
+// data cannot (production messages, bugs, every stage rejected).
+const createThemeFailures = vi.hoisted(() => [] as Error[]);
+vi.mock('@mui/material', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@mui/material')>();
+  return {
+    ...actual,
+    createTheme: (...args: Parameters<typeof actual.createTheme>) => {
+      const failure = createThemeFailures.shift();
+      if (failure) throw failure;
+      return actual.createTheme(...args);
+    },
+  };
+});
+
+afterEach(() => {
+  createThemeFailures.length = 0;
+  vi.restoreAllMocks();
+});
+
+const boTheme = {
+  palette: { primary: { main: '#123456' } },
+  typography: { fontFamily: 'Lato, sans-serif' },
+  mode: 'dark',
+} as const;
 
 describe('createBoMuiTheme', () => {
   it('builds a MUI theme from the palette, typography and mode of the back office', () => {
@@ -54,16 +78,34 @@ describe('createBoMuiTheme', () => {
     expect(theme.typography.fontFamily).toBe('Lato, sans-serif');
   });
 
-  it('rethrows an error that is not about a malformed theme', () => {
-    const palette = Object.defineProperty({}, 'primary', {
-      enumerable: true,
-      get: () => {
-        throw new TypeError('broken getter');
-      },
-    });
-    expect(() => createBoMuiTheme({ palette, typography: {}, mode: 'light' })).toThrow(
-      'broken getter',
+  it('rethrows an error of MUI that is not about a malformed theme, without warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createThemeFailures.push(new TypeError('Cannot read properties of undefined'));
+    expect(() => createBoMuiTheme(boTheme)).toThrow('Cannot read properties of undefined');
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('recognizes the minified errors of a production build of MUI', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createThemeFailures.push(
+      new Error('Minified MUI error #9; visit https://mui.com/production-error/?code=9'),
     );
+    const theme = createBoMuiTheme(boTheme);
+    expect(theme.palette.mode).toBe('dark');
+    expect(theme.typography.fontFamily).toBe('Lato, sans-serif');
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it('falls back to the default theme in the same mode when the typography is rejected too', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    createThemeFailures.push(
+      new Error('MUI: invalid palette'),
+      new Error('MUI: invalid typography'),
+    );
+    const theme = createBoMuiTheme(boTheme);
+    expect(theme.palette.mode).toBe('dark');
+    expect(theme.typography.fontFamily).not.toBe('Lato, sans-serif');
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 });
 

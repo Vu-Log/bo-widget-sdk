@@ -89,7 +89,7 @@ describe('WidgetProvider', () => {
       </WidgetProvider>,
     );
     await waitFor(() =>
-      expect(screen.getByRole('alert').textContent).toBe('The widget could not start: offline'),
+      expect(screen.getByRole('alert').textContent).toBe('The widget cannot be displayed: offline'),
     );
   });
 
@@ -206,6 +206,31 @@ describe('WidgetProvider', () => {
     await waitFor(() => expect(screen.getByText('Broken')).toBeDefined());
     expect(log).toHaveBeenCalledWith(
       expect.stringContaining('cannot load the back office state'),
+      expect.any(Error),
+    );
+  });
+
+  it('removes every listener even when removing one fails', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fake = createFakeHostApi();
+    const off = fake.api.off;
+    fake.api.off = vi.fn((name: string, listener: (data: unknown) => void) => {
+      off(name, listener);
+      if (name === 'localeChanged') throw new Error('off failed');
+    });
+    const client = await connect({ vulogBo: fake.api });
+    const { unmount } = render(
+      <WidgetProvider client={client}>
+        <Probe />
+      </WidgetProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('Jane Doe FLEET en')).toBeDefined());
+
+    unmount();
+
+    expect(fake.listenerCount()).toBe(0);
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('cannot remove a back office listener'),
       expect.any(Error),
     );
   });
