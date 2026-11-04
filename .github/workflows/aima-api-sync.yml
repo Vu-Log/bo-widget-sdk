@@ -78,7 +78,9 @@ jobs:
           fi
           BEFORE=""
           if git cat-file -e "origin/main:$SKILL_DIR/SKILL.md" 2>/dev/null; then
-            BEFORE=$(git show "origin/main:$SKILL_DIR/SKILL.md" | count_of) || BEFORE=""
+            # Through a file, not a pipe: grep -m 1 could close it early (SIGPIPE under pipefail).
+            git show "origin/main:$SKILL_DIR/SKILL.md" > "$RUNNER_TEMP/main-skill.md"
+            BEFORE=$(count_of < "$RUNNER_TEMP/main-skill.md") || BEFORE=""
             if [ -z "$BEFORE" ]; then
               echo "::error::Endpoint count not found in $SKILL_DIR/SKILL.md of main"
               exit 1
@@ -116,16 +118,17 @@ jobs:
         run: |
           set -euo pipefail
           if git rev-parse --verify --quiet "refs/remotes/origin/$BRANCH" > /dev/null; then
-            AUTHORS=$(git log --format='%ae' "origin/main..refs/remotes/origin/$BRANCH")
+            # Author AND committer: an amend or a rebase by a person keeps the bot as author.
+            AUTHORS=$(git log --format='%ae %ce' "origin/main..refs/remotes/origin/$BRANCH")
             TOTAL=$(printf '%s' "$AUTHORS" | grep -c . || true)
-            BOT=$(printf '%s' "$AUTHORS" | grep -cxF "$BOT_EMAIL" || true)
+            BOT=$(printf '%s' "$AUTHORS" | grep -cxF "$BOT_EMAIL $BOT_EMAIL" || true)
             if ! [[ "$TOTAL" =~ ^[0-9]+$ && "$BOT" =~ ^[0-9]+$ ]]; then
               echo "::error::Could not count the authors of $BRANCH."
               exit 1
             fi
             OTHERS=$((TOTAL - BOT))
             if [ "$OTHERS" -ne 0 ]; then
-              echo "::error::$BRANCH has $OTHERS commit(s) not made by this workflow: merge or close its PR first."
+              echo "::error::$BRANCH has $OTHERS commit(s) not made by this workflow: merge or close its PR first (a merge of main or an amend counts too; deleting the branch unblocks the sync)."
               exit 1
             fi
           fi

@@ -44,7 +44,7 @@ The id must belong to your namespace: only the BO checks it, on publication. Loc
 
 ## `bo-widget validate` exits with code `2`
 
-Without argument, it checks the only `.zip` of the current folder or, among several (one per version built), the one of the version in `package.json` (`{name}-{version}.zip`). Code `2` means there is no zip, or several and none of the current version (the version was raised but not built yet). Build, or give the file: `npx bo-widget validate my-widget-0.1.1.zip`.
+Without argument, it checks the only `.zip` of the current folder or, among several (one per version built), the one of the version in `package.json` (`{id}-{version}.zip`). Code `2` means there is no zip, or several and none of the current version (the version was raised but not built yet). Build, or give the file: `npx bo-widget validate my-widget-0.1.1.zip`.
 
 ## Web Component or iframe?
 

@@ -560,12 +560,16 @@ function routeSegments(path) {
  * @param {string} path - spec route
  * @returns {string} the base path without its last segment when the route starts with it
  */
-function dropRepeatedService(basePath, path) {
+function dropRepeatedService(basePath, path, warnings = []) {
   if (basePath === GATEWAY_BASE_PATH || !basePath.startsWith(`${GATEWAY_BASE_PATH}/`)) {
     return basePath;
   }
   const segments = basePath.split('/');
-  return segments.at(-1) === routeSegments(path)[0] ? segments.slice(0, -1).join('/') : basePath;
+  if (segments.at(-1) !== routeSegments(path)[0]) return basePath;
+  const shortened = segments.slice(0, -1).join('/');
+  const warning = `Base path /${basePath} shortened to /${shortened}: its routes repeat the service (/${segments.at(-1)}/...)`;
+  if (!warnings.includes(warning)) warnings.push(warning);
+  return shortened;
 }
 
 /**
@@ -577,7 +581,11 @@ function pathItemBasePath(item, path, specBasePath, warnings) {
   if (Array.isArray(item.servers) && item.servers.length === 0) {
     return KNOWN_ROOT_SERVICES.includes(routeSegments(path)[0]) ? GATEWAY_BASE_PATH : null;
   }
-  return dropRepeatedService(resolveBasePath(item.servers, specBasePath, path, warnings), path);
+  return dropRepeatedService(
+    resolveBasePath(item.servers, specBasePath, path, warnings),
+    path,
+    warnings,
+  );
 }
 
 /**

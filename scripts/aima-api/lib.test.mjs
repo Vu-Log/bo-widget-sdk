@@ -627,6 +627,11 @@ describe('collectEndpoints', () => {
   it('drops the service segment that the route repeats', () => {
     expect(find('GET', '/business/fleets/{fleetId}/entities').basePath).toBe('boapi/proxy');
     expect(find('GET', '/fleets/{fleetId}/taxes').basePath).toBe('boapi/proxy/business');
+    expect(
+      warnings.filter((warning) => warning.startsWith('Base path /boapi/proxy/business shortened')),
+    ).toEqual([
+      'Base path /boapi/proxy/business shortened to /boapi/proxy: its routes repeat the service (/business/...)',
+    ]);
   });
 
   it('keeps what was redacted from the texts of each endpoint', () => {
