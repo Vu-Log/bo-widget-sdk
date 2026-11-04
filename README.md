@@ -6,12 +6,13 @@ A BO widget is a page added to the Vulog back office menu, delivered either as a
 
 ## Packages
 
-| Package                                             | Description                                                        | Status      |
-| --------------------------------------------------- | ------------------------------------------------------------------ | ----------- |
-| [`@vulog/bo-widget-sdk`](packages/bo-widget-sdk/)   | Framework-agnostic client of the widget protocol                   | Pre-release |
-| [`@vulog/bo-widget-vite`](packages/bo-widget-vite/) | Vite plugin: `widget.json`, bundle layout, fake back office in dev | Pre-release |
+| Package                                               | Description                                                                  | Status      |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------- | ----------- |
+| [`@vulog/bo-widget-sdk`](packages/bo-widget-sdk/)     | Framework-agnostic client of the widget protocol                             | Pre-release |
+| [`@vulog/bo-widget-vite`](packages/bo-widget-vite/)   | Vite plugin: `widget.json`, bundle layout, fake back office in dev           | Pre-release |
+| [`@vulog/bo-widget-react`](packages/bo-widget-react/) | React bindings: Web Component wrapper (Shadow DOM, MUI), iframe entry, hooks | Pre-release |
 
-More packages (React bindings, CLI, project generator) will be added here.
+More packages (CLI, project generator) will be added here.
 
 ## Requirements
 
@@ -44,7 +45,7 @@ npm test
 
 1. Create `packages/<name>/` with a `package.json` named `@vulog/<name>`, `"type": "module"`, an `exports` map, `"files": ["dist", "src", "!src/**/*.test.ts"]` and `publishConfig.access: public`. Use [`packages/bo-widget-sdk`](packages/bo-widget-sdk/) as the reference.
 2. Add `tsconfig.json`, `tsconfig.build.json`, `vitest.config.ts`, `README.md` and `LICENSE`, copied from that package (npm only packs the files of the package directory).
-3. Define the `build` and `check:package` scripts: the root scripts run them in every package and fail if one is missing.
+3. Define the `build` and `check:package` scripts: the root scripts run them in every package and fail if one is missing. They run in the order of `workspaces` in the root `package.json`, then alphabetically: a package that others build against (such as `bo-widget-sdk`) is listed first, so that its `dist` exists when they are built.
 4. Colocate tests with the code: `feature.ts` → `feature.test.ts`.
 
 ## Contributing a change
