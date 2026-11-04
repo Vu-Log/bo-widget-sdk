@@ -45,7 +45,7 @@ npm test
 
 1. Create `packages/<name>/` with a `package.json` named `@vulog/<name>`, `"type": "module"`, an `exports` map, `"files": ["dist", "src", "!src/**/*.test.ts"]` and `publishConfig.access: public`. Use [`packages/bo-widget-sdk`](packages/bo-widget-sdk/) as the reference.
 2. Add `tsconfig.json`, `tsconfig.build.json`, `vitest.config.ts`, `README.md` and `LICENSE`, copied from that package (npm only packs the files of the package directory).
-3. Define the `build` and `check:package` scripts: the root scripts run them in every package and fail if one is missing.
+3. Define the `build` and `check:package` scripts: the root scripts run them in every package and fail if one is missing. They run in the order of `workspaces` in the root `package.json`, then alphabetically: a package that others build against (such as `bo-widget-sdk`) is listed first, so that its `dist` exists when they are built.
 4. Colocate tests with the code: `feature.ts` → `feature.test.ts`.
 
 ## Contributing a change
