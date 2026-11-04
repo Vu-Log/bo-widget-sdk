@@ -1,12 +1,21 @@
 /**
  * Scope of the generated `aima-api` skill and mapping between the AIMA OpenAPI tags and its files.
  *
- * The skill only lists what a BO widget can call with `bo.authFetch(...)`: the endpoints served
- * under the admin gateway ({@link GATEWAY_BASE_PATH}), minus those tagged {@link EXCLUDED_TAGS}.
+ * The skill only lists what a BO widget can call with `bo.authFetch(...)`. An endpoint is left out
+ * (and counted by reason in the sync summary) when:
+ * - its base path is not under the admin gateway ({@link GATEWAY_BASE_PATH}), e.g. the mobile API;
+ * - its base path is unknown: its path item declares `servers: []` and its route does not start
+ *   with one of {@link KNOWN_ROOT_SERVICES} (reported as a warning);
+ * - it is deprecated (`deprecated: true` or the `deprecated` tag) or internal (`x-internal: true`
+ *   or the `internal` tag);
+ * - it carries one of {@link EXCLUDED_TAGS} (compared case-insensitively);
+ * - its route or its base path has one of {@link EXCLUDED_PATH_SEGMENTS}.
+ *
  * Each kept endpoint goes to the first file (in this order) that claims one of its tags. Endpoints
  * whose tags are claimed by no file land in {@link FALLBACK_FILE} and are reported as warnings
- * (untagged endpoints too), so a new tag in the swagger shows up in the sync PR instead of
- * disappearing silently.
+ * (untagged endpoints too, and `admin-*` tags caught by its prefix but missing from its
+ * `expectedTags`), so a new tag in the swagger shows up in the sync PR instead of disappearing
+ * silently.
  */
 
 /** Public swagger of the AIMA platform. */
@@ -26,18 +35,57 @@ export const GATEWAY_BASE_PATH = 'boapi/proxy';
  */
 export const PRIVATE_HOST_SUFFIX = '.local';
 
-/** Endpoints carrying one of these tags are not meant for widgets: they are left out. */
+/**
+ * Services of the admin gateway that a route may start with (`/geoloc/fleets/...`, called as
+ * `boapi/proxy/geoloc/fleets/...`). Only used for the path items declaring `servers: []`, whose base
+ * path is otherwise unknown: such a route is kept only when its first segment is one of these.
+ */
+export const KNOWN_ROOT_SERVICES = ['desk', 'fleetadmin', 'geoloc'];
+
+/**
+ * Endpoints carrying one of these tags (in any case: `Internal` too) are not meant for widgets:
+ * they are left out.
+ */
 export const EXCLUDED_TAGS = ['internal', 'deprecated', 'todo', 'need-migration'];
 
-/** Endpoints whose route has one of these segments (`/internal/fleets/...`) are left out too. */
+/**
+ * Endpoints whose route or base path has one of these segments (`/internal/fleets/...`,
+ * `boapi/proxy/internal`) are left out too.
+ */
 export const EXCLUDED_PATH_SEGMENTS = ['internal'];
 
 /**
- * Prefixes of standard references (`ISO-8601`, `BG-23` of EN 16931…) kept in the descriptions.
- * Any other `ABC-123` reference is an issue-tracker key, meaningless for a widget developer: it is
- * removed from the descriptions.
+ * Prefixes of standard references (`ISO-8601`, `SHA-256`, `RSA-2048`…) kept in the descriptions.
+ * Any other `ABC-123` reference (upper-case prefix, {@link TRACKER_KEY_MIN_DIGITS} digits or more)
+ * is an issue-tracker key, meaningless for a widget developer: it is removed from the descriptions.
  */
-export const STANDARD_REFERENCE_PREFIXES = ['BG', 'BT', 'EN', 'ISO', 'RFC', 'SHA', 'UTC', 'UTF'];
+export const STANDARD_REFERENCE_PREFIXES = [
+  'AES',
+  'BCP',
+  'BG',
+  'BT',
+  'COVID',
+  'EN',
+  'ES',
+  'HS',
+  'HTTP',
+  'ISO',
+  'PS',
+  'PSD',
+  'RFC',
+  'RS',
+  'RSA',
+  'SHA',
+  'TLS',
+  'UTC',
+  'UTF',
+];
+
+/**
+ * Minimum number of digits of an issue-tracker key: shorter references (`HTTP-2`, `UTF-8`,
+ * `COVID-19`) are technical terms, never redacted.
+ */
+export const TRACKER_KEY_MIN_DIGITS = 3;
 
 /** File that also receives the endpoints whose tags match no other entry of {@link SKILL_FILES}. */
 export const FALLBACK_FILE = 'admin-other.md';
@@ -49,6 +97,8 @@ export const FALLBACK_FILE = 'admin-other.md';
  * @property {string} summary - one-line content description, used in the SKILL.md router table
  * @property {string[]} [tags] - swagger tags claimed by this file (exact match)
  * @property {string} [tagPrefix] - claims any tag starting with this prefix
+ * @property {string[]} [expectedTags] - tags known to be claimed by `tagPrefix`: any other tag it
+ *   claims is reported as a warning, so a new admin area shows up in the sync PR
  */
 
 /**
@@ -134,6 +184,23 @@ export const SKILL_FILES = [
     summary:
       'Other admin APIs (report, product, pricing, subscription, promocode, mobility plan, time ranges, notifier, PDF, etc.) and unmapped tags',
     tagPrefix: 'admin-',
+    expectedTags: [
+      'admin-additional-driver',
+      'admin-charge-product-request',
+      'admin-mobility-plan',
+      'admin-notifier-rules',
+      'admin-notifier-simulator',
+      'admin-notifier-templates',
+      'admin-notifier-tickets',
+      'admin-pdf-simulator',
+      'admin-pricing',
+      'admin-product',
+      'admin-promocode',
+      'admin-receipt',
+      'admin-report',
+      'admin-subscription',
+      'admin-timeranges',
+    ],
   },
 ];
 

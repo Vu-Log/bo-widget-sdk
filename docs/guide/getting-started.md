@@ -49,15 +49,15 @@ npm install
 
 The project holds:
 
-| File                          | Role                                                                                |
-| ----------------------------- | ----------------------------------------------------------------------------------- |
-| `widget.config.ts`            | The manifest of the widget (name, permissions, menu, settings) and the fake BO data |
-| `package.json`                | The id (`name`), the `version` and the `description` of the widget, and the scripts |
-| `vite.config.ts`              | Vite with the `boWidget` plugin of `@vulog/bo-widget-vite`                          |
-| `src/`                        | The widget (`main.tsx` and `App.tsx` for React) and its tests                       |
-| `.github/workflows/build.yml` | Example CI that tests, builds and keeps the zip as an artifact                      |
-| `README.md`                   | How the project works                                                               |
-| `AGENTS.md`, `CLAUDE.md`      | Instructions for AI coding agents, see [AI coding agents](../ai-agents)             |
+| File                                            | Role                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `widget.config.ts`                              | The manifest of the widget (name, permissions, menu, settings) and the fake BO data   |
+| `package.json`                                  | The id (`name`), the `version` and the `description` of the widget, and the scripts   |
+| `vite.config.ts`                                | Vite with the `boWidget` plugin of `@vulog/bo-widget-vite`                            |
+| `src/`                                          | The widget (`main.tsx` and `App.tsx` for React) and its tests                         |
+| `.github/workflows/build.yml`, `.gitlab-ci.yml` | Example CI, for GitHub or GitLab, that tests, builds and keeps the zip as an artifact |
+| `README.md`                                     | How the project works                                                                 |
+| `AGENTS.md`, `CLAUDE.md`                        | Instructions for AI coding agents, see [AI coding agents](../ai-agents)               |
 
 ## Run it in the fake back office
 
@@ -121,7 +121,7 @@ The script type-checks the project, runs `vite build`, which writes `dist/` with
 npx bo-widget validate
 ```
 
-Without argument, it checks the only `.zip` of the current folder. With several zips there (after a version change), give the file:
+Without argument, it checks the only `.zip` of the current folder or, when the folder holds the zips of several versions, the one of the version in `package.json`. You can also give the file:
 
 ```bash
 npx bo-widget validate my-widget-0.1.0.zip

@@ -1,18 +1,19 @@
 ---
 name: aima-api
-description: Vulog admin API endpoints a BO widget can call with authFetch -- the AIMA admin API served under /boapi/proxy, generated weekly from the public swagger. Use it while writing a BO widget to find the path to pass to bo.authFetch(...), its parameters, request body, response schema, pagination and error codes (users, trips, bookings, vehicles, invoices, services, fleet, service desk, geoloc, reports...).
+description: Vulog admin API endpoints a BO widget can call with authFetch -- the AIMA admin API served under /boapi/proxy, generated from the public swagger. Use it while writing a BO widget to find the path to pass to bo.authFetch(...), its parameters, request body, response schema, pagination and error codes (users, trips, bookings, vehicles, invoices, services, fleet, service desk, geoloc, reports...).
 ---
 
 # AIMA admin API for BO widgets
 
 > **Release {{release}}** — OpenAPI {{openapi}} — {{endpointCount}} endpoints a widget can call,
 > {{tagCount}} tags, {{schemaCount}} schemas ({{excludedCount}} other swagger endpoints left out:
-> mobile API, private, deprecated or unfinished ones)
+> mobile API, private, deprecated or unfinished ones, or served at an undocumented base path)
 > **Source:** https://vulog-doc-api.web.app/swagger/sta.yaml
 >
-> The endpoint files and `schemas.md` are regenerated weekly from the public swagger by
-> `scripts/aima-api/generate.mjs` in the bo-widget-sdk repository. Edit
-> `scripts/aima-api/SKILL.template.md` or `scripts/aima-api/config.mjs`, never the generated files.
+> The endpoint files and `schemas.md` are generated from the public swagger by
+> `scripts/aima-api/generate.mjs` in the bo-widget-sdk repository; a weekly job proposes a
+> regenerated version (pull request). Edit `scripts/aima-api/SKILL.template.md` or
+> `scripts/aima-api/config.mjs`, never the generated files.
 
 ## Calling an endpoint from a widget
 
@@ -31,16 +32,21 @@ of this skill shows it on its `authFetch path:` line, e.g.
 - Never prefix the path with `boapi/proxy/`, never add `Authorization` or `X-API-Key` yourself,
   and do not build URLs from `getApiInfo()` or call `getAccessToken()` for these APIs.
 - The widget needs the `apiInfo` permission in the `permissions` of its `widget.json` to call
-  `authFetch` with such a path (plus `accessToken` when it runs in an iframe).
+  `authFetch` with such a path: the SDK adds `X-API-Key`. In an iframe it also needs
+  `accessToken`: the SDK adds the `Authorization: Bearer` header itself, while a Web Component
+  gets it from the BO service worker.
 - Handle a `401` (session lost) by showing a message, never by retrying in a loop.
-- Only the endpoints under `/boapi/proxy` are listed: other Vulog APIs (such as the mobile API
-  `/apiv5`) are not authenticated by `authFetch`.
+- Only the endpoints under `/boapi/proxy` are listed: the BO service worker only authenticates
+  `/boapi/proxy/`. `authFetch` sends any other absolute URL as a third-party call (a `Bearer`
+  token only with the `accessToken` permission, never the API key), so other Vulog APIs such as
+  the mobile API `/apiv5` cannot be called this way.
 
 ## How to use this skill
 
 Read this file first, then open only the sub-file you need. The files are large: search them
-instead of reading them whole. They live next to this SKILL.md, in `${CLAUDE_SKILL_DIR}` -- always
-use that full path (the working directory is the widget project, not this skill), e.g.:
+instead of reading them whole. They live next to this SKILL.md, in `${CLAUDE_SKILL_DIR}` (in other
+agents: the folder this SKILL.md was installed in) -- always use that full path (the working
+directory is the widget project, not this skill), e.g.:
 
 ```bash
 grep -n -A30 '^### GET `/fleets/{fleetId}/users/{id}/status`$' "${CLAUDE_SKILL_DIR}/admin-user.md"
@@ -56,7 +62,8 @@ not send them.
 
 ### Sub-files
 
-All files are in `${CLAUDE_SKILL_DIR}`, next to this SKILL.md:
+All files are in `${CLAUDE_SKILL_DIR}` (in other agents: the folder this SKILL.md was installed
+in), next to this SKILL.md:
 
 | File | Content | Endpoints |
 | ---- | ------- | --------- |
@@ -66,8 +73,14 @@ All files are in `${CLAUDE_SKILL_DIR}`, next to this SKILL.md:
 
 ## Pagination
 
-Query params: `page` (0-based), `size`, `sort` (e.g. `userName,DESC`).
-Response headers: `first`, `last`, `number`, `numberOfElements`, `size`, `totalElements`, `totalPages`.
+Query params: `page` (0-based), `size`, `sort` (e.g. `userName,DESC`). An endpoint listing a
+`pageable` param (`Pageable` or `BusinessWsPageable`) takes these three as separate query params.
+
+- **Admin endpoints** (`user/`, `fleetmanager/public/`…): the body is the plain list
+  (`200 → Trip[]`); the page is described in the response headers `first`, `last`, `number`,
+  `numberOfElements`, `size`, `sort`, `totalElements`, `totalPages`.
+- **`business/` endpoints**: the body is a `BusinessWsPage…` object (`content`, `totalElements`,
+  `totalPages`, `number`, `size`, `first`, `last`, `empty`), described in `schemas.md`.
 
 ---
 
@@ -120,8 +133,9 @@ Response headers: `first`, `last`, `number`, `numberOfElements`, `size`, `totalE
 
 - **Fleet ID:** `fleetId` scopes all resources; a widget gets it from the BO context
   (`bo.getContext()`), never hard-codes it
-- **Services behind the gateway:** `user/`, `business/`, `fleetmanager/public/`, `notifier/`,
-  `pdf/`, or none (each endpoint's `authFetch path` says which)
+- **Services behind the gateway:** `user/`, `business/`, `fleetmanager/public/`, `desk/`,
+  `geoloc/`, `fleetadmin/`, `notifier/`, `pdf/`: never guess it, copy each endpoint's
+  `authFetch path` line
 - **Pagination default:** `page=0`, `size=50` (fleet manager vehicles: at most 2000 per page)
 - **Swagger vs. behaviour:** the swagger documents the contract, not always the implementation:
   check the actual response when a field is missing or a status is unexpected

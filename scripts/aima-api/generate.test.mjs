@@ -9,7 +9,9 @@ import { DEFAULT_SPEC_URL, SCHEMAS_FILE, SKILL_FILES } from './config.mjs';
 import {
   DEFAULT_OUT_DIR,
   DEFAULT_TEMPLATE,
+  describeError,
   FETCH_TIMEOUT_MS,
+  formatFailure,
   main,
   parseArgs,
   readSpecText,
@@ -74,13 +76,21 @@ describe('readSpecText', () => {
     await expect(readSpecText(join(outDir, 'missing.yaml'))).rejects.toThrow(/ENOENT/);
   });
 
-  it('downloads a URL with a timeout signal', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, text: async () => 'openapi: 3.0.3' });
-    expect(await readSpecText('https://example.test/spec.yaml', fetchImpl)).toBe('openapi: 3.0.3');
-    const [url, init] = fetchImpl.mock.calls[0];
-    expect(url).toBe('https://example.test/spec.yaml');
-    expect(init.signal).toBeInstanceOf(AbortSignal);
-    expect(FETCH_TIMEOUT_MS).toBeGreaterThan(0);
+  it('downloads a URL with a timeout signal of FETCH_TIMEOUT_MS', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    try {
+      const fetchImpl = vi.fn().mockResolvedValue({ ok: true, text: async () => 'openapi: 3.0.3' });
+      expect(await readSpecText('https://example.test/spec.yaml', fetchImpl)).toBe(
+        'openapi: 3.0.3',
+      );
+      expect(timeout).toHaveBeenCalledExactlyOnceWith(FETCH_TIMEOUT_MS);
+      const [url, init] = fetchImpl.mock.calls[0];
+      expect(url).toBe('https://example.test/spec.yaml');
+      expect(init.signal).toBe(timeout.mock.results[0].value);
+      expect(FETCH_TIMEOUT_MS).toBeGreaterThan(0);
+    } finally {
+      timeout.mockRestore();
+    }
   });
 
   it('rejects a non-2xx download', async () => {
@@ -99,6 +109,17 @@ describe('readSpecText', () => {
     );
   });
 
+  it('keeps the cause of a network error in the message', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(
+      new TypeError('fetch failed', {
+        cause: Object.assign(new Error('x'), { code: 'ENOTFOUND' }),
+      }),
+    );
+    await expect(readSpecText('https://example.test/spec.yaml', fetchImpl)).rejects.toThrow(
+      'Download failed: https://example.test/spec.yaml → fetch failed (ENOTFOUND)',
+    );
+  });
+
   it('rejects a network error or a timeout with the URL in the message', async () => {
     const fetchImpl = vi
       .fn()
@@ -108,6 +129,39 @@ describe('readSpecText', () => {
     await expect(readSpecText('https://example.test/spec.yaml', fetchImpl)).rejects.toThrow(
       'Download failed: https://example.test/spec.yaml → The operation was aborted due to timeout',
     );
+  });
+});
+
+describe('describeError', () => {
+  it.each([
+    [new Error('boom'), 'boom'],
+    [new Error('fetch failed', { cause: { code: 'ECONNRESET' } }), 'fetch failed (ECONNRESET)'],
+    [
+      new Error('fetch failed', { cause: new Error('socket hang up') }),
+      'fetch failed (socket hang up)',
+    ],
+    [new Error('same', { cause: new Error('same') }), 'same'],
+    [new Error('odd', { cause: 'text cause' }), 'odd (text cause)'],
+    ['not an error', 'not an error'],
+  ])('describes %s', (error, expected) => {
+    expect(describeError(error)).toBe(expected);
+  });
+});
+
+describe('formatFailure', () => {
+  it('prints the stack of the error, then of each cause', () => {
+    const root = new Error('root cause');
+    const text = formatFailure(new Error('top', { cause: root }));
+    expect(text).toMatch(/^Error: top\n\s+at /);
+    expect(text).toContain('Caused by: Error: root cause');
+  });
+
+  it('prints a non-error cause and survives a cause cycle', () => {
+    expect(formatFailure(new Error('top', { cause: 'plain' }))).toContain('Caused by: plain');
+    const cyclic = new Error('loop');
+    cyclic.cause = cyclic;
+    expect(formatFailure(cyclic).match(/loop/g)).toHaveLength(1);
+    expect(formatFailure('just text')).toBe('just text');
   });
 });
 
@@ -165,7 +219,7 @@ describe('main', () => {
     const skillDir = join(outDir, 'skill');
     const report = await main(['--input', FIXTURE, '--out', skillDir, '--summary', summary]);
 
-    expect(report.stats.endpointCount).toBe(7);
+    expect(report.stats.endpointCount).toBe(14);
     expect(await readdir(skillDir)).toHaveLength(GENERATED_FILE_COUNT);
     expect(await readdir(skillDir)).not.toContain('internal.md');
     expect(await readFile(join(skillDir, 'SKILL.md'), 'utf8')).toContain('**Release 9.99**');
@@ -221,7 +275,10 @@ describe('CLI', () => {
 
   it('prints a report and exits 0', async () => {
     const { stdout, stderr } = await run('node', [SCRIPT, '--input', FIXTURE, '--out', outDir]);
-    expect(stdout).toContain('aima-api: release 9.99, 7 endpoints (7 left out), 4 schemas');
+    expect(stdout).toContain('aima-api: release 9.99, 14 endpoints (11 left out), 4 schemas');
+    expect(stdout).toContain(
+      'left out: unknownBasePath 1, outsideGateway 1, deprecatedOrInternal 5, excludedTag 3, excludedPathSegment 1',
+    );
     expect(stderr).toContain('warning: Tag not mapped');
   });
 
@@ -236,7 +293,7 @@ describe('CLI', () => {
       ]),
     ).rejects.toMatchObject({
       code: 1,
-      stderr: expect.stringContaining('aima-api generation failed'),
+      stderr: expect.stringMatching(/aima-api generation failed: .*ENOENT[\s\S]*\n\s+at /),
     });
   });
 });

@@ -6,7 +6,7 @@ description: Practical answers - styles missing or leaking, customElements.defin
 
 ## My styles are missing in the widget
 
-The styles ended up outside the shadow root. A CSS file imported as a regular module is emitted by Vite next to `index.js` and loaded in the BO page, where it does not reach the Shadow DOM. Import it with `?inline` and insert it in the shadow root, or let your framework do it: `.ce.vue` files in Vue, `<style>` of a Svelte custom element, `static styles` in Lit, `toCustomElement` for MUI. See [Layout and isolation](./guide/layout-and-isolation#styles-never-in-document-head).
+The styles ended up outside the shadow root. A CSS file imported as a regular module is emitted by Vite as a separate file next to `index.js`, which the BO never loads (in `npm run dev`, it is injected in the `document.head` of the page, where it does not reach the Shadow DOM either). Import it with `?inline` and insert it in the shadow root, or let your framework do it: `.ce.vue` files in Vue, `<style>` of a Svelte custom element, `static styles` in Lit, `toCustomElement` for MUI. See [Layout and isolation](./guide/layout-and-isolation#styles-never-in-document-head).
 
 A dialog, menu or tooltip without styles is rendered on `document.body`: see [Overlays stay in the shadow root](./guide/layout-and-isolation#overlays-stay-in-the-shadow-root).
 
@@ -44,7 +44,7 @@ The id must belong to your namespace: only the BO checks it, on publication. Loc
 
 ## `bo-widget validate` exits with code `2`
 
-Without argument, it checks the only `.zip` of the current folder: there is none, or several (one per version built). Give the file: `npx bo-widget validate my-widget-0.1.1.zip`.
+Without argument, it checks the only `.zip` of the current folder or, among several (one per version built), the one of the version in `package.json` (`{name}-{version}.zip`). Code `2` means there is no zip, or several and none of the current version (the version was raised but not built yet). Build, or give the file: `npx bo-widget validate my-widget-0.1.1.zip`.
 
 ## Web Component or iframe?
 

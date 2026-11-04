@@ -135,6 +135,41 @@ describe('runCli', () => {
       expect(err[0]).toContain(message);
     });
 
+    it('validates the zip of the version in package.json when the folder holds several', async () => {
+      await writeFile(join(root, 'fleet-report-1.1.0.zip'), 'an older, broken zip');
+      await writeFile(join(root, 'fleet-report-1.2.0.zip'), createZip(VALID_FILES));
+      await writeFile(
+        join(root, 'package.json'),
+        JSON.stringify({ name: 'fleet-report', version: '1.2.0' }),
+      );
+
+      expect(await runCli(['validate'], io)).toBe(0);
+      expect(out[0]).toBe('fleet-report-1.2.0.zip: fleet-report 1.2.0 is valid');
+    });
+
+    it.each([
+      ['no zip of the current version', JSON.stringify({ name: 'fleet-report', version: '2.0.0' })],
+      ['no version', JSON.stringify({ name: 'fleet-report' })],
+      ['an invalid package.json', '{ not json'],
+      ['a package.json that is not an object', 'null'],
+    ])('asks for the zip among several when there is %s', async (_, packageJson) => {
+      await writeFile(join(root, 'fleet-report-1.1.0.zip'), createZip(VALID_FILES));
+      await writeFile(join(root, 'fleet-report-1.2.0.zip'), createZip(VALID_FILES));
+      await writeFile(join(root, 'package.json'), packageJson);
+
+      expect(await runCli(['validate'], io)).toBe(2);
+      expect(err[0]).toContain('none named after the name and version of package.json');
+    });
+
+    it('passes on an unreadable package.json', async () => {
+      await writeFile(join(root, 'a.zip'), createZip(VALID_FILES));
+      await writeFile(join(root, 'b.zip'), createZip(VALID_FILES));
+      await mkdir(join(root, 'package.json'));
+
+      expect(await runCli(['validate'], io)).toBe(1);
+      expect(err[0]).toMatch(/^bo-widget validate: EISDIR/);
+    });
+
     it('fails when the zip does not exist', async () => {
       expect(await runCli(['validate', 'missing.zip'], io)).toBe(1);
       expect(err[0]).toMatch(/^bo-widget validate: ENOENT/);

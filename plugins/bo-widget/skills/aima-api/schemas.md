@@ -326,11 +326,6 @@
 | turnEventCount | integer (int32) | no | Count of harsh cornering events during the trip. |
 | idleTotalSec | integer (int32) | no | Cumulative seconds idling (ignition ON, speed < 1 km/h). |
 
-### AddLabel
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| labelId | string | no | The unique identifier of the label |
-
 ### AddPoiGeo
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
@@ -2770,20 +2765,6 @@ Here there is a rappresentation of the financial information
 | pecAddress | string | no | The PEC address of the user |
 | marketReference | string | no | The market reference of the user |
 
-### FleetAdminCreateTicketDTO
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| creatorId | string (uuid) | no |  |
-| assignedTo | string (uuid) | no |  |
-| categoryId | string | no |  |
-| groupId | integer | no |  |
-| priority | string | no |  |
-| vehicleId | string | no |  |
-| subject | string | no |  |
-| description | string | no |  |
-| userIds | string[] | no |  |
-| vehicleIds | string[] | no |  |
-
 ### FleetAdminFleetConfigurationAdminDTO
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
@@ -2802,79 +2783,10 @@ Here there is a rappresentation of the financial information
 | attachmentId | string | no |  |
 | uploadUrl | string | no |  |
 
-### FleetAdminServiceDeskTicketDTO
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| id | string (uuid) | no |  |
-| fleetId | string | no |  |
-| userId | string (uuid) | no |  |
-| creatorId | string (uuid) | no |  |
-| assignedTo | string (uuid) | no |  |
-| categoryId | string | no |  |
-| groupId | integer | no |  |
-| status | string | no |  |
-| priority | string | no |  |
-| creationDate | string (date-time) | no |  |
-| updateDate | string (date-time) | no |  |
-| tripId | string | no |  |
-| modelId | string | no |  |
-| vehicleId | string | no |  |
-| subject | string | no |  |
-| description | string | no |  |
-| workedHours | integer | no |  |
-| customerFault | integer | no |  |
-| eventType | string | no |  |
-
-### FleetAdminTicket
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| id | string (uuid) | no |  |
-| fleetId | string | no |  |
-| subject | string | no |  |
-| status | string | no |  |
-| priority | string | no |  |
-| assignedTo | string (uuid) | no |  |
-| categoryId | string | no |  |
-| groupId | integer | no |  |
-| vehicleId | string | no |  |
-| creationDatetime | string (date-time) | no |  |
-| updateDatetime | string (date-time) | no |  |
-
 ### FleetAdminTicketAttachmentRequestDTO
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | filename | string | no |  |
-
-### FleetAdminTicketDTO
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| id | string (uuid) | no |  |
-| subject | string | no |  |
-| status | string | no |  |
-| priority | string | no |  |
-| assignedTo | string (uuid) | no |  |
-| categoryId | string | no |  |
-| groupId | integer | no |  |
-| vehicleId | string (uuid) | no |  |
-| vehicleIds | string[] | no | list of vehicleIds linked to ticket |
-| creationDate | string (date-time) | no |  |
-| updateDate | string (date-time) | no |  |
-| vehicleDistance | number | no | distance between the user and the vehicle associated |
-
-### FleetAdminTicketError
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| status | string: `NOT_FOUND`, `BAD_REQUEST` | no | status |
-| errorCode | string | no | Error code |
-| message | string | no | error message |
-| detail | string | no | detail message |
-
-### FleetAdminUpdateTicketDTO
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| userId | string (uuid) | no |  |
-| property | string | no |  |
-| value | string | no |  |
 
 ### FlexibleCalendarResponseDto
 | Field | Type | Required | Notes |

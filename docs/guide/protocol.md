@@ -104,7 +104,7 @@ disconnectedCallback() {
 }
 ```
 
-Every template does this. See [Examples](../examples/vanilla).
+The svelte, vue, lit and vanilla templates do this; with React, `toCustomElement` does it for you. See [Examples](../examples/vanilla).
 
 ## Errors
 

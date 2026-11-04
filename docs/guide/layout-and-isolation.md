@@ -63,7 +63,7 @@ A style added to `document.head` applies to the BO page, not to the shadow root:
 | Lit         | `static styles` go into the shadow root                                                   |
 | Vanilla     | Import the CSS with `?inline` and insert a `<style>` into the shadow root                 |
 
-A CSS file imported as a regular module is emitted by Vite next to `index.js`, **outside** the Shadow DOM: import it with `?inline`, or let the framework inject it.
+A CSS file imported as a regular module is emitted by Vite as a separate file next to `index.js`, which the BO **never loads** (and in `npm run dev`, it lands in `document.head`, outside the Shadow DOM): import it with `?inline`, or let the framework inject it.
 
 `@font-face` is ignored in a shadow root by some browsers. The templates use the Roboto font the BO already loads.
 

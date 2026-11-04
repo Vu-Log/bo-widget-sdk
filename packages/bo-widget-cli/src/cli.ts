@@ -31,7 +31,8 @@ const HELP = `Usage: bo-widget <command> [options]
 
 Commands:
   validate [zip]       Checks a widget zip with the rules applied on publication.
-                       Without argument, the only .zip of the current folder.
+                       Without argument, the only .zip of the current folder, or the
+                       one of the version in package.json ({name}-{version}.zip).
   pack [dir]           Zips the content of dir (default: dist) into {id}-{version}.zip,
                        after checking it with the same rules.
       --out-dir <dir>  Folder of the zip (default: the current folder).
@@ -64,18 +65,48 @@ const parseOrUsage = <T>(parse: () => T): T => {
   }
 };
 
-/** The zip to validate: the one given, or the only `.zip` of the current folder. */
+/**
+ * The zip of the current version, `{name}-{version}.zip` from the `package.json` of `cwd`, or
+ * `undefined` when there is no readable `package.json` with a name and a version: the caller then
+ * asks for the zip.
+ */
+const currentVersionZip = async (cwd: string): Promise<string | undefined> => {
+  let text: string;
+  try {
+    text = await readFile(resolve(cwd, 'package.json'), 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  }
+  let pkg: unknown;
+  try {
+    pkg = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  const { name, version } = (pkg ?? {}) as { name?: unknown; version?: unknown };
+  return typeof name === 'string' && typeof version === 'string'
+    ? `${name}-${version}.zip`
+    : undefined;
+};
+
+/**
+ * The zip to validate: the one given, else the only `.zip` of the current folder, else, among
+ * several, the zip of the current version (`{name}-{version}.zip` of `package.json`), as `pack`
+ * names it.
+ */
 const findZip = async (cwd: string, given: string | undefined): Promise<string> => {
   if (given !== undefined) return resolve(cwd, given);
   const zips = (await readdir(cwd)).filter((name) => name.endsWith('.zip'));
-  if (zips.length !== 1) {
-    throw new UsageError(
-      zips.length === 0
-        ? 'no .zip in the current folder: give the path of the zip'
-        : `several .zip in the current folder (${zips.join(', ')}): give the path of the zip`,
-    );
+  if (zips.length === 0) {
+    throw new UsageError('no .zip in the current folder: give the path of the zip');
   }
-  return resolve(cwd, zips[0] as string);
+  if (zips.length === 1) return resolve(cwd, zips[0] as string);
+  const current = await currentVersionZip(cwd);
+  if (current !== undefined && zips.includes(current)) return resolve(cwd, current);
+  throw new UsageError(
+    `several .zip in the current folder (${zips.join(', ')}), none named after the name and version of package.json: give the path of the zip`,
+  );
 };
 
 const validateCommand = async (args: string[], io: CliIo): Promise<number> => {

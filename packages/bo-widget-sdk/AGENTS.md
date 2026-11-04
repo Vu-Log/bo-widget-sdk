@@ -26,7 +26,7 @@ You are writing or changing a **Vulog back office (BO) widget**: a page the BO s
 
 ## Finding a Vulog API endpoint
 
-Never guess an endpoint. The `aima-api` skill of the SDK repository (`plugins/bo-widget/skills/aima-api` in <https://github.com/Vu-Log/bo-widget-sdk>) lists the admin endpoints a widget can call, with their parameters, bodies and response schemas, and the path to pass to `authFetch`. It is regenerated every week from the public Vulog API reference. Install it in Claude Code with `/plugin marketplace add Vu-Log/bo-widget-sdk` then `/plugin install bo-widget@bo-widget-sdk`, or in another agent with `npx skills add Vu-Log/bo-widget-sdk`. Without it, read the reference at <https://vulog-doc-api.web.app/>.
+Never guess an endpoint. The `aima-api` skill of the SDK repository (`plugins/bo-widget/skills/aima-api` in <https://github.com/Vu-Log/bo-widget-sdk>) lists the admin endpoints a widget can call, with their parameters, bodies and response schemas, and the path to pass to `authFetch`. It is generated from the public Vulog API reference, and a weekly job proposes an update. Install it in Claude Code with `/plugin marketplace add Vu-Log/bo-widget-sdk` then `/plugin install bo-widget@bo-widget-sdk`, or in another agent with `npx skills add Vu-Log/bo-widget-sdk`. Without it, read the reference at <https://vulog-doc-api.web.app/>.
 
 ## Error handling
 

@@ -4,10 +4,12 @@ import {
   EXCLUDED_TAGS,
   FALLBACK_FILE,
   GATEWAY_BASE_PATH,
+  KNOWN_ROOT_SERVICES,
   PRIVATE_HOST_SUFFIX,
   SCHEMAS_FILE,
   SKILL_FILES,
   STANDARD_REFERENCE_PREFIXES,
+  TRACKER_KEY_MIN_DIGITS,
 } from './config.mjs';
 
 /** HTTP methods rendered, in display order. */
@@ -43,30 +45,57 @@ const MAX_REF_HOPS = 20;
  */
 
 /**
+ * Something {@link redactReferences} removed from a text: an issue-tracker key or a backend
+ * web-service name. Only counted in the warnings, never printed.
+ *
+ * @typedef {{kind: 'tracker' | 'service', token: string}} Redaction
+ */
+
+/**
  * An operation, flattened for rendering. `summary` and `description` are single lines.
  *
  * @typedef {object} Endpoint
  * @property {string} method - uppercase member of {@link HTTP_METHODS}
  * @property {string} path - spec path, e.g. `/fleets/{fleetId}/users/{id}`
- * @property {string} basePath - public path the route is relative to: `boapi/proxy`,
- *   `boapi/proxy/user`, `boapi/proxy/fleetmanager/public`, `apiv5`…
+ * @property {string | null} basePath - public path the route is relative to: `boapi/proxy`,
+ *   `boapi/proxy/user`, `boapi/proxy/fleetmanager/public`, `apiv5`…; `null` when unknown (path
+ *   item declaring `servers: []` with a route outside {@link KNOWN_ROOT_SERVICES})
  * @property {string[]} tags - non-empty string tags
  * @property {string} summary
  * @property {string} description
- * @property {boolean} deprecated - `deprecated: true` or the `deprecated` tag
- * @property {boolean} internal - the `internal` tag or `x-internal: true`
+ * @property {boolean} deprecated - `deprecated: true` or the `deprecated` tag (any case)
+ * @property {boolean} internal - the `internal` tag (any case) or `x-internal: true`
  * @property {string | null} operationId
  * @property {Param[]} params - path-level parameters overridden by operation-level ones
  * @property {{label: string, fields: Field[]} | null} requestBody
  * @property {{status: string, label: string | null}[]} responses
+ * @property {Redaction[]} redacted - what was redacted from its texts (summary, description,
+ *   parameters, request body fields)
  */
 
 /**
+ * Why an endpoint is left out of the skill (see {@link exclusionReason}).
+ *
+ * @typedef {'outsideGateway' | 'unknownBasePath' | 'deprecatedOrInternal' | 'excludedTag' |
+ *   'excludedPathSegment'} ExclusionReason
+ */
+
+/** Every {@link ExclusionReason}, in the order they are checked and reported. */
+export const EXCLUSION_REASONS = [
+  'unknownBasePath',
+  'outsideGateway',
+  'deprecatedOrInternal',
+  'excludedTag',
+  'excludedPathSegment',
+];
+
+/**
  * Values injected into the SKILL.md template and written to the sync summary. Counts are those
- * of the generated skill; `excludedCount` is the number of swagger endpoints left out of it.
+ * of the generated skill; `excludedCount` is the number of swagger endpoints left out of it, and
+ * `excluded` splits it by {@link ExclusionReason}.
  *
  * @typedef {{release: string, openapi: string, endpointCount: number, excludedCount: number,
- *   tagCount: number, schemaCount: number}} SkillStats
+ *   excluded: Record<ExclusionReason, number>, tagCount: number, schemaCount: number}} SkillStats
  */
 
 /**
@@ -170,45 +199,66 @@ export function schemaLabel(schema) {
 }
 
 /**
- * Flattens a text for a Markdown table cell or a one-line note.
+ * Flattens a text for a Markdown table cell or a one-line note, after {@link redactReferences}.
  *
  * @param {unknown} text - raw description
  * @param {number} maxLength - truncation length
+ * @param {Redaction[]} [found] - collects what was redacted
  * @returns {string} single-line text, pipes escaped, truncated with `…`
  */
-export function oneLine(text, maxLength = NOTE_MAX_LENGTH) {
+export function oneLine(text, maxLength = NOTE_MAX_LENGTH, found = []) {
   if (text === undefined || text === null) return '';
-  const flat = redactReferences(String(text)).replace(/\s+/g, ' ').trim().replace(/\|/g, '\\|');
+  const flat = redactReferences(String(text), found)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\|/g, '\\|');
   return flat.length > maxLength ? `${flat.slice(0, maxLength - 1).trimEnd()}…` : flat;
 }
 
-const TRACKER_KEY = /\b([A-Z][A-Z0-9]+)-\d+\b(\s*[—:]\s*)?/g;
+const TRACKER_KEY = new RegExp(
+  `\\b([A-Z][A-Z0-9]+)-\\d{${TRACKER_KEY_MIN_DIGITS},}\\b(\\s*[—:]\\s*)?`,
+  'g',
+);
 const BACKEND_SERVICE_NAME = /\b[A-Za-z]*[a-z][A-Za-z]*WS\b/g;
 
 /**
  * Removes from a description what only makes sense inside the platform team: issue-tracker keys
- * (`ABC-123 — text` gives `text`, `since ABC-123,` gives `since an earlier change,`), except the
- * standard references of {@link STANDARD_REFERENCE_PREFIXES}, and backend web-service names
- * (`fooWS` gives `the backend`).
+ * (`ABC-123 — text` gives `text`, `since ABC-123,` gives `since an earlier change,`), and backend
+ * web-service names (`fooWS` gives `the backend`). A key needs {@link TRACKER_KEY_MIN_DIGITS}
+ * digits and a prefix outside {@link STANDARD_REFERENCE_PREFIXES}, so technical terms (`UTF-8`,
+ * `SHA-256`, `ISO-8601`, `HTTP-2`…) are kept.
  *
  * @param {string} text - swagger description or summary
+ * @param {Redaction[]} [found] - collects what was redacted (to report counts, never the tokens)
  * @returns {string} the text, redacted
  */
-export function redactReferences(text) {
+export function redactReferences(text, found = []) {
   return text
     .replace(TRACKER_KEY, (match, prefix, separator) => {
       if (STANDARD_REFERENCE_PREFIXES.includes(prefix)) return match;
+      found.push({
+        kind: 'tracker',
+        token: match.slice(0, match.length - (separator?.length ?? 0)),
+      });
       return separator ? '' : 'an earlier change';
     })
-    .replace(BACKEND_SERVICE_NAME, 'the backend');
+    .replace(BACKEND_SERVICE_NAME, (token) => {
+      found.push({ kind: 'service', token });
+      return 'the backend';
+    });
 }
 
 const ESCAPED_SUFFIX = PRIVATE_HOST_SUFFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// The suffix must end the host name: `api.local.example.com` and `foo.localhost` are public.
+const END_OF_HOST = '(?![\\w-]|\\.[\\w-])';
 const PRIVATE_URL = new RegExp(
-  `\\bhttps?://[^\\s/?#:"'\`<>]+${ESCAPED_SUFFIX}(?::\\d+)?([^\\s"'\`<>)\\]]*)`,
+  `\\bhttps?://[^\\s/?#:"'\`<>]+${ESCAPED_SUFFIX}${END_OF_HOST}(?::\\d+)?([^\\s"'\`<>)\\]]*)`,
   'gi',
 );
-const PRIVATE_HOST = new RegExp(`\\b[\\w-]+(?:\\.[\\w-]+)*${ESCAPED_SUFFIX}\\b(?::\\d+)?`, 'gi');
+const PRIVATE_HOST = new RegExp(
+  `\\b[\\w-]+(?:\\.[\\w-]+)*${ESCAPED_SUFFIX}${END_OF_HOST}(?::\\d+)?`,
+  'gi',
+);
 
 /**
  * Removes the private hosts (ending with {@link PRIVATE_HOST_SUFFIX}) from a text: a URL on such a
@@ -244,9 +294,10 @@ function checkPropertyRefs(spec, property, warnings) {
  * @param {string[]} warnings - collects unresolved/circular references and malformed `required`
  * @param {Set<object>} [visited] - schemas being expanded on the current `allOf` path (guards
  *   circular `allOf`; a base shared by several parts is expanded each time)
+ * @param {Redaction[]} [found] - collects what was redacted from the field descriptions
  * @returns {Field[]} fields, in spec order
  */
-export function describeFields(spec, schema, warnings = [], visited = new Set()) {
+export function describeFields(spec, schema, warnings = [], visited = new Set(), found = []) {
   const resolved = resolveRef(spec, schema, warnings);
   if (!resolved) return [];
   if (visited.has(resolved)) {
@@ -256,7 +307,9 @@ export function describeFields(spec, schema, warnings = [], visited = new Set())
   let inherited = [];
   if (Array.isArray(resolved.allOf)) {
     visited.add(resolved);
-    inherited = resolved.allOf.flatMap((part) => describeFields(spec, part, warnings, visited));
+    inherited = resolved.allOf.flatMap((part) =>
+      describeFields(spec, part, warnings, visited, found),
+    );
     visited.delete(resolved);
   }
   if (resolved.required !== undefined && !Array.isArray(resolved.required)) {
@@ -274,6 +327,8 @@ export function describeFields(spec, schema, warnings = [], visited = new Set())
         [property?.deprecated ? '*(deprecated)*' : '', property?.description ?? '']
           .filter(Boolean)
           .join(' '),
+        NOTE_MAX_LENGTH,
+        found,
       ),
     };
   });
@@ -326,9 +381,17 @@ export function assignFile(tags, files = SKILL_FILES) {
  * @param {unknown[]} operationParameters - `operation.parameters`
  * @param {string} where - `METHOD path`, for warnings
  * @param {string[]} warnings - collects dropped parameters
+ * @param {Redaction[]} [found] - collects what was redacted from the parameter descriptions
  * @returns {Param[]} parameters, path-level order first
  */
-export function mergeParameters(spec, pathParameters, operationParameters, where, warnings = []) {
+export function mergeParameters(
+  spec,
+  pathParameters,
+  operationParameters,
+  where,
+  warnings = [],
+  found = [],
+) {
   const merged = new Map();
   for (const list of [pathParameters, operationParameters]) {
     if (list === undefined || list === null) continue;
@@ -347,7 +410,7 @@ export function mergeParameters(spec, pathParameters, operationParameters, where
         in: parameter.in,
         type: schemaLabel(parameter.schema),
         required: Boolean(parameter.required),
-        notes: oneLine(parameter.description),
+        notes: oneLine(parameter.description, NOTE_MAX_LENGTH, found),
       });
     }
   }
@@ -361,12 +424,24 @@ function firstJsonSchema(content) {
   return content[mediaType]?.schema;
 }
 
+function hasTag(tags, name) {
+  return tags.some((tag) => tag.toLowerCase() === name);
+}
+
 function collectOperation(spec, path, item, method, basePath, warnings) {
   const where = `${method.toUpperCase()} ${path}`;
   const operation = item[method];
+  const redacted = [];
   const { names: tags, malformed } = normalizeTags(operation.tags);
   if (malformed) warnings.push(`Malformed tags on ${where}`);
-  const params = mergeParameters(spec, item.parameters, operation.parameters, where, warnings);
+  const params = mergeParameters(
+    spec,
+    item.parameters,
+    operation.parameters,
+    where,
+    warnings,
+    redacted,
+  );
   for (const param of params) {
     if (!PARAM_LOCATIONS.includes(param.in)) {
       warnings.push(`Parameter \`${param.name}\` with unknown location "${param.in}" on ${where}`);
@@ -378,19 +453,23 @@ function collectOperation(spec, path, item, method, basePath, warnings) {
     path,
     basePath,
     tags,
-    summary: oneLine(operation.summary, DESCRIPTION_MAX_LENGTH),
-    description: oneLine(operation.description, DESCRIPTION_MAX_LENGTH),
-    deprecated: Boolean(operation.deprecated) || tags.includes('deprecated'),
-    internal: tags.includes('internal') || operation['x-internal'] === true,
+    summary: oneLine(operation.summary, DESCRIPTION_MAX_LENGTH, redacted),
+    description: oneLine(operation.description, DESCRIPTION_MAX_LENGTH, redacted),
+    deprecated: Boolean(operation.deprecated) || hasTag(tags, 'deprecated'),
+    internal: hasTag(tags, 'internal') || operation['x-internal'] === true,
     operationId: operation.operationId ?? null,
     params,
     requestBody: bodySchema
-      ? { label: schemaLabel(bodySchema), fields: describeFields(spec, bodySchema, warnings) }
+      ? {
+          label: schemaLabel(bodySchema),
+          fields: describeFields(spec, bodySchema, warnings, new Set(), redacted),
+        }
       : null,
     responses: Object.entries(operation.responses ?? {}).map(([status, response]) => {
       const schema = firstJsonSchema(resolveRef(spec, response, warnings)?.content);
       return { status, label: schema ? schemaLabel(schema) : null };
     }),
+    redacted,
   };
 }
 
@@ -417,23 +496,25 @@ function variableDefault(variables, name) {
  * - a private service (host ending with {@link PRIVATE_HOST_SUFFIX}) is reached through the
  *   admin gateway: `https://service.example.local:1443/user` gives `boapi/proxy/user`;
  * - any other URL gives its path: `https://api-{region}.example.com/boapi/proxy/fleetmanager/public`
- *   gives `boapi/proxy/fleetmanager/public`.
+ *   gives `boapi/proxy/fleetmanager/public`; one without path gives `fallback`, with a warning.
  *
  * @param {unknown} servers - `servers` of a path item or of the spec
  * @param {string} fallback - base path when no usable server is declared
  * @param {string} where - path or `spec`, for the warning
- * @param {string[]} warnings - collects an unreadable server URL
+ * @param {string[]} warnings - collects an unreadable server URL, a path variable without default
+ *   and a public server URL without path
  * @returns {string} base path, without leading or trailing `/`
  */
 export function resolveBasePath(servers, fallback, where, warnings = []) {
   const server = Array.isArray(servers) ? servers[0] : undefined;
   if (typeof server?.url !== 'string') return fallback;
+  // A variable without default becomes a placeholder token, to find out below where it sits.
   const missing = [];
   const url = server.url.replace(/\{([^}]+)\}/g, (_, name) => {
     const value = variableDefault(server.variables, name);
     if (value !== undefined) return value;
-    missing.push(name);
-    return name;
+    missing.push({ name, token: `unresolvedvariable${missing.length}` });
+    return missing.at(-1).token;
   });
   let parsed;
   try {
@@ -445,7 +526,9 @@ export function resolveBasePath(servers, fallback, where, warnings = []) {
   }
   const path = parsed.pathname.replace(/^\/+|\/+$/g, '');
   // A variable without default is harmless in the host, which is not rendered, but not in the path.
-  const unresolved = missing.filter((name) => parsed.pathname.split('/').includes(name));
+  const unresolved = missing
+    .filter(({ token }) => parsed.pathname.includes(token))
+    .map(({ name }) => name);
   if (unresolved.length > 0) {
     warnings.push(
       `Server variable without default {${unresolved.join('}, {')}} in the path of "${server.url}" on ${where}, base path /${fallback} used`,
@@ -455,7 +538,46 @@ export function resolveBasePath(servers, fallback, where, warnings = []) {
   if (parsed.hostname.endsWith(PRIVATE_HOST_SUFFIX)) {
     return path ? `${GATEWAY_BASE_PATH}/${path}` : GATEWAY_BASE_PATH;
   }
-  return path || fallback;
+  if (!path) {
+    warnings.push(
+      `Server URL "${server.url}" without path on ${where}, base path /${fallback} used`,
+    );
+    return fallback;
+  }
+  return path;
+}
+
+function routeSegments(path) {
+  return path.split('/').filter(Boolean);
+}
+
+/**
+ * Drops the service segment that a route repeats: a private service declared as
+ * `https://service.example.local:1443/business` with the route `/business/fleets/...` is called as
+ * `boapi/proxy/business/fleets/...`, not `boapi/proxy/business/business/fleets/...`.
+ *
+ * @param {string} basePath - resolved base path
+ * @param {string} path - spec route
+ * @returns {string} the base path without its last segment when the route starts with it
+ */
+function dropRepeatedService(basePath, path) {
+  if (basePath === GATEWAY_BASE_PATH || !basePath.startsWith(`${GATEWAY_BASE_PATH}/`)) {
+    return basePath;
+  }
+  const segments = basePath.split('/');
+  return segments.at(-1) === routeSegments(path)[0] ? segments.slice(0, -1).join('/') : basePath;
+}
+
+/**
+ * Base path of a path item. An empty `servers` list says nothing about where the route is served:
+ * it is reached through the admin gateway only when its first segment is one of
+ * {@link KNOWN_ROOT_SERVICES}, otherwise its base path is unknown (`null`).
+ */
+function pathItemBasePath(item, path, specBasePath, warnings) {
+  if (Array.isArray(item.servers) && item.servers.length === 0) {
+    return KNOWN_ROOT_SERVICES.includes(routeSegments(path)[0]) ? GATEWAY_BASE_PATH : null;
+  }
+  return dropRepeatedService(resolveBasePath(item.servers, specBasePath, path, warnings), path);
 }
 
 /**
@@ -474,12 +596,17 @@ export function collectEndpoints(spec, warnings = []) {
       warnings.push(`Path item is not an object, skipped: ${path}`);
       continue;
     }
-    const basePath = resolveBasePath(item.servers, specBasePath, path, warnings);
+    const basePath = pathItemBasePath(item, path, specBasePath, warnings);
     for (const method of IGNORED_METHODS) {
       if (item[method]) warnings.push(`Method not rendered: ${method.toUpperCase()} ${path}`);
     }
     for (const method of HTTP_METHODS) {
       if (!item[method]) continue;
+      if (basePath === null) {
+        warnings.push(
+          `Empty servers on ${method.toUpperCase()} ${path}: base path unknown, left out`,
+        );
+      }
       try {
         endpoints.push(collectOperation(spec, path, item, method, basePath, warnings));
       } catch (error) {
@@ -493,25 +620,47 @@ export function collectEndpoints(spec, warnings = []) {
 }
 
 function isUnderGateway(basePath) {
-  return basePath === GATEWAY_BASE_PATH || basePath.startsWith(`${GATEWAY_BASE_PATH}/`);
+  return (
+    typeof basePath === 'string' &&
+    (basePath === GATEWAY_BASE_PATH || basePath.startsWith(`${GATEWAY_BASE_PATH}/`))
+  );
 }
 
 /**
- * Tells whether a widget can call an endpoint with `bo.authFetch`: it is served under the admin
- * gateway ({@link GATEWAY_BASE_PATH}), is neither deprecated nor internal, carries none of
- * {@link EXCLUDED_TAGS} and its route has none of {@link EXCLUDED_PATH_SEGMENTS}.
+ * Tells why a widget cannot call an endpoint with `bo.authFetch`, checking in the order of
+ * {@link EXCLUSION_REASONS}: its base path is unknown or not under the admin gateway
+ * ({@link GATEWAY_BASE_PATH}), it is deprecated or internal, it carries one of
+ * {@link EXCLUDED_TAGS} (any case), or its route or base path has one of
+ * {@link EXCLUDED_PATH_SEGMENTS}.
+ *
+ * @param {Endpoint} endpoint - item of {@link collectEndpoints}
+ * @returns {ExclusionReason | null} the first reason found, `null` when the endpoint belongs in the skill
+ */
+export function exclusionReason(endpoint) {
+  if (endpoint.basePath === null) return 'unknownBasePath';
+  if (!isUnderGateway(endpoint.basePath)) return 'outsideGateway';
+  if (endpoint.deprecated || endpoint.internal) return 'deprecatedOrInternal';
+  if (EXCLUDED_TAGS.some((excluded) => hasTag(endpoint.tags, excluded))) return 'excludedTag';
+  const segments = [...endpoint.basePath.split('/'), ...routeSegments(endpoint.path)];
+  if (segments.some((segment) => EXCLUDED_PATH_SEGMENTS.includes(segment))) {
+    return 'excludedPathSegment';
+  }
+  return null;
+}
+
+/**
+ * Tells whether a widget can call an endpoint with `bo.authFetch` (see {@link exclusionReason}).
  *
  * @param {Endpoint} endpoint - item of {@link collectEndpoints}
  * @returns {boolean} true when the endpoint belongs in the skill
  */
 export function isWidgetEndpoint(endpoint) {
-  if (!isUnderGateway(endpoint.basePath) || endpoint.deprecated || endpoint.internal) return false;
-  if (endpoint.tags.some((tag) => EXCLUDED_TAGS.includes(tag))) return false;
-  return !endpoint.path.split('/').some((segment) => EXCLUDED_PATH_SEGMENTS.includes(segment));
+  return exclusionReason(endpoint) === null;
 }
 
 /**
- * Path to pass to `bo.authFetch`: the base path after the admin gateway, then the route.
+ * Path to pass to `bo.authFetch`: the base path after the admin gateway, then the route, with
+ * duplicate slashes collapsed (`fleetadmin//fleets` gives `fleetadmin/fleets`).
  *
  * @param {Endpoint} endpoint - endpoint under {@link GATEWAY_BASE_PATH}
  * @returns {string} e.g. `fleetmanager/public/fleets/{fleetId}/vehicles`
@@ -520,10 +669,14 @@ export function isWidgetEndpoint(endpoint) {
 export function authFetchPath(endpoint) {
   const { basePath, path } = endpoint;
   if (!isUnderGateway(basePath)) {
-    throw new Error(`Not under /${GATEWAY_BASE_PATH}: ${endpoint.method} ${path} (/${basePath})`);
+    const where = basePath === null ? 'base path unknown' : `/${basePath}`;
+    throw new Error(`Not under /${GATEWAY_BASE_PATH}: ${endpoint.method} ${path} (${where})`);
   }
   const service = basePath.slice(GATEWAY_BASE_PATH.length + 1);
-  return [service, path.replace(/^\/+/, '')].filter(Boolean).join('/');
+  return [service, path]
+    .join('/')
+    .replace(/\/{2,}/g, '/')
+    .replace(/^\/+/, '');
 }
 
 /**
@@ -661,6 +814,7 @@ export function renderEndpointFile(definition, entries) {
  * @param {string[]} warnings - collects unresolved/circular references
  * @param {Iterable<string>} [names] - schemas to render (default: all of them); unknown names are
  *   skipped
+ * @param {Redaction[]} [found] - collects what was redacted from the descriptions
  * @returns {string} Markdown content, one `### Name` section per schema
  * @throws {Error} with the schema name in the message when a schema cannot be read
  */
@@ -668,6 +822,7 @@ export function renderSchemas(
   spec,
   warnings = [],
   names = Object.keys(spec.components?.schemas ?? {}),
+  found = [],
 ) {
   const schemas = spec.components?.schemas ?? {};
   const parts = [
@@ -680,9 +835,12 @@ export function renderSchemas(
   for (const name of selected.sort((a, b) => a.localeCompare(b))) {
     const schema = schemas[name];
     parts.push('', `### ${name}`);
-    if (schema?.description) parts.push(oneLine(schema.description, DESCRIPTION_MAX_LENGTH));
+    if (schema?.description) {
+      parts.push(oneLine(schema.description, DESCRIPTION_MAX_LENGTH, found));
+    }
     try {
-      const fields = describeFields(spec, { $ref: `#/components/schemas/${name}` }, warnings);
+      const ref = { $ref: `#/components/schemas/${name}` };
+      const fields = describeFields(spec, ref, warnings, new Set(), found);
       parts.push(fields.length > 0 ? fieldsTable(fields) : `Type: ${schemaLabel(schema)}`);
     } catch (error) {
       throw new Error(`Cannot read schema ${name}: ${error.message}`, { cause: error });
@@ -707,18 +865,31 @@ export function renderTemplate(template, values) {
 }
 
 /**
- * Groups the widget endpoints by skill file, and warns about untagged and unmapped ones.
+ * Tells whether a tag was claimed by the `tagPrefix` of a file without being one of its
+ * `expectedTags`: a new admin area, to map or to list.
+ */
+function isUnexpectedPrefixTag(file, tag) {
+  const definition = SKILL_FILES.find((candidate) => candidate.file === file);
+  if (!definition?.tagPrefix || definition.tags?.includes(tag)) return false;
+  return !(definition.expectedTags ?? []).includes(tag);
+}
+
+/**
+ * Groups the widget endpoints by skill file, and warns about untagged and unmapped ones, and about
+ * tags caught by a prefix but not expected.
  *
  * @param {Endpoint[]} endpoints - endpoints kept by {@link isWidgetEndpoint}
- * @param {string[]} warnings - collects untagged endpoints and unmapped tags
+ * @param {string[]} warnings - collects untagged endpoints, unmapped and unexpected tags
  * @returns {Map<string, {endpoint: Endpoint, section: string}[]>} file name → entries
  */
 function groupByFile(endpoints, warnings) {
   const byFile = new Map(SKILL_FILES.map((definition) => [definition.file, []]));
   const unmappedTags = new Set();
+  const unexpectedTags = new Map();
   for (const endpoint of endpoints) {
     const { file, tag } = assignFile(endpoint.tags);
     if (!tag) endpoint.tags.forEach((unknown) => unmappedTags.add(unknown));
+    if (tag && isUnexpectedPrefixTag(file, tag)) unexpectedTags.set(tag, file);
     if (endpoint.tags.length === 0) {
       warnings.push(
         `Untagged endpoint (sent to ${FALLBACK_FILE}): ${endpoint.method} ${endpoint.path}`,
@@ -731,25 +902,78 @@ function groupByFile(endpoints, warnings) {
       `Tag not mapped in scripts/aima-api/config.mjs (sent to ${FALLBACK_FILE}): ${tag}`,
     );
   }
+  for (const [tag, file] of [...unexpectedTags].sort(([a], [b]) => a.localeCompare(b))) {
+    warnings.push(
+      `New tag sent to ${file} by prefix: ${tag} (give it a file or add it to its expectedTags in scripts/aima-api/config.mjs)`,
+    );
+  }
   return byFile;
 }
 
 /**
+ * Checks that the skill is not empty nor shrunk: at least one endpoint is kept, and every file of
+ * {@link SKILL_FILES} but {@link FALLBACK_FILE} receives at least one.
+ *
+ * @throws {Error} naming the empty files
+ */
+function checkNotShrunk(endpoints, byFile) {
+  if (endpoints.length === 0) {
+    throw new Error('No endpoint a widget can call in the swagger: wrong spec or scope rules');
+  }
+  const empty = SKILL_FILES.filter(
+    (definition) => definition.file !== FALLBACK_FILE && byFile.get(definition.file).length === 0,
+  ).map((definition) => `${definition.file} (tags: ${definition.tags?.join(', ')})`);
+  if (empty.length > 0) {
+    throw new Error(
+      `No endpoint for ${empty.join('; ')}: tags renamed or removed in the swagger? Update scripts/aima-api/config.mjs`,
+    );
+  }
+}
+
+/**
+ * Warnings counting what was redacted in a file: the tokens themselves may be internal, so they
+ * are never printed.
+ *
+ * @param {string} file - generated file name
+ * @param {Redaction[]} found - redactions of its content
+ * @returns {string[]} one warning per kind with at least one distinct token
+ */
+function redactionWarnings(file, found) {
+  const distinct = (kind) =>
+    new Set(found.filter((item) => item.kind === kind).map((item) => item.token)).size;
+  const trackers = distinct('tracker');
+  const services = distinct('service');
+  return [
+    trackers > 0 ? `Redacted ${trackers} tracker reference(s) in ${file}` : null,
+    services > 0 ? `Replaced ${services} backend service name(s) in ${file}` : null,
+  ].filter(Boolean);
+}
+
+/**
  * Generates every file of the `aima-api` skill from a parsed spec: only the endpoints a widget can
- * call ({@link isWidgetEndpoint}) and the schemas they reach. Every file and warning goes through
- * {@link sanitizeText}, so no private host can leak into the skill or the sync PR.
+ * call ({@link isWidgetEndpoint}) and the schemas they reach. Every file goes through
+ * {@link sanitizeText}, and every warning through {@link redactReferences} and
+ * {@link sanitizeText}, so no private host nor internal reference can leak into the skill or the
+ * sync PR.
  *
  * @param {object} spec - parsed OpenAPI spec
  * @param {string} template - SKILL.md template
  * @returns {{files: Map<string, string>, warnings: string[], stats: SkillStats}} file name → content,
  *   deduplicated warnings to surface in the sync PR, and the release/counts
- * @throws {Error} when an operation, a schema or a template placeholder cannot be rendered
+ * @throws {Error} when an operation, a schema or a template placeholder cannot be rendered, when no
+ *   endpoint is kept, or when a file other than {@link FALLBACK_FILE} gets no endpoint
  */
 export function buildSkill(spec, template) {
   const warnings = [];
   const all = collectEndpoints(spec, warnings);
-  const endpoints = all.filter(isWidgetEndpoint);
+  const excluded = Object.fromEntries(EXCLUSION_REASONS.map((reason) => [reason, 0]));
+  const endpoints = all.filter((endpoint) => {
+    const reason = exclusionReason(endpoint);
+    if (reason) excluded[reason] += 1;
+    return reason === null;
+  });
   const byFile = groupByFile(endpoints, warnings);
+  checkNotShrunk(endpoints, byFile);
 
   const files = new Map();
   const tableRows = [];
@@ -757,13 +981,17 @@ export function buildSkill(spec, template) {
     const entries = byFile.get(definition.file);
     files.set(definition.file, renderEndpointFile(definition, entries));
     tableRows.push(`| \`${definition.file}\` | ${definition.summary} | ${entries.length} |`);
+    const found = entries.flatMap(({ endpoint }) => endpoint.redacted);
+    warnings.push(...redactionWarnings(definition.file, found));
   }
   const roots = endpoints.flatMap(({ method, path }) => [
     spec.paths[path].parameters,
     spec.paths[path][method.toLowerCase()],
   ]);
   const schemaNames = collectSchemaNames(spec, roots);
-  files.set(SCHEMAS_FILE, renderSchemas(spec, warnings, schemaNames));
+  const schemaRedactions = [];
+  files.set(SCHEMAS_FILE, renderSchemas(spec, warnings, schemaNames, schemaRedactions));
+  warnings.push(...redactionWarnings(SCHEMAS_FILE, schemaRedactions));
   tableRows.push(
     `| \`${SCHEMAS_FILE}\` | Request/response schemas used by these endpoints (first-level fields) | ${schemaNames.size} schemas |`,
   );
@@ -774,6 +1002,7 @@ export function buildSkill(spec, template) {
     openapi: String(spec.openapi),
     endpointCount: endpoints.length,
     excludedCount: all.length - endpoints.length,
+    excluded,
     tagCount: new Set(endpoints.flatMap((endpoint) => endpoint.tags)).size,
     schemaCount: schemaNames.size,
   };
@@ -781,5 +1010,6 @@ export function buildSkill(spec, template) {
     warnings.push('Release not found in info.title nor info.version');
   files.set('SKILL.md', renderTemplate(template, { ...stats, fileTable: tableRows.join('\n') }));
   for (const [name, content] of files) files.set(name, sanitizeText(content));
-  return { files, warnings: [...new Set(warnings.map(sanitizeText))], stats };
+  const cleanWarnings = warnings.map((warning) => sanitizeText(redactReferences(warning)));
+  return { files, warnings: [...new Set(cleanWarnings)], stats };
 }

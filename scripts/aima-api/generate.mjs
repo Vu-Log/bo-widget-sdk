@@ -57,6 +57,40 @@ export function parseArgs(argv) {
 }
 
 /**
+ * Message of an error followed by the code (or message) of its cause, which Node's `fetch` keeps
+ * there: `fetch failed (ENOTFOUND)`.
+ *
+ * @param {unknown} error - caught error
+ * @returns {string} e.g. `fetch failed (ENOTFOUND)`
+ */
+export function describeError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const cause = error instanceof Error ? error.cause : undefined;
+  if (cause === undefined || cause === null) return message;
+  const detail = cause.code ?? (cause instanceof Error ? cause.message : String(cause));
+  return detail && detail !== message ? `${message} (${detail})` : message;
+}
+
+/**
+ * Text printed by the CLI on failure: the stack of the error, then of each cause.
+ *
+ * @param {unknown} error - caught error
+ * @returns {string} multi-line report
+ */
+export function formatFailure(error) {
+  const lines = [];
+  const seen = new Set();
+  for (let current = error; current !== undefined && current !== null; current = current.cause) {
+    if (seen.has(current)) break;
+    seen.add(current);
+    const text = current instanceof Error ? (current.stack ?? current.message) : String(current);
+    lines.push(lines.length === 0 ? text : `Caused by: ${text}`);
+    if (!(current instanceof Error)) break;
+  }
+  return lines.join('\n');
+}
+
+/**
  * Reads the swagger from a URL or a local file.
  *
  * @param {string} input - `http(s)://` URL or file path
@@ -70,13 +104,13 @@ export async function readSpecText(input, fetchImpl = fetch) {
   try {
     response = await fetchImpl(input, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   } catch (error) {
-    throw new Error(`Download failed: ${input} → ${error.message}`, { cause: error });
+    throw new Error(`Download failed: ${input} → ${describeError(error)}`, { cause: error });
   }
   if (!response.ok) throw new Error(`Download failed: ${input} → HTTP ${response.status}`);
   try {
     return await response.text();
   } catch (error) {
-    throw new Error(`Download failed: ${input} → ${error.message}`, { cause: error });
+    throw new Error(`Download failed: ${input} → ${describeError(error)}`, { cause: error });
   }
 }
 
@@ -161,11 +195,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.ar
       process.stdout.write(
         `aima-api: release ${stats.release}, ${stats.endpointCount} endpoints (${stats.excludedCount} left out), ${stats.schemaCount} schemas\n`,
       );
+      const reasons = Object.entries(stats.excluded).map(([reason, count]) => `${reason} ${count}`);
+      process.stdout.write(`left out: ${reasons.join(', ')}\n`);
       removed.forEach((name) => process.stdout.write(`removed stale file: ${name}\n`));
       warnings.forEach((warning) => process.stderr.write(`warning: ${warning}\n`));
     })
     .catch((error) => {
-      process.stderr.write(`aima-api generation failed: ${error.message}\n`);
+      process.stderr.write(`aima-api generation failed: ${describeError(error)}\n`);
+      process.stderr.write(`${formatFailure(error)}\n`);
       process.exitCode = 1;
     });
 }

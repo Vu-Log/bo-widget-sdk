@@ -7,6 +7,8 @@ import {
   collectEndpoints,
   collectSchemaNames,
   describeFields,
+  EXCLUSION_REASONS,
+  exclusionReason,
   GENERATED_MARKER,
   getRelease,
   isWidgetEndpoint,
@@ -52,13 +54,17 @@ const makeEndpoint = (overrides = {}) => ({
   params: [],
   requestBody: null,
   responses: [],
+  redacted: [],
   ...overrides,
 });
+
+/** The fixture spec, parsed again so a test can change it. */
+const freshSpec = () => parseSpec(FIXTURE);
 
 describe('parseSpec', () => {
   it('parses a YAML OpenAPI document', () => {
     expect(spec.openapi).toBe('3.1.0');
-    expect(Object.keys(spec.paths)).toHaveLength(10);
+    expect(Object.keys(spec.paths)).toHaveLength(20);
   });
 
   it('parses a JSON document', () => {
@@ -181,17 +187,22 @@ describe('oneLine', () => {
     expect(oneLine(42)).toBe('42');
   });
 
-  it('redacts issue-tracker keys and backend service names', () => {
-    expect(oneLine('ABC-12 — refund lines, sent to\nfooWS')).toBe(
+  it('redacts issue-tracker keys and backend service names, and collects them', () => {
+    const found = [];
+    expect(oneLine('ABC-123 — refund lines, sent to\nfooWS', 160, found)).toBe(
       'refund lines, sent to the backend',
     );
+    expect(found).toEqual([
+      { kind: 'tracker', token: 'ABC-123' },
+      { kind: 'service', token: 'fooWS' },
+    ]);
   });
 });
 
 describe('redactReferences', () => {
   it('drops an issue-tracker key followed by a separator', () => {
     expect(redactReferences('ABC-123 — lines to refund')).toBe('lines to refund');
-    expect(redactReferences('XY1-9: fixed')).toBe('fixed');
+    expect(redactReferences('XY1-9999: fixed')).toBe('fixed');
   });
 
   it('replaces an issue-tracker key inside a sentence', () => {
@@ -203,6 +214,37 @@ describe('redactReferences', () => {
   it('keeps standard references', () => {
     const text = 'A date in ISO-8601, grouped as in BG-23, encoded in UTF-8';
     expect(redactReferences(text)).toBe(text);
+  });
+
+  it.each([
+    'AES-256',
+    'HTTP-2',
+    'PSD-2',
+    'TLS-1',
+    'SHA-256',
+    'RSA-2048',
+    'BCP-47',
+    'ES-256',
+    'RS-256',
+    'HS-256',
+    'COVID-19',
+    'UTF-8',
+    'ISO-8601',
+    'ABC-12',
+  ])('keeps the technical term or short reference %s', (term) => {
+    const found = [];
+    expect(redactReferences(`signed with ${term} here`, found)).toBe(`signed with ${term} here`);
+    expect(found).toEqual([]);
+  });
+
+  it('collects every redacted token, keys without their separator', () => {
+    const found = [];
+    redactReferences('ABC-123 — since XYZ-4567, via fooWS', found);
+    expect(found).toEqual([
+      { kind: 'tracker', token: 'ABC-123' },
+      { kind: 'tracker', token: 'XYZ-4567' },
+      { kind: 'service', token: 'fooWS' },
+    ]);
   });
 
   it('replaces backend web-service names, not acronyms nor schema names', () => {
@@ -235,6 +277,15 @@ describe('sanitizeText', () => {
 
   it('keeps public URLs, localhost and words containing "local"', () => {
     const text = 'https://api.example.com/boapi/proxy, http://localhost:3000, a localized label';
+    expect(sanitizeText(text)).toBe(text);
+  });
+
+  it.each([
+    'https://api.local.example.com/x',
+    'http://foo.localhost:3000/a',
+    'svc.local.example.com',
+    'see svc.localhost:8080',
+  ])('keeps %s, whose host does not end with .local', (text) => {
     expect(sanitizeText(text)).toBe(text);
   });
 
@@ -527,8 +578,22 @@ describe('resolveBasePath', () => {
     },
   );
 
-  it('falls back for a server URL without path', () => {
-    expect(resolve([{ url: 'https://api.example.com/' }])).toBe('fallback');
+  it('falls back, with a warning, for a public server URL without path', () => {
+    const warnings = [];
+    expect(resolve([{ url: 'https://api.example.com/' }], warnings)).toBe('fallback');
+    expect(warnings).toEqual([
+      'Server URL "https://api.example.com/" without path on GET /x, base path /fallback used',
+    ]);
+  });
+
+  it('falls back, with a warning, for a path variable without default inside a segment', () => {
+    const warnings = [];
+    expect(resolve([{ url: 'https://api.example.com/boapi/v-{version}' }], warnings)).toBe(
+      'fallback',
+    );
+    expect(warnings).toEqual([
+      'Server variable without default {version} in the path of "https://api.example.com/boapi/v-{version}" on GET /x, base path /fallback used',
+    ]);
   });
 
   it('falls back, with a warning, for an unreadable server URL', () => {
@@ -547,7 +612,31 @@ describe('collectEndpoints', () => {
     endpoints.find((endpoint) => endpoint.method === method && endpoint.path === path);
 
   it('flattens every operation, in or out of scope', () => {
-    expect(endpoints).toHaveLength(14);
+    expect(endpoints).toHaveLength(25);
+  });
+
+  it('serves an empty servers list under the gateway only for a known root service', () => {
+    expect(find('GET', '/geoloc/fleets/{fleetId}/zones').basePath).toBe('boapi/proxy');
+    expect(find('GET', '/tickets/{ticketId}').basePath).toBeNull();
+    expect(warnings).toContain(
+      'Empty servers on GET /tickets/{ticketId}: base path unknown, left out',
+    );
+    expect(warnings.filter((warning) => warning.startsWith('Empty servers'))).toHaveLength(1);
+  });
+
+  it('drops the service segment that the route repeats', () => {
+    expect(find('GET', '/business/fleets/{fleetId}/entities').basePath).toBe('boapi/proxy');
+    expect(find('GET', '/fleets/{fleetId}/taxes').basePath).toBe('boapi/proxy/business');
+  });
+
+  it('keeps what was redacted from the texts of each endpoint', () => {
+    expect(find('GET', '/fleets/{fleetId}/trips').redacted).toEqual([
+      { kind: 'tracker', token: 'ABC-1234' },
+      { kind: 'tracker', token: 'ABC-1234' },
+      { kind: 'tracker', token: 'XYZ-987' },
+      { kind: 'service', token: 'fooWS' },
+    ]);
+    expect(find('GET', '/fleets/{fleetId}/stations').redacted).toEqual([]);
   });
 
   it('uses the path-level base path, else the spec one', () => {
@@ -592,6 +681,7 @@ describe('collectEndpoints', () => {
     expect(find('GET', '/trips/legacy').deprecated).toBe(true);
     expect(find('DELETE', '/fleets/{fleetId}/users/{id}').internal).toBe(true);
     expect(find('GET', '/trips/hidden').internal).toBe(true);
+    expect(find('GET', '/fleets/{fleetId}/services/old').deprecated).toBe(true);
     expect(find('GET', '/fleets/{fleetId}/users/{id}')).toMatchObject({
       deprecated: false,
       internal: false,
@@ -684,18 +774,49 @@ describe('isWidgetEndpoint', () => {
     },
   );
 
-  it.each([['internal'], ['deprecated'], ['todo'], ['need-migration']])(
+  it.each([['internal'], ['deprecated'], ['todo'], ['need-migration'], ['Internal'], ['TODO']])(
     'drops an endpoint tagged %s',
     (tag) => {
       expect(isWidgetEndpoint(makeEndpoint({ tags: ['admin-user', tag] }))).toBe(false);
     },
   );
 
+  it('drops an endpoint whose base path is unknown or has an excluded segment', () => {
+    expect(isWidgetEndpoint(makeEndpoint({ basePath: null }))).toBe(false);
+    expect(isWidgetEndpoint(makeEndpoint({ basePath: 'boapi/proxy/internal' }))).toBe(false);
+    expect(isWidgetEndpoint(makeEndpoint({ basePath: 'boapi/proxy/internalx' }))).toBe(true);
+  });
+
   it('drops deprecated and internal endpoints, and routes under /internal/', () => {
     expect(isWidgetEndpoint(makeEndpoint({ deprecated: true }))).toBe(false);
     expect(isWidgetEndpoint(makeEndpoint({ internal: true }))).toBe(false);
     expect(isWidgetEndpoint(makeEndpoint({ path: '/internal/fleets/{fleetId}' }))).toBe(false);
     expect(isWidgetEndpoint(makeEndpoint({ path: '/fleets/{fleetId}/internalNotes' }))).toBe(true);
+  });
+});
+
+describe('exclusionReason', () => {
+  it.each([
+    [{}, null],
+    [{ basePath: null }, 'unknownBasePath'],
+    [{ basePath: 'apiv5', deprecated: true }, 'outsideGateway'],
+    [{ deprecated: true, tags: ['todo'] }, 'deprecatedOrInternal'],
+    [{ internal: true }, 'deprecatedOrInternal'],
+    [{ tags: ['admin-user', 'Need-Migration'] }, 'excludedTag'],
+    [{ path: '/internal/x' }, 'excludedPathSegment'],
+    [{ basePath: 'boapi/proxy/internal' }, 'excludedPathSegment'],
+  ])('classifies %j as %s', (overrides, reason) => {
+    expect(exclusionReason(makeEndpoint(overrides))).toBe(reason);
+  });
+
+  it('only returns known reasons', () => {
+    expect(EXCLUSION_REASONS).toEqual([
+      'unknownBasePath',
+      'outsideGateway',
+      'deprecatedOrInternal',
+      'excludedTag',
+      'excludedPathSegment',
+    ]);
   });
 });
 
@@ -713,6 +834,21 @@ describe('authFetchPath', () => {
 
   it('returns the bare route for the gateway itself', () => {
     expect(authFetchPath(makeEndpoint({ path: '/tickets' }))).toBe('tickets');
+  });
+
+  it('collapses duplicate slashes', () => {
+    expect(authFetchPath(makeEndpoint({ path: '/fleetadmin//fleets/{fleetId}/config' }))).toBe(
+      'fleetadmin/fleets/{fleetId}/config',
+    );
+    expect(
+      authFetchPath(makeEndpoint({ basePath: 'boapi/proxy/user', path: '//fleets//{fleetId}' })),
+    ).toBe('user/fleets/{fleetId}');
+  });
+
+  it('throws for an endpoint whose base path is unknown', () => {
+    expect(() => authFetchPath(makeEndpoint({ basePath: null, path: '/tickets' }))).toThrow(
+      'Not under /boapi/proxy: GET /tickets (base path unknown)',
+    );
   });
 
   it('throws for an endpoint outside the admin gateway', () => {
@@ -845,6 +981,23 @@ describe('renderSchemas', () => {
     expect(markdown).toContain('### Gender\nType: string: `MALE`, `FEMALE`, `UNDEFINED`');
   });
 
+  it('collects what it redacted from the schema and field descriptions', () => {
+    const redactSpec = makeSpec(
+      {},
+      {
+        X: {
+          description: 'Built by fooWS',
+          properties: { a: { type: 'string', description: 'since ABC-123' } },
+        },
+      },
+    );
+    const found = [];
+    const markdown = renderSchemas(redactSpec, [], ['X'], found);
+    expect(markdown).toContain('Built by the backend');
+    expect(markdown).toContain('since an earlier change');
+    expect(found.map((item) => item.kind)).toEqual(['service', 'tracker']);
+  });
+
   it('renders only the requested schemas, skipping unknown names', () => {
     const markdown = renderSchemas(spec, [], new Set(['User', 'Nope']));
     expect(markdown.match(/^### .+$/gm)).toEqual(['### User']);
@@ -902,11 +1055,20 @@ describe('buildSkill', () => {
     expect(stats).toEqual({
       release: '9.99',
       openapi: '3.1.0',
-      endpointCount: 7,
-      excludedCount: 7,
-      tagCount: 6,
+      endpointCount: 14,
+      excludedCount: 11,
+      excluded: {
+        unknownBasePath: 1,
+        outsideGateway: 1,
+        deprecatedOrInternal: 5,
+        excludedTag: 3,
+        excludedPathSegment: 1,
+      },
+      tagCount: 13,
       schemaCount: 4,
     });
+    const reasons = Object.values(stats.excluded).reduce((sum, count) => sum + count, 0);
+    expect(reasons).toBe(stats.excludedCount);
   });
 
   it('keeps only the endpoints under the admin gateway that are not excluded', () => {
@@ -923,11 +1085,15 @@ describe('buildSkill', () => {
       'Delete a user',
       'apiv5',
       'Mobile',
+      'Old services',
+      'Create a service',
+      'Secrets of a private service',
+      'served nobody knows where',
     ]) {
       expect(all).not.toContain(excluded);
     }
     expect(files.get('admin-user.md')).toContain('## admin-user (1 endpoint)');
-    expect(files.get('admin-trip.md')).not.toContain('##');
+    expect(files.get('admin-trip.md')).toContain('## admin-trip (1 endpoint)');
   });
 
   it('routes endpoints to their files and sections', () => {
@@ -936,6 +1102,59 @@ describe('buildSkill', () => {
     expect(files.get('admin-other.md')).toContain('## admin-report (1 endpoint)');
     expect(files.get('admin-other.md')).toContain('## brand-new-tag (1 endpoint)');
     expect(files.get('admin-other.md')).toContain('## Untagged (1 endpoint)');
+    expect(files.get('admin-other.md')).toContain('## admin-novelty (1 endpoint)');
+    expect(files.get('business-other.md')).toContain('## Zone (1 endpoint)');
+    expect(files.get('business-other.md')).toContain(
+      'authFetch path: `geoloc/fleets/{fleetId}/zones` (base path `/boapi/proxy`)',
+    );
+    expect(files.get('business-other.md')).toContain(
+      'authFetch path: `business/fleets/{fleetId}/entities` (base path `/boapi/proxy`)',
+    );
+  });
+
+  it('warns about a tag caught by the admin- prefix that admin-other.md does not expect', () => {
+    expect(warnings).toContain(
+      'New tag sent to admin-other.md by prefix: admin-novelty (give it a file or add it to its expectedTags in scripts/aima-api/config.mjs)',
+    );
+    expect(warnings.join('\n')).not.toContain('by prefix: admin-report');
+  });
+
+  it('reports how many references it redacted per file, never the references themselves', () => {
+    expect(warnings).toContain('Redacted 2 tracker reference(s) in admin-trip.md');
+    expect(warnings).toContain('Replaced 1 backend service name(s) in admin-trip.md');
+    expect(warnings.join('\n')).not.toMatch(/ABC-1234|XYZ-987|fooWS/);
+    expect(files.get('admin-trip.md')).toContain(
+      'Trips of the fleet. Signed with SHA-256 by the backend, see an earlier change and an earlier change.',
+    );
+  });
+
+  it('throws when no endpoint is kept', () => {
+    const empty = freshSpec();
+    empty.servers = [{ url: 'https://api.example.com/apiv5' }];
+    for (const item of Object.values(empty.paths)) delete item.servers;
+    expect(() => buildSkill(empty, TEMPLATE)).toThrow('No endpoint a widget can call');
+  });
+
+  it('throws naming the file that gets no endpoint', () => {
+    const shrunk = freshSpec();
+    delete shrunk.paths['/fleets/{fleetId}/models'];
+    expect(() => buildSkill(shrunk, TEMPLATE)).toThrow(
+      'No endpoint for admin-vehicle.md (tags: admin-vehicle)',
+    );
+  });
+
+  it('does not require an endpoint in the fallback file', () => {
+    const noFallback = freshSpec();
+    const fallbackPaths = [
+      '/fleets/{fleetId}/reports',
+      '/brand-new',
+      '/untagged',
+      '/fleets/{fleetId}/novelties',
+    ];
+    noFallback.paths = Object.fromEntries(
+      Object.entries(noFallback.paths).filter(([path]) => !fallbackPaths.includes(path)),
+    );
+    expect(buildSkill(noFallback, TEMPLATE).files.get('admin-other.md')).not.toContain('##');
   });
 
   it('reports unmapped tags, untagged endpoints and malformed tags', () => {
@@ -962,20 +1181,25 @@ describe('buildSkill', () => {
     );
   });
 
-  it('sanitises the warnings too', () => {
-    const { warnings: hostWarnings } = buildSkill(
-      makeSpec({ '/a': { servers: [{ url: 'https://svc.example.local/{basePath}' }] } }),
-      TEMPLATE,
-    );
-    expect(hostWarnings).toEqual([
+  it('sanitises and redacts the warnings too', () => {
+    const withHost = freshSpec();
+    withHost.paths['/a'] = { servers: [{ url: 'https://svc.example.local/{basePath}' }] };
+    withHost.paths['/b'] = {
+      get: { tags: ['admin-user'], parameters: [{ name: 'w', in: 'ABC-1234' }] },
+    };
+    const { warnings: hostWarnings } = buildSkill(withHost, TEMPLATE);
+    expect(hostWarnings).toContain(
       'Server variable without default {basePath} in the path of "/boapi/proxy/{basePath}" on /a, base path /boapi/proxy used',
-    ]);
+    );
+    expect(hostWarnings).toContain(
+      'Parameter `w` with unknown location "an earlier change" on GET /b',
+    );
   });
 
   it('renders the SKILL.md router with release, counts and file table', () => {
     const skill = files.get('SKILL.md');
     expect(skill).toMatch(/^---\nname: aima-api\n/);
-    expect(skill).toContain('**Release 9.99** — OpenAPI 3.1.0 — 7 endpoints a widget can call');
+    expect(skill).toContain('**Release 9.99** — OpenAPI 3.1.0 — 14 endpoints a widget can call');
     expect(skill).toContain('| `admin-user.md` | Users, documents');
     expect(skill).toContain('| `admin-other.md` |');
     expect(skill).toMatch(/\| `schemas\.md` \| .+ \| 4 schemas \|/);
@@ -983,10 +1207,9 @@ describe('buildSkill', () => {
   });
 
   it('warns when the release cannot be found', () => {
-    const { warnings: releaseWarnings, stats: releaseStats } = buildSkill(
-      { openapi: '3.0.0', info: { title: 'API' }, paths: {} },
-      TEMPLATE,
-    );
+    const noRelease = freshSpec();
+    noRelease.info = { title: 'API' };
+    const { warnings: releaseWarnings, stats: releaseStats } = buildSkill(noRelease, TEMPLATE);
     expect(releaseStats.release).toBe('unknown');
     expect(releaseWarnings).toContain('Release not found in info.title nor info.version');
   });

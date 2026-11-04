@@ -191,6 +191,102 @@ paths:
       responses:
         '200':
           description: OK
+  /fleets/{fleetId}/trips:
+    get:
+      tags:
+        - admin-trip
+      summary: List trips
+      description: ABC-1234 — Trips of the fleet. Signed with SHA-256 by fooWS, see ABC-1234 and XYZ-987.
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/stations:
+    get:
+      tags:
+        - admin-booking
+      summary: List stations
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/models:
+    get:
+      tags:
+        - admin-vehicle
+      summary: List vehicle models
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/services:
+    get:
+      tags:
+        - admin-service
+      summary: List services
+      responses:
+        '200':
+          description: OK
+    post:
+      tags:
+        - admin-service
+        - TODO
+      summary: Create a service, not ready
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/services/old:
+    get:
+      tags:
+        - admin-service
+        - Deprecated
+      summary: Old services
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/secrets:
+    servers:
+      - url: https://service.example.local:1443/internal
+    get:
+      tags:
+        - admin-user
+      summary: Secrets of a private service
+      responses:
+        '200':
+          description: OK
+  /business/fleets/{fleetId}/entities:
+    servers:
+      - url: https://service.example.local:1443/business
+    get:
+      tags:
+        - business-controller
+      summary: List business entities
+      responses:
+        '200':
+          description: OK
+  /geoloc/fleets/{fleetId}/zones:
+    servers: []
+    get:
+      tags:
+        - Zone
+      summary: List zones
+      responses:
+        '200':
+          description: OK
+  /tickets/{ticketId}:
+    servers: []
+    get:
+      tags:
+        - Tickets
+      summary: Get a ticket, served nobody knows where
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/novelties:
+    get:
+      tags:
+        - admin-novelty
+      summary: A new admin area
+      responses:
+        '200':
+          description: OK
 components:
   parameters:
     VehicleId:

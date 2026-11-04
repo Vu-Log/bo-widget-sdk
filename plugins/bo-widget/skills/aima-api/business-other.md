@@ -7,7 +7,7 @@
 
 ### GET `/business/fleets/{fleetId}/billing/entity/{entityId}/balance`
 
-authFetch path: `business/business/fleets/{fleetId}/billing/entity/{entityId}/balance` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/billing/entity/{entityId}/balance` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -20,7 +20,7 @@ authFetch path: `business/business/fleets/{fleetId}/billing/entity/{entityId}/ba
 
 ### GET `/business/fleets/{fleetId}/billing/entity/{entityId}/product`
 
-authFetch path: `business/business/fleets/{fleetId}/billing/entity/{entityId}/product` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/billing/entity/{entityId}/product` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -39,7 +39,7 @@ authFetch path: `business/business/fleets/{fleetId}/billing/entity/{entityId}/pr
 
 ### GET `/business/fleets/{fleetId}/billing/entity/{entityId}/trip`
 
-authFetch path: `business/business/fleets/{fleetId}/billing/entity/{entityId}/trip` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/billing/entity/{entityId}/trip` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -58,7 +58,7 @@ authFetch path: `business/business/fleets/{fleetId}/billing/entity/{entityId}/tr
 
 ### GET `/business/fleets/{fleetId}/billing/entity/{entityId}/trips/cost`
 
-authFetch path: `business/business/fleets/{fleetId}/billing/entity/{entityId}/trips/cost` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/billing/entity/{entityId}/trips/cost` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -77,7 +77,7 @@ authFetch path: `business/business/fleets/{fleetId}/billing/entity/{entityId}/tr
 
 ### GET `/business/fleets/{fleetId}/billing/groups`
 
-authFetch path: `business/business/fleets/{fleetId}/billing/groups` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/billing/groups` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -91,7 +91,7 @@ authFetch path: `business/business/fleets/{fleetId}/billing/groups` (base path `
 
 ### POST `/business/fleets/{fleetId}/business`
 
-authFetch path: `business/business/fleets/{fleetId}/business` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -135,7 +135,7 @@ authFetch path: `business/business/fleets/{fleetId}/business` (base path `/boapi
 
 ### GET `/business/fleets/{fleetId}/business/{businessId}`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{businessId}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{businessId}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -148,7 +148,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{businessId}` (base
 
 ### GET `/business/fleets/{fleetId}/business/{businessId}/contacts`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/contacts` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{businessId}/contacts` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -161,7 +161,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/contac
 
 ### GET `/business/fleets/{fleetId}/business/{businessId}/costcenter`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/costcenter` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{businessId}/costcenter` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -174,7 +174,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/costce
 
 ### POST `/business/fleets/{fleetId}/business/{businessId}/costcenter`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/costcenter` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{businessId}/costcenter` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -193,7 +193,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/costce
 
 ### GET `/business/fleets/{fleetId}/business/{businessId}/costcenter/{id}`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/costcenter/{id}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{businessId}/costcenter/{id}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -207,7 +207,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/costce
 
 ### PUT `/business/fleets/{fleetId}/business/{businessId}/costcenter/{id}`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/costcenter/{id}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{businessId}/costcenter/{id}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -227,7 +227,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/costce
 
 ### DELETE `/business/fleets/{fleetId}/business/{businessId}/costcenter/{id}`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/costcenter/{id}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{businessId}/costcenter/{id}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -242,7 +242,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/costce
 ### POST `/business/fleets/{fleetId}/business/{businessId}/paymentDetails/wireTransfer`
 Send IBAN for wire transfer
 
-authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/paymentDetails/wireTransfer` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{businessId}/paymentDetails/wireTransfer` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -262,7 +262,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/paymen
 ### POST `/business/fleets/{fleetId}/business/{businessId}/product`
 Charge the given product to the business
 
-authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/product` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{businessId}/product` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -285,7 +285,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/produc
 ### POST `/business/fleets/{fleetId}/business/{businessId}/profiles/{profileId}/deactivate`
 Archive an existing business profile
 
-authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/profiles/{profileId}/deactivate` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{businessId}/profiles/{profileId}/deactivate` (base path `/boapi/proxy`)
 
 **Path params:**
 - `businessId`: string (required)
@@ -300,7 +300,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/profil
 ### DELETE `/business/fleets/{fleetId}/business/{businessId}/user/{userId}/profile/{profileId}`
 Archive an existing business profile
 
-authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/user/{userId}/profile/{profileId}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{businessId}/user/{userId}/profile/{profileId}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `businessId`: string (required)
@@ -315,7 +315,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{businessId}/user/{
 
 ### PUT `/business/fleets/{fleetId}/business/{id}`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -364,7 +364,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}` (base path `/
 
 ### POST `/business/fleets/{fleetId}/business/{id}/credit`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/credit` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/credit` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -384,7 +384,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/credit` (base 
 
 ### GET `/business/fleets/{fleetId}/business/{id}/paymentDetails`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/paymentDetails` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/paymentDetails` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -397,7 +397,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/paymentDetails
 
 ### PUT `/business/fleets/{fleetId}/business/{id}/profile/user/profile/status/{status}`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/profile/user/profile/status/{status}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/profile/user/profile/status/{status}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -413,7 +413,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/profile/user/p
 
 ### POST `/business/fleets/{fleetId}/business/{id}/promoCodes/redeem/{reference}`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/promoCodes/redeem/{reference}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/promoCodes/redeem/{reference}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -427,7 +427,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/promoCodes/red
 
 ### GET `/business/fleets/{fleetId}/business/{id}/user`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/user` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/user` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -445,7 +445,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/user` (base pa
 
 ### POST `/business/fleets/{fleetId}/business/{id}/user/bulk`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/bulk` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/user/bulk` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -466,7 +466,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/bulk` (ba
 
 ### POST `/business/fleets/{fleetId}/business/{id}/user/invite`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/invite` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/user/invite` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -486,7 +486,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/invite` (
 
 ### GET `/business/fleets/{fleetId}/business/{id}/user/{userId}`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -500,7 +500,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}`
 
 ### POST `/business/fleets/{fleetId}/business/{id}/user/{userId}`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -522,7 +522,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}`
 
 ### POST `/business/fleets/{fleetId}/business/{id}/user/{userId}/delegatedAdmin`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}/delegatedAdmin` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}/delegatedAdmin` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -536,7 +536,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}/
 
 ### DELETE `/business/fleets/{fleetId}/business/{id}/user/{userId}/delegatedAdmin`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}/delegatedAdmin` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}/delegatedAdmin` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -550,7 +550,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}/
 
 ### POST `/business/fleets/{fleetId}/business/{id}/user/{userId}/owner`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}/owner` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}/owner` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -564,7 +564,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}/
 
 ### DELETE `/business/fleets/{fleetId}/business/{id}/user/{userId}/owner`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}/owner` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}/owner` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -578,7 +578,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}/
 
 ### PUT `/business/fleets/{fleetId}/business/{id}/user/{userId}/profile/{profileId}`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}/profile/{profileId}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}/profile/{profileId}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -603,7 +603,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/user/{userId}/
 
 ### GET `/business/fleets/{fleetId}/business/{id}/users/name`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/users/name` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/users/name` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -620,7 +620,7 @@ authFetch path: `business/business/fleets/{fleetId}/business/{id}/users/name` (b
 
 ### GET `/business/fleets/{fleetId}/business/{id}/wallet`
 
-authFetch path: `business/business/fleets/{fleetId}/business/{id}/wallet` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/business/{id}/wallet` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -724,7 +724,7 @@ authFetch path: `desk/fleets/{fleetId}/conf` (base path `/boapi/proxy`)
 ### PUT `/fleetadmin//fleets/{fleetId}/config`
 update configuration
 
-authFetch path: `fleetadmin//fleets/{fleetId}/config` (base path `/boapi/proxy`)
+authFetch path: `fleetadmin/fleets/{fleetId}/config` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required) — the id of the fleet
@@ -1007,7 +1007,7 @@ authFetch path: `desk/fleets/{fleetId}/users/{userId}/groups` (base path `/boapi
 
 ### GET `/business/fleets/{fleetId}/invitationRequest/{id}`
 
-authFetch path: `business/business/fleets/{fleetId}/invitationRequest/{id}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/invitationRequest/{id}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1020,7 +1020,7 @@ authFetch path: `business/business/fleets/{fleetId}/invitationRequest/{id}` (bas
 
 ### DELETE `/business/fleets/{fleetId}/invitationRequest/{id}`
 
-authFetch path: `business/business/fleets/{fleetId}/invitationRequest/{id}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/invitationRequest/{id}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1035,7 +1035,7 @@ authFetch path: `business/business/fleets/{fleetId}/invitationRequest/{id}` (bas
 
 ### GET `/business/fleets/{fleetId}/entities/{entityId}/businessInvoices`
 
-authFetch path: `business/business/fleets/{fleetId}/entities/{entityId}/businessInvoices` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/entities/{entityId}/businessInvoices` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1053,7 +1053,7 @@ authFetch path: `business/business/fleets/{fleetId}/entities/{entityId}/business
 
 ### GET `/business/fleets/{fleetId}/entities/{entityId}/businessInvoices/{invoiceId}/products`
 
-authFetch path: `business/business/fleets/{fleetId}/entities/{entityId}/businessInvoices/{invoiceId}/products` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/entities/{entityId}/businessInvoices/{invoiceId}/products` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1070,7 +1070,7 @@ authFetch path: `business/business/fleets/{fleetId}/entities/{entityId}/business
 
 ### GET `/business/fleets/{fleetId}/entities/{entityId}/businessInvoices/{invoiceId}/trips`
 
-authFetch path: `business/business/fleets/{fleetId}/entities/{entityId}/businessInvoices/{invoiceId}/trips` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/entities/{entityId}/businessInvoices/{invoiceId}/trips` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1090,7 +1090,7 @@ return the credit note for a invoiceId
 
 This endpoint returns the PDF version of the credit note of an invoice
 
-authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/creditNote` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/creditNote` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: any (required) — The fleet Id of your account
@@ -1104,7 +1104,7 @@ authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/creditN
 ### PUT `/business/fleets/{fleetId}/invoices/{invoiceId}/externalPayment`
 Update invoice for external payment
 
-authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/externalPayment` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/externalPayment` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1124,7 +1124,7 @@ authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/externa
 
 ### GET `/business/fleets/{fleetId}/invoices/{invoiceId}/pdf`
 
-authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/pdf` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/pdf` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1137,7 +1137,7 @@ authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/pdf` (b
 
 ### POST `/business/fleets/{fleetId}/invoices/{invoiceId}/refund`
 
-authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/refund` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/refund` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1160,7 +1160,7 @@ return the refund note for a invoiceId
 
 This endpoint returns the PDF version of the refund of an invoice
 
-authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/refundNote` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/refundNote` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: any (required) — The fleet Id of your account
@@ -1176,7 +1176,7 @@ authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/refundN
 
 ### GET `/business/fleets/{fleetId}/invoices/{invoiceId}/refundableAmount`
 
-authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/refundableAmount` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/refundableAmount` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1189,7 +1189,7 @@ authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/refunda
 
 ### POST `/business/fleets/{fleetId}/invoices/{invoiceId}/status/{status}`
 
-authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/status/{status}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/status/{status}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1201,44 +1201,7 @@ authFetch path: `business/business/fleets/{fleetId}/invoices/{invoiceId}/status/
 
 **Responses:** `200`
 
-## Label (8 endpoints)
-
-### GET `/fleets/{fleetId}/zones/{zoneId}/labels`
-Retrieve the list of dedicated label for a zone
-
-Return the list of dedicated label for a zone
-
-authFetch path: `fleets/{fleetId}/zones/{zoneId}/labels` (base path `/boapi/proxy`)
-
-**Path params:**
-- `fleetId`: string (required) — The fleet ID provided by vulog and that represents your fleet.
-- `zoneId`: string (required) — the unique identifier of the zone
-
-**Responses:** `200` → `ListLabels`, `400` → `string`, `500`
-
-### PUT `/fleets/{fleetId}/zones/{zoneId}/labels/{labelId}`
-Assign a dedicated label to a zone
-
-authFetch path: `fleets/{fleetId}/zones/{zoneId}/labels/{labelId}` (base path `/boapi/proxy`)
-
-**Path params:**
-- `fleetId`: string (required) — The fleet ID provided by vulog and that represents your fleet.
-- `zoneId`: string (required) — the unique identifier of the zone
-- `labelId`: string (uuid) (required) — the unique identifier of the label
-
-**Responses:** `200` → `AddLabel`, `400` → `string`, `500`
-
-### DELETE `/fleets/{fleetId}/zones/{zoneId}/labels/{labelId}`
-Remove a dedicated label to a zone
-
-authFetch path: `fleets/{fleetId}/zones/{zoneId}/labels/{labelId}` (base path `/boapi/proxy`)
-
-**Path params:**
-- `fleetId`: string (required) — The fleet ID provided by vulog and that represents your fleet.
-- `zoneId`: string (required) — the unique identifier of the zone
-- `labelId`: string (uuid) (required) — the unique identifier of the label
-
-**Responses:** `200`, `500`
+## Label (5 endpoints)
 
 ### GET `/geoloc/fleets/{fleetId}/labels`
 Get list of labels
@@ -1430,7 +1393,7 @@ authFetch path: `geoloc/fleets/{fleetId}/pois/{poiname}/versions/{version}` (bas
 
 ### GET `/business/fleets/{fleetId}/product`
 
-authFetch path: `business/business/fleets/{fleetId}/product` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/product` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1444,7 +1407,7 @@ authFetch path: `business/business/fleets/{fleetId}/product` (base path `/boapi/
 
 ### GET `/business/fleets/{fleetId}/stripe/businesses/{businessId}/add`
 
-authFetch path: `business/business/fleets/{fleetId}/stripe/businesses/{businessId}/add` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/stripe/businesses/{businessId}/add` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
@@ -1458,7 +1421,7 @@ authFetch path: `business/business/fleets/{fleetId}/stripe/businesses/{businessI
 ### GET `/business/fleets/{fleetId}/stripe/config/key`
 Retrieve the stripe publishable key for the fleet
 
-authFetch path: `business/business/fleets/{fleetId}/stripe/config/key` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/stripe/config/key` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
@@ -1468,16 +1431,7 @@ authFetch path: `business/business/fleets/{fleetId}/stripe/config/key` (base pat
 
 **Responses:** `200` → `string`
 
-## Tickets (26 endpoints)
-
-### POST `/assignees`
-batch assign tickets to user
-
-authFetch path: `assignees` (base path `/boapi/proxy`)
-
-**Request body:** `object`
-
-**Responses:** `200` → `object`
+## Tickets (19 endpoints)
 
 ### POST `/desk/fleets/{FleetId}/bulkTickets`
 Bulk creation of tickets
@@ -1848,115 +1802,11 @@ authFetch path: `fleetadmin/fleets/{fleetId}/tickets/{ticketId}/attachments` (ba
 
 **Responses:** `200` → `FleetAdminServiceDeskTicketAttachmentDTO`, `401`
 
-### POST `/group/{groupId}`
-batch assign tickets to group
-
-authFetch path: `group/{groupId}` (base path `/boapi/proxy`)
-
-**Path params:**
-- `groupId`: string (required)
-
-**Request body:** `object`
-
-**Responses:** `200` → `object`, `400`
-
-### GET `/tickets`
-searches tickets
-
-By passing in the appropriate options, you can search for available tickets in the system. It returns a list of ticket summaries, there are no detailed information, only necessary info for a list view.
-
-authFetch path: `tickets` (base path `/boapi/proxy`)
-
-**Query params:**
-- `id`: string (optional) — Ticket ID, supports multiple query values
-- `fleetId`: string (optional) — Fleet ID of the tickets, supports multiple values
-- `subject`: string (optional) — ticket subject, supports multiple values
-- `status`: string (optional) — ticket status, supporst multiple query values
-- `priority`: string (optional) — ticket priority, supports multiple query values
-- `categoryId`: string (optional) — ticket category ID, supports multiple query values
-- `groupId`: integer (optional) — ticket group ID, supports multiple query values
-- `vehicleId`: string (optional) — ticket vehicle ID, supports multiple query values
-- `latitude`: number (optional) — latitude of the user location
-- `longitude`: number (optional) — longitude of the user location
-- `backlogUserId`: string (optional) — if present, returns tickets which are not assigned and belongs to the specified user's ticket groups
-- `assignedTo`: string (optional) — ticket assigneed, if specified, returns tickets whose assignee is the specified user
-
-**Responses:** `200` → `FleetAdminTicketDTO[]`, `400`, `403`
-
-### GET `/tickets/{ticketId}`
-get the details of a ticket given its id
-
-authFetch path: `tickets/{ticketId}` (base path `/boapi/proxy`)
-
-**Path params:**
-- `ticketId`: string (required)
-
-**Responses:** `200`
-
-### POST `/tickets/{ticketId}`
-create ticket
-
-authFetch path: `tickets/{ticketId}` (base path `/boapi/proxy`)
-
-**Path params:**
-- `ticketId`: string (required)
-
-**Request body:** `FleetAdminCreateTicketDTO`
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| creatorId | string (uuid) | no |  |
-| assignedTo | string (uuid) | no |  |
-| categoryId | string | no |  |
-| groupId | integer | no |  |
-| priority | string | no |  |
-| vehicleId | string | no |  |
-| subject | string | no |  |
-| description | string | no |  |
-| userIds | string[] | no |  |
-| vehicleIds | string[] | no |  |
-
-**Responses:** `200` → `FleetAdminTicket`
-
-### PUT `/tickets/{ticketId}`
-update ticket
-
-authFetch path: `tickets/{ticketId}` (base path `/boapi/proxy`)
-
-**Path params:**
-- `ticketId`: string (required)
-
-**Header params:**
-- `updateByAssignedOnly`: boolean (optional)
-
-**Responses:** `200` → `FleetAdminServiceDeskTicketDTO`, `400` → `FleetAdminTicketError`, `404` → `FleetAdminTicketError`
-
-### PUT `/{ticketId}/single`
-update ticket with one property
-
-update a ticket but each request will only have one property and value
-
-authFetch path: `{ticketId}/single` (base path `/boapi/proxy`)
-
-**Path params:**
-- `ticketId`: string (required)
-
-**Header params:**
-- `updateByAssignedOnly`: boolean (optional)
-
-**Request body:** `FleetAdminUpdateTicketDTO`
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| userId | string (uuid) | no |  |
-| property | string | no |  |
-| value | string | no |  |
-
-**Responses:** `200` → `string`, `400` → `FleetAdminTicketError`, `404` → `FleetAdminTicketError`
-
 ## trip-controller (4 endpoints)
 
 ### GET `/business/fleets/{fleetId}/ongoingTrip/{tripId}/notes`
 
-authFetch path: `business/business/fleets/{fleetId}/ongoingTrip/{tripId}/notes` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/ongoingTrip/{tripId}/notes` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1969,7 +1819,7 @@ authFetch path: `business/business/fleets/{fleetId}/ongoingTrip/{tripId}/notes` 
 
 ### GET `/business/fleets/{fleetId}/trip/ongoing`
 
-authFetch path: `business/business/fleets/{fleetId}/trip/ongoing` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/trip/ongoing` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1985,7 +1835,7 @@ authFetch path: `business/business/fleets/{fleetId}/trip/ongoing` (base path `/b
 
 ### GET `/business/fleets/{fleetId}/trip/{tripId}`
 
-authFetch path: `business/business/fleets/{fleetId}/trip/{tripId}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/trip/{tripId}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -1998,7 +1848,7 @@ authFetch path: `business/business/fleets/{fleetId}/trip/{tripId}` (base path `/
 
 ### POST `/business/fleets/{fleetId}/trip/{tripId}/notes`
 
-authFetch path: `business/business/fleets/{fleetId}/trip/{tripId}/notes` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/trip/{tripId}/notes` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -2018,7 +1868,7 @@ authFetch path: `business/business/fleets/{fleetId}/trip/{tripId}/notes` (base p
 
 ### POST `/business/fleets/{fleetId}/users/list`
 
-authFetch path: `business/business/fleets/{fleetId}/users/list` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/users/list` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -2032,7 +1882,7 @@ authFetch path: `business/business/fleets/{fleetId}/users/list` (base path `/boa
 
 ### GET `/business/fleets/{fleetId}/users/search`
 
-authFetch path: `business/business/fleets/{fleetId}/users/search` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/users/search` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
@@ -2048,7 +1898,7 @@ authFetch path: `business/business/fleets/{fleetId}/users/search` (base path `/b
 
 ### GET `/business/fleets/{fleetId}/users/{id}`
 
-authFetch path: `business/business/fleets/{fleetId}/users/{id}` (base path `/boapi/proxy/business`)
+authFetch path: `business/fleets/{fleetId}/users/{id}` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)

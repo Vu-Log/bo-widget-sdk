@@ -4,10 +4,12 @@ import {
   EXCLUDED_TAGS,
   FALLBACK_FILE,
   GATEWAY_BASE_PATH,
+  KNOWN_ROOT_SERVICES,
   PRIVATE_HOST_SUFFIX,
   SCHEMAS_FILE,
   SKILL_FILES,
   STANDARD_REFERENCE_PREFIXES,
+  TRACKER_KEY_MIN_DIGITS,
 } from './config.mjs';
 
 describe('SKILL_FILES', () => {
@@ -33,6 +35,17 @@ describe('SKILL_FILES', () => {
       expect(Boolean(definition.tags?.length) || definition.tagPrefix !== undefined).toBe(true);
       // An empty prefix would claim every tag.
       if (definition.tagPrefix !== undefined) expect(definition.tagPrefix).not.toBe('');
+    }
+  });
+
+  it('expects only tags that its own prefix claims and no other file maps', () => {
+    const explicit = SKILL_FILES.flatMap((definition) => definition.tags ?? []);
+    for (const definition of SKILL_FILES.filter((candidate) => candidate.expectedTags)) {
+      expect(definition.tagPrefix).toBeDefined();
+      for (const tag of definition.expectedTags) {
+        expect(tag.startsWith(definition.tagPrefix), tag).toBe(true);
+        expect(explicit, tag).not.toContain(tag);
+      }
     }
   });
 
@@ -65,5 +78,14 @@ describe('scope', () => {
 
   it('lists standard reference prefixes in upper case', () => {
     for (const prefix of STANDARD_REFERENCE_PREFIXES) expect(prefix).toMatch(/^[A-Z]+$/);
+  });
+
+  it('only redacts tracker keys of several digits', () => {
+    expect(TRACKER_KEY_MIN_DIGITS).toBeGreaterThanOrEqual(3);
+  });
+
+  it('lists the gateway services a route may start with, as single path segments', () => {
+    expect(KNOWN_ROOT_SERVICES).toEqual(['desk', 'fleetadmin', 'geoloc']);
+    for (const service of KNOWN_ROOT_SERVICES) expect(service).toMatch(/^[a-z]+$/);
   });
 });

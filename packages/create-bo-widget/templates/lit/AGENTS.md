@@ -10,12 +10,12 @@ Instructions for AI coding agents working on **{{title}}**, a widget of the Vulo
 
 ## Commands
 
-| Command                        | When                                                                            |
-| ------------------------------ | ------------------------------------------------------------------------------- |
-| `npm run dev`                  | Shows the widget in a fake BO with the mock data of `widget.config.ts` (`dev`). |
-| `npm test`                     | After every change (Vitest).                                                    |
-| `npm run build`                | Type-checks (`tsc`), builds `dist/` and packs `{{name}}-<version>.zip`.         |
-| `npx bo-widget validate <zip>` | Checks the zip with the rules the BO applies at publication.                    |
+| Command                  | When                                                                                |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| `npm run dev`            | Shows the widget in a fake BO with the mock data of `widget.config.ts` (`dev`).     |
+| `npm test`               | After every change (Vitest).                                                        |
+| `npm run build`          | Type-checks (`tsc`), builds `dist/` and packs `{{name}}-<version>.zip`.             |
+| `npx bo-widget validate` | Checks the zip of the current version with the rules the BO applies at publication. |
 
 Before you say a change is done: `npm test` and `npm run build` pass.
 
@@ -37,7 +37,7 @@ Before you say a change is done: `npm test` and `npm run build` pass.
 
 Use `bo.authFetch('<service path>/<route>')`, a path relative to the BO admin API (`.../boapi/proxy/`): never prefix it with `boapi/proxy/`, never add `Authorization` or `X-API-Key`. The widget needs the `apiInfo` permission.
 
-To find an endpoint, its parameters and its response, use the **`aima-api` skill** of the SDK repository (`plugins/bo-widget/skills/aima-api` in <https://github.com/Vu-Log/bo-widget-sdk>, regenerated every week from the public API reference): it gives the path to pass to `authFetch`. In Claude Code: `/plugin marketplace add Vu-Log/bo-widget-sdk`, then `/plugin install bo-widget@bo-widget-sdk`. Other agents: `npx skills add Vu-Log/bo-widget-sdk`. Never guess an endpoint: if you cannot find it, ask.
+To find an endpoint, its parameters and its response, use the **`aima-api` skill** of the SDK repository (`plugins/bo-widget/skills/aima-api` in <https://github.com/Vu-Log/bo-widget-sdk>, generated from the public API reference; a weekly job proposes an update): it gives the path to pass to `authFetch`. In Claude Code: `/plugin marketplace add Vu-Log/bo-widget-sdk`, then `/plugin install bo-widget@bo-widget-sdk`. Other agents: `npx skills add Vu-Log/bo-widget-sdk`. Never guess an endpoint: if you cannot find it, ask.
 
 In `npm run dev` (mock mode), API calls are answered by `dev.responses` of `widget.config.ts`: add a response there for each endpoint the widget calls.
 

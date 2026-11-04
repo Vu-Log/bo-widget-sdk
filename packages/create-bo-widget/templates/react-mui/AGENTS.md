@@ -10,12 +10,12 @@ Instructions for AI coding agents working on **{{title}}**, a widget of the Vulo
 
 ## Commands
 
-| Command                        | When                                                                            |
-| ------------------------------ | ------------------------------------------------------------------------------- |
-| `npm run dev`                  | Shows the widget in a fake BO with the mock data of `widget.config.ts` (`dev`). |
-| `npm test`                     | After every change (Vitest).                                                    |
-| `npm run build`                | Type-checks (`tsc`), builds `dist/` and packs `{{name}}-<version>.zip`.         |
-| `npx bo-widget validate <zip>` | Checks the zip with the rules the BO applies at publication.                    |
+| Command                  | When                                                                                |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| `npm run dev`            | Shows the widget in a fake BO with the mock data of `widget.config.ts` (`dev`).     |
+| `npm test`               | After every change (Vitest).                                                        |
+| `npm run build`          | Type-checks (`tsc`), builds `dist/` and packs `{{name}}-<version>.zip`.             |
+| `npx bo-widget validate` | Checks the zip of the current version with the rules the BO applies at publication. |
 
 Before you say a change is done: `npm test` and `npm run build` pass.
 
@@ -24,21 +24,20 @@ Before you say a change is done: `npm test` and `npm run build` pass.
 - `src/main.tsx` exports `toCustomElement(App)`: keep it the default export, do not register the class. It renders React in a shadow root, keeps the Emotion styles and the MUI portals (Dialog, Menu, Popover, Tooltip, Select…) in it, and builds the MUI theme from the theme of the back office.
 - Read the back office state with the hooks of `@vulog/bo-widget-react`: `useBoContext()`, `useCurrentUser()`, `useAuthFetch()`, `useBoTheme()`, `useBoRouter()`, `useBoClient()`. Do not call `connect` yourself. See `node_modules/@vulog/bo-widget-react/README.md`.
 - Keep `@mui/material` 7.3.6 or later: earlier versions trap the focus of a dialog outside a shadow root.
+- The hooks load the initial state and follow the events (`localeChanged`, `fleetChanged`, `themeChanged`…). Navigate with `useBoRouter().navigate`, show feedback with `useBoClient().notify({ message, severity })`: never `window.location`, `history` or `alert`.
 - Do not set `container` on MUI portals and do not use `cssVariables` in the theme: its `:root` variables do not apply in a shadow root. Customize the theme with the `customizeTheme` option of `toCustomElement`.
 - The BO registers the class under a tag it chooses: never call `customElements.define`, never register other elements globally, never assume the tag name.
 - Fill the content zone: `:host` at 100 %, a column root, only the main area scrolls (`flex: 1; min-height: 0; overflow: auto`). Never use `100vh` or `100vw`.
 - Keep every style in the shadow root: nothing in `document.head`.
-- Read the initial state (`getContext`, `getCurrentUser`, `getTheme`), then follow the events (`localeChanged`, `fleetChanged`, `themeChanged`…): the BO does not push the initial state.
-- Navigate with `bo.navigate({ path })`, show feedback with `bo.notify({ message, severity })`: never `window.location`, `history` or `alert`.
 - A request needing a permission (`apiInfo`, `accessToken`, `navigate`, `notify`) needs it in `permissions` of `widget.config.ts`.
 - The bundle is public: no secret, no API key, no token in the code or in `widget.config.ts`. `.env.local` holds the developer's values and is never committed.
 - Errors the BO cannot see (anything after the element is inserted) are shown by the widget itself, with a loading and an error state.
 
 ## Calling the Vulog API
 
-Use `bo.authFetch('<service path>/<route>')`, a path relative to the BO admin API (`.../boapi/proxy/`): never prefix it with `boapi/proxy/`, never add `Authorization` or `X-API-Key`. The widget needs the `apiInfo` permission.
+Use `useAuthFetch()`, then `authFetch('<service path>/<route>')`, a path relative to the BO admin API (`.../boapi/proxy/`): never prefix it with `boapi/proxy/`, never add `Authorization` or `X-API-Key`. The widget needs the `apiInfo` permission.
 
-To find an endpoint, its parameters and its response, use the **`aima-api` skill** of the SDK repository (`plugins/bo-widget/skills/aima-api` in <https://github.com/Vu-Log/bo-widget-sdk>, regenerated every week from the public API reference): it gives the path to pass to `authFetch`. In Claude Code: `/plugin marketplace add Vu-Log/bo-widget-sdk`, then `/plugin install bo-widget@bo-widget-sdk`. Other agents: `npx skills add Vu-Log/bo-widget-sdk`. Never guess an endpoint: if you cannot find it, ask.
+To find an endpoint, its parameters and its response, use the **`aima-api` skill** of the SDK repository (`plugins/bo-widget/skills/aima-api` in <https://github.com/Vu-Log/bo-widget-sdk>, generated from the public API reference; a weekly job proposes an update): it gives the path to pass to `authFetch`. In Claude Code: `/plugin marketplace add Vu-Log/bo-widget-sdk`, then `/plugin install bo-widget@bo-widget-sdk`. Other agents: `npx skills add Vu-Log/bo-widget-sdk`. Never guess an endpoint: if you cannot find it, ask.
 
 In `npm run dev` (mock mode), API calls are answered by `dev.responses` of `widget.config.ts`: add a response there for each endpoint the widget calls.
 
