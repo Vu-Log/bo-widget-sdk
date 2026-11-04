@@ -12,6 +12,17 @@ import {
 
 const names = Object.keys(TEMPLATES) as TemplateName[];
 const templatesRoot = join(templateDir(DEFAULT_TEMPLATE), '..');
+const repoRoot = join(templatesRoot, '..', '..', '..');
+
+/** `/plugin install` argument of the Claude Code plugin that holds the skills, from the marketplace. */
+const pluginInstall = (): string => {
+  const marketplace = JSON.parse(
+    readFileSync(join(repoRoot, '.claude-plugin', 'marketplace.json'), 'utf8'),
+  ) as { name: string; plugins: { name: string; source: string }[] };
+  const [plugin] = marketplace.plugins;
+  if (plugin === undefined) throw new Error('marketplace.json lists no plugin');
+  return `${plugin.name}@${marketplace.name}`;
+};
 
 interface PackageJson {
   version: string;
@@ -45,6 +56,8 @@ describe('templates', () => {
 
     it('has the files of a widget project', () => {
       for (const file of [
+        'AGENTS.md',
+        'CLAUDE.md',
         'README.md',
         '_gitignore',
         '_gitlab-ci.yml',
@@ -63,6 +76,18 @@ describe('templates', () => {
         path.split(/[\\/]/).some((segment) => segment.startsWith('.')),
       );
       expect(dotFiles).toEqual([]);
+    });
+
+    it('gives AI coding agents the contract of the SDK, and Claude Code the same file', () => {
+      const agents = readFileSync(join(dir, 'AGENTS.md'), 'utf8');
+      expect(agents).toMatch(/^# AGENTS\.md\n/);
+      expect(agents).toContain('node_modules/@vulog/bo-widget-sdk/AGENTS.md');
+      expect(agents).toContain('`aima-api` skill');
+      expect(agents).toContain(`/plugin install ${pluginInstall()}`);
+      expect(existsSync(join(repoRoot, 'plugins', 'bo-widget', 'skills', 'aima-api'))).toBe(true);
+      expect(agents).toContain('plugins/bo-widget/skills/aima-api');
+      expect(agents).toContain(packageJson.scripts?.build?.split(' ')[0] ?? 'missing build script');
+      expect(readFileSync(join(dir, 'CLAUDE.md'), 'utf8')).toBe('@AGENTS.md\n');
     });
 
     it('builds, tests and packs the zip with its scripts', () => {

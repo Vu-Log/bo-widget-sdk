@@ -95,6 +95,8 @@ describe('createWidgetProject', () => {
           '.gitignore',
           '.github/workflows/build.yml',
           '.gitlab-ci.yml',
+          'AGENTS.md',
+          'CLAUDE.md',
           'README.md',
           'package.json',
           'vite.config.ts',
@@ -108,6 +110,10 @@ describe('createWidgetProject', () => {
         "name: 'Fleet report'",
       );
       expect(await readFile(join(dir, 'README.md'), 'utf8')).toMatch(/^# Fleet report\n/);
+      expect(await readFile(join(dir, 'AGENTS.md'), 'utf8')).toContain('**Fleet report**');
+      expect(await readFile(join(dir, 'AGENTS.md'), 'utf8')).toContain(
+        '`fleet-report-<version>.zip`',
+      );
       for (const file of result.files) {
         const content = await readFile(join(dir, file), 'utf8');
         expect(content, file).not.toMatch(/\{\{(name|title)\}\}/);

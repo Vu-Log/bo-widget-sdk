@@ -33,7 +33,7 @@ The archive is checked as `validate` does before it is written: when the BO woul
 
 ### `bo-widget validate [zip]`
 
-Checks a zip; without argument, the only `.zip` of the current folder. Prints each error and warning with its code, and exits with `1` when there is an error, `0` otherwise (warnings do not block publication).
+Checks a zip; without argument, the only `.zip` of the current folder, or, when it holds several (one per version built), the one of the version in `package.json` (`{id}-{version}.zip`, as `pack` names it). Prints each error and warning with its code, and exits with `1` when there is an error, `0` otherwise (warnings do not block publication).
 
 | Code                    | Type    | Cause                                                                                                                             |
 | ----------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |

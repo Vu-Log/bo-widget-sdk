@@ -1,0 +1,362 @@
+openapi: 3.1.0
+info:
+  title: Example Platform API Documentation - Release 9.99
+  version: 9.99.0
+servers:
+  - url: https://api.example.com/{basePath}
+    variables:
+      - basePath: null
+        default: boapi/proxy
+        enum: [apiv5, boapi/proxy]
+paths:
+  /vehicles/{VehicleId}/journey:
+    servers:
+      - url: https://{environment}.example.com/{basePath}
+        variables:
+          basePath:
+            default: apiv5
+    post:
+      tags:
+        - Journey
+      summary: Book a vehicle (mobile API, out of scope)
+      parameters:
+        - $ref: '#/components/parameters/VehicleId'
+        - name: Coordsys
+          in: query
+          schema:
+            type: string
+            enum: [WGS, GCJ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MobileBook'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileJourneyInfo'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/MobileInvalidProfile'
+                  - $ref: '#/components/schemas/MobileServiceInvalid'
+  /fleets/{fleetId}/users/{id}:
+    servers:
+      - url: https://service.example.local:1443/user
+    parameters:
+      - name: fleetId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - admin-user
+      summary: Get user's info by Id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+    put:
+      tags:
+        - admin-user
+      deprecated: true
+      summary: Replace a user
+      responses:
+        '200':
+          description: OK
+    patch:
+      tags:
+        - todo
+        - admin-user
+      summary: Patch a user, not ready
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags:
+        - admin-user
+        - internal
+      summary: Delete a user | hard
+      responses:
+        '204':
+          description: No content
+  /fleets/{fleetId}/taxes:
+    servers:
+      - url: https://service.example.local:1443/business
+    get:
+      tags:
+        - admin-invoice
+        - in: path
+      summary: List taxes | by fleet
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/reports:
+    get:
+      tags:
+        - admin-report
+      summary: List reports
+      description: Same as https://service.example.local:1443/user/fleets/{fleetId}/reports/ on service.example.local.
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/vehicles:
+    servers:
+      - url: https://api-{region}.example.com/boapi/proxy/fleetmanager/public
+        variables:
+          region:
+            default: eu
+    get:
+      tags:
+        - admin-fleet
+      summary: List fleet vehicles
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vehicle'
+  /trips/legacy:
+    get:
+      tags:
+        - admin-trip
+        - deprecated
+      summary: Legacy trips
+      responses:
+        '200':
+          description: OK
+    post:
+      tags:
+        - admin-trip
+        - need-migration
+      summary: Legacy trip creation
+      responses:
+        '200':
+          description: OK
+  /trips/hidden:
+    get:
+      tags:
+        - admin-trip
+      x-internal: true
+      summary: Hidden trips
+      responses:
+        '200':
+          description: OK
+  /tickets:
+    get:
+      tags:
+        - Tickets
+      summary: List tickets
+      responses:
+        '200':
+          description: OK
+  /brand-new:
+    get:
+      tags:
+        - brand-new-tag
+      summary: Endpoint with a tag nobody mapped yet
+      responses:
+        '200':
+          description: OK
+  /untagged:
+    get:
+      summary: Endpoint without tags
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/trips:
+    get:
+      tags:
+        - admin-trip
+      summary: List trips
+      description: ABC-1234 — Trips of the fleet. Signed with SHA-256 by fooWS, see ABC-1234 and XYZ-987.
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/stations:
+    get:
+      tags:
+        - admin-booking
+      summary: List stations
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/models:
+    get:
+      tags:
+        - admin-vehicle
+      summary: List vehicle models
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/services:
+    get:
+      tags:
+        - admin-service
+      summary: List services
+      responses:
+        '200':
+          description: OK
+    post:
+      tags:
+        - admin-service
+        - TODO
+      summary: Create a service, not ready
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/services/old:
+    get:
+      tags:
+        - admin-service
+        - Deprecated
+      summary: Old services
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/secrets:
+    servers:
+      - url: https://service.example.local:1443/internal
+    get:
+      tags:
+        - admin-user
+      summary: Secrets of a private service
+      responses:
+        '200':
+          description: OK
+  /business/fleets/{fleetId}/entities:
+    servers:
+      - url: https://service.example.local:1443/business
+    get:
+      tags:
+        - business-controller
+      summary: List business entities
+      responses:
+        '200':
+          description: OK
+  /geoloc/fleets/{fleetId}/zones:
+    servers: []
+    get:
+      tags:
+        - Zone
+      summary: List zones
+      responses:
+        '200':
+          description: OK
+  /tickets/{ticketId}:
+    servers: []
+    get:
+      tags:
+        - Tickets
+      summary: Get a ticket, served nobody knows where
+      responses:
+        '200':
+          description: OK
+  /fleets/{fleetId}/novelties:
+    get:
+      tags:
+        - admin-novelty
+      summary: A new admin area
+      responses:
+        '200':
+          description: OK
+components:
+  parameters:
+    VehicleId:
+      name: VehicleId
+      in: path
+      required: true
+      description: ID of the vehicle
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    MobileBook:
+      type: object
+      required: [serviceId]
+      properties:
+        serviceId:
+          type: string
+          format: uuid
+          description: The service id
+        pricingId:
+          type: string
+          deprecated: true
+          description: Pricing override
+    MobileJourneyInfo:
+      allOf:
+        - $ref: '#/components/schemas/MobileBook'
+        - type: object
+          properties:
+            journeyId:
+              type: string
+    MobileInvalidProfile:
+      type: object
+      properties:
+        code:
+          type: string
+    MobileServiceInvalid:
+      type: object
+      properties:
+        code:
+          type: string
+    User:
+      type: object
+      description: A physical person
+      properties:
+        id:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [manager, customer]
+        gender:
+          $ref: '#/components/schemas/Gender'
+    Gender:
+      type: string
+      enum: [MALE, FEMALE, UNDEFINED]
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: string
+        model:
+          $ref: '#/components/schemas/VehicleModel'
+    VehicleModel:
+      type: object
+      properties:
+        name:
+          type: string
+    Unused:
+      type: object
+      properties:
+        x:
+          type: string

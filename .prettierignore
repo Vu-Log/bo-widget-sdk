@@ -3,3 +3,6 @@ coverage
 package-lock.json
 .changeset/*.md
 CHANGELOG.md
+docs/.vitepress/cache
+docs/.vitepress/dist
+plugins/bo-widget/skills/aima-api/*.md

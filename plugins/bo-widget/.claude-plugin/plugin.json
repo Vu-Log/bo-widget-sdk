@@ -1,0 +1,8 @@
+{
+  "name": "bo-widget",
+  "description": "Skills for AI agents writing Vulog BO widgets: the Vulog admin API endpoints a widget can call with authFetch, generated weekly from the public AIMA swagger.",
+  "author": { "name": "Vulog" },
+  "license": "MIT",
+  "homepage": "https://github.com/Vu-Log/bo-widget-sdk",
+  "repository": "https://github.com/Vu-Log/bo-widget-sdk"
+}
