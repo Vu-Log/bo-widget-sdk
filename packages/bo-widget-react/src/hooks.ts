@@ -28,8 +28,8 @@ const useWidgetState = (hook: string): WidgetState => {
 export const useBoClient = (): BoClient => useWidgetState('useBoClient').client;
 
 /**
- * Context of the back office page: fleet, locale, timezone, currency, basename… It is kept up to
- * date with `localeChanged` and `fleetChanged`.
+ * Context of the back office page: fleet, locale, timezone, currency, basename… `locale` follows
+ * `localeChanged` and `fleetId` follows `fleetChanged`; the other fields are read once.
  *
  * @throws {Error} Outside a widget.
  */
@@ -63,17 +63,18 @@ export const useBoTheme = (): Theme => useWidgetState('useBoTheme').theme;
 /** What {@link useBoRouter} returns. */
 export interface BoRouter {
   /** Path of the widget's view in the back office: give it to your router as its basename. */
-  basename: string;
+  readonly basename: string;
   /**
    * Current route of the back office, updated by `routeChanged`. A Web Component starts from
    * `window.location`; in an iframe it is `null` until the first `routeChanged`.
    */
-  location: BoLocation | null;
+  readonly location: BoLocation | null;
   /**
    * Navigates in the back office (permission `navigate`): `'/app/...'` is a back office route under
-   * the current fleet, `'details/1'` is relative to the widget's view.
+   * the current fleet, `'details/1'` is relative to the widget's view. Rejects with a `BoError`
+   * (`FORBIDDEN` without the permission, `INVALID_PAYLOAD` for an external URL).
    */
-  navigate: (path: BoNavigatePayload['path']) => Promise<{ path: string }>;
+  readonly navigate: (path: BoNavigatePayload['path']) => Promise<{ path: string }>;
 }
 
 /**

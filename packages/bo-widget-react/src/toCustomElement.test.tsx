@@ -1,8 +1,8 @@
-import { Button, createTheme, Dialog, DialogTitle } from '@mui/material';
+import { Button, createTheme, Dialog, DialogTitle, Menu, MenuItem, Tooltip } from '@mui/material';
 import { act, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { useBoContext } from './hooks.js';
-import { createFakeHostApi } from './testing/fakeHostApi.js';
+import { boTheme, createFakeHostApi } from './testing/fakeHostApi.js';
 import { toCustomElement } from './toCustomElement.js';
 
 beforeAll(() => {
@@ -37,7 +37,26 @@ const defined = <T,>(value: T | null | undefined): T => {
   return value;
 };
 
-const shadowText = (element: HTMLElement) => element.shadowRoot?.textContent ?? '';
+// The element unmounts in a later task.
+const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+// Text the widget renders, without the CSS of the <style> elements.
+const shadowText = (element: HTMLElement) =>
+  [...(element.shadowRoot?.children ?? [])]
+    .filter((child) => child.tagName !== 'STYLE')
+    .map((child) => child.textContent)
+    .join('');
+
+// Emotion's development mode writes the rules as text, which the tests read.
+const shadowCss = (element: HTMLElement) =>
+  [...defined(element.shadowRoot).querySelectorAll('style')]
+    .map((style) => style.textContent)
+    .join('\n');
+
+const ruleOf = (css: string, node: Element): string => {
+  const className = defined([...node.classList].find((name) => name.startsWith('bo-widget-')));
+  return new RegExp(`\\.${className}\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+};
 
 const FleetApp = () => {
   const { fleetId } = useBoContext();
@@ -45,8 +64,12 @@ const FleetApp = () => {
 };
 
 afterEach(async () => {
-  await act(async () => document.body.replaceChildren());
+  await act(async () => {
+    document.body.replaceChildren();
+    await nextTask();
+  });
   document.head.querySelectorAll('style').forEach((style) => style.remove());
+  vi.restoreAllMocks();
 });
 
 describe('toCustomElement', () => {
@@ -55,7 +78,6 @@ describe('toCustomElement', () => {
     const WidgetClass = toCustomElement(FleetApp);
     expect(WidgetClass.prototype).toBeInstanceOf(HTMLElement);
     expect(define).not.toHaveBeenCalled();
-    define.mockRestore();
   });
 
   it('renders the app in an open shadow root once connected to the back office', async () => {
@@ -81,7 +103,17 @@ describe('toCustomElement', () => {
     expect(emotionStyles?.length).toBeGreaterThan(0);
   });
 
-  it('renders MUI dialogs into the shadow root, styled and covering the whole page', async () => {
+  it('keeps the rules as text even in production mode, so that they survive a move', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const element = await mount(toCustomElement(() => <Button variant="contained">Save</Button>));
+    await waitFor(() => expect(element.shadowRoot?.querySelector('button')).not.toBeNull());
+    vi.unstubAllEnvs();
+    expect(
+      ruleOf(shadowCss(element), defined(element.shadowRoot?.querySelector('button'))),
+    ).not.toBe('');
+  });
+
+  it('renders full-screen MUI dialogs into the shadow root, styled and covering the page', async () => {
     const App = () => (
       <Dialog open fullScreen>
         <DialogTitle>Edit vehicle</DialogTitle>
@@ -92,14 +124,38 @@ describe('toCustomElement', () => {
     await waitFor(() => expect(shadow.querySelector('[role="dialog"]')).not.toBeNull());
 
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();
-    const modal = defined(shadow.querySelector<HTMLElement>('.MuiDialog-root'));
+    const modal = defined(shadow.querySelector('.MuiDialog-root'));
     expect(modal.parentElement?.hasAttribute('data-bo-widget-portals')).toBe(true);
-    const css = [...shadow.querySelectorAll('style')].map((style) => style.textContent).join('\n');
-    const modalClass = defined([...modal.classList].find((name) => name.startsWith('bo-widget-')));
-    const modalRule = new RegExp(`\\.${modalClass}\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+    const css = shadowCss(element);
+    const modalRule = ruleOf(css, modal);
     expect(modalRule).toContain('position:fixed');
     for (const side of ['top', 'right', 'bottom', 'left']) expect(modalRule).toContain(`${side}:0`);
+    const paperRule = ruleOf(css, defined(shadow.querySelector('.MuiDialog-paperFullScreen')));
+    expect(paperRule).toContain('width:100%');
+    expect(paperRule).toContain('height:100%');
     expect(document.head.querySelector('style[data-emotion]')).toBeNull();
+  });
+
+  it('renders menus and tooltips into the shadow root', async () => {
+    const App = () => (
+      <>
+        <Tooltip open title="Vehicle details">
+          <span>Hover me</span>
+        </Tooltip>
+        <Menu open anchorEl={document.body}>
+          <MenuItem>Edit</MenuItem>
+        </Menu>
+      </>
+    );
+    const element = await mount(toCustomElement(App));
+    const shadow = defined(element.shadowRoot);
+    await waitFor(() => expect(shadow.querySelector('[role="menu"]')).not.toBeNull());
+    await waitFor(() => expect(shadow.querySelector('[role="tooltip"]')).not.toBeNull());
+
+    const portals = defined(shadow.querySelector('[data-bo-widget-portals]'));
+    expect(portals.querySelector('[role="menu"]')).not.toBeNull();
+    expect(portals.querySelector('[role="tooltip"]')).not.toBeNull();
+    expect(document.body.querySelector('[role="menu"], [role="tooltip"]')).toBeNull();
   });
 
   it('disconnects and unmounts once removed from the page', async () => {
@@ -108,13 +164,16 @@ describe('toCustomElement', () => {
     await waitFor(() => expect(shadowText(element)).toContain('Fleet FLEET'));
     expect(fake.listenerCount()).toBeGreaterThan(0);
 
-    await act(async () => element.remove());
+    await act(async () => {
+      element.remove();
+      await nextTask();
+    });
 
     expect(fake.listenerCount()).toBe(0);
     expect(element.shadowRoot?.childNodes).toHaveLength(0);
   });
 
-  it('keeps the same tree and connection when the element is moved', async () => {
+  it('keeps the same tree and connection when the element is moved, even across an await', async () => {
     const fake = createFakeHostApi();
     const element = await mount(toCustomElement(FleetApp), fake.api);
     await waitFor(() => expect(shadowText(element)).toContain('Fleet FLEET'));
@@ -122,57 +181,134 @@ describe('toCustomElement', () => {
     const other = document.createElement('section');
     document.body.appendChild(other);
 
-    await act(async () => other.appendChild(element));
+    await act(async () => {
+      element.remove();
+      await Promise.resolve();
+      other.appendChild(element);
+      await nextTask();
+    });
 
     expect(element.shadowRoot?.querySelector('p')).toBe(paragraph);
     expect(fake.api.getContext).toHaveBeenCalledTimes(1);
     expect(fake.listenerCount()).toBeGreaterThan(0);
   });
 
-  it('mounts again when inserted after a removal', async () => {
+  it('mounts again, with its styles, when inserted after a removal', async () => {
     const fake = createFakeHostApi();
-    const element = await mount(toCustomElement(FleetApp), fake.api);
-    await waitFor(() => expect(shadowText(element)).toContain('Fleet FLEET'));
-    await act(async () => element.remove());
+    const App = () => <Button>{useBoContext().fleetId}</Button>;
+    const element = await mount(toCustomElement(App), fake.api);
+    await waitFor(() => expect(shadowText(element)).toContain('FLEET'));
+    await act(async () => {
+      element.remove();
+      await nextTask();
+    });
 
     await act(async () => document.body.appendChild(element));
 
-    await waitFor(() => expect(shadowText(element)).toContain('Fleet FLEET'));
+    await waitFor(() => expect(shadowText(element)).toContain('FLEET'));
     expect(fake.api.getContext).toHaveBeenCalledTimes(2);
+    expect(
+      ruleOf(shadowCss(element), defined(element.shadowRoot?.querySelector('button'))),
+    ).not.toBe('');
   });
 
-  it('shows the error fallback when vulogBo is not a back office API', async () => {
+  it('shows the error fallback, and logs, when vulogBo is not a back office API', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     const errorFallback = vi.fn((error: unknown) => `Failed: ${(error as Error).message}`);
     const element = await mount(toCustomElement(FleetApp, { errorFallback }), { nope: true });
     await waitFor(() => expect(shadowText(element)).toContain('Failed:'));
     expect(shadowText(element)).toContain('vulogBo is not a back office API');
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('cannot connect to the back office'),
+      expect.any(Error),
+    );
   });
 
-  it('shows the default error message when the initial state cannot be loaded', async () => {
+  it('shows the default error message, with the error code, when the state cannot be loaded', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const { api } = createFakeHostApi({
       getCurrentUser: async () => {
-        throw new Error('session expired');
+        throw Object.assign(new Error('session expired'), { code: 'no-token' });
       },
     });
     const element = await mount(toCustomElement(FleetApp), api);
     await waitFor(() => expect(element.shadowRoot?.querySelector('[role="alert"]')).not.toBeNull());
-    expect(shadowText(element)).toContain('session expired');
+    expect(shadowText(element)).toContain('The widget could not start');
+    expect(shadowText(element)).toContain('session expired (INTERNAL, no-token)');
   });
 
-  it('applies the theme customization on top of the back office theme', async () => {
-    const App = () => <Button variant="contained">Save</Button>;
+  it('shows the error fallback when the app throws while rendering', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const Broken = () => {
+      throw new Error('render failed');
+    };
+    const element = await mount(
+      toCustomElement(Broken, { errorFallback: (error) => `Oops: ${(error as Error).message}` }),
+    );
+    await waitFor(() => expect(shadowText(element)).toBe('Oops: render failed'));
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('the widget failed to render'),
+      expect.any(Error),
+    );
+  });
+
+  it('shows the default message when errorFallback itself throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const element = await mount(
+      toCustomElement(FleetApp, {
+        errorFallback: () => {
+          throw new Error('fallback failed');
+        },
+      }),
+      { nope: true },
+    );
+    await waitFor(() => expect(element.shadowRoot?.querySelector('[role="alert"]')).not.toBeNull());
+    expect(shadowText(element)).toContain('vulogBo is not a back office API');
+  });
+
+  it('applies the theme customization on top of the back office theme, portals kept', async () => {
+    const App = () => (
+      <>
+        <Button variant="contained">Save</Button>
+        <Dialog open>
+          <DialogTitle>Edit</DialogTitle>
+        </Dialog>
+      </>
+    );
     const element = await mount(
       toCustomElement(App, {
-        theme: (boTheme) => {
-          expect(boTheme.palette.primary.main).toBe('#123456');
-          return createTheme(boTheme, { palette: { primary: { main: '#abcdef' } } });
+        customizeTheme: (theme) => {
+          expect(theme.palette.primary.main).toBe('#123456');
+          return createTheme(theme, {
+            palette: { primary: { main: '#abcdef' } },
+            components: { MuiModal: { defaultProps: { container: document.body } } },
+          });
         },
       }),
     );
-    await waitFor(() => expect(element.shadowRoot?.querySelector('button')).not.toBeNull());
-    const css = [...defined(element.shadowRoot).querySelectorAll('style')]
-      .map((style) => style.textContent)
-      .join('\n');
-    expect(css).toContain('#abcdef');
+    const shadow = defined(element.shadowRoot);
+    await waitFor(() => expect(shadow.querySelector('[role="dialog"]')).not.toBeNull());
+    expect(shadowCss(element)).toContain('#abcdef');
+    expect(shadow.querySelector('[data-bo-widget-portals] [role="dialog"]')).not.toBeNull();
+  });
+
+  it('shows the error fallback when the theme customization throws on themeChanged', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fake = createFakeHostApi();
+    const element = await mount(
+      toCustomElement(FleetApp, {
+        errorFallback: () => 'Theme failed',
+        customizeTheme: (theme) => {
+          if (theme.palette.mode === 'dark') throw new Error('no dark theme');
+          return theme;
+        },
+      }),
+      fake.api,
+    );
+    await waitFor(() => expect(shadowText(element)).toContain('Fleet FLEET'));
+
+    await act(async () => fake.emit('themeChanged', { ...boTheme, mode: 'dark' }));
+
+    expect(shadowText(element)).toBe('Theme failed');
   });
 });

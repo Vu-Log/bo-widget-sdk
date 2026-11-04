@@ -10,7 +10,7 @@ import {
   useBoTheme,
   useCurrentUser,
 } from './hooks.js';
-import { boTheme, createFakeHostApi } from './testing/fakeHostApi.js';
+import { boTheme, createFakeHostApi, user } from './testing/fakeHostApi.js';
 import { WidgetProvider } from './WidgetProvider.js';
 
 const setup = async <T,>(hook: () => T, fake = createFakeHostApi()) => {
@@ -26,6 +26,7 @@ const setup = async <T,>(hook: () => T, fake = createFakeHostApi()) => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('hooks', () => {
@@ -96,7 +97,6 @@ describe('hooks', () => {
     const { result } = await setup(useBoTheme, fake);
     expect(result.current.palette.primary.main).toBe('#1976d2');
     expect(warn).toHaveBeenCalledOnce();
-    warn.mockRestore();
   });
 
   it('useBoRouter gives the basename, follows routeChanged and navigates through the client', async () => {
@@ -110,6 +110,26 @@ describe('hooks', () => {
 
     await expect(result.current.navigate('details/2')).resolves.toEqual({ path: 'details/2' });
     expect(fake.api.navigate).toHaveBeenCalledWith({ path: 'details/2' });
+  });
+
+  it('useBoRouter.navigate rejects with the BoError of the back office', async () => {
+    const fake = createFakeHostApi({
+      navigate: async () => {
+        throw Object.assign(new Error('external URL'), { code: 'invalid-payload' });
+      },
+    });
+    const { result } = await setup(useBoRouter, fake);
+    await expect(result.current.navigate('https://example.com')).rejects.toMatchObject({
+      name: 'BoError',
+      code: 'INVALID_PAYLOAD',
+    });
+  });
+
+  it('useBoRouter keeps its identity across unrelated updates', async () => {
+    const { result, fake } = await setup(useBoRouter);
+    const first = result.current;
+    act(() => fake.emit('userChanged', { ...user, fullName: 'John Roe' }));
+    expect(result.current).toBe(first);
   });
 
   it('useBoRouter has no location in an iframe until the first routeChanged', async () => {
@@ -131,12 +151,11 @@ describe('hooks', () => {
     ['useBoTheme', useBoTheme],
     ['useBoRouter', useBoRouter],
   ])('%s throws outside a widget', (name, hook) => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const Probe = () => {
       hook();
       return null;
     };
     expect(() => render(<Probe />)).toThrow(`${name} must be called inside a widget`);
-    error.mockRestore();
   });
 });

@@ -1,5 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createBoMuiTheme, withPortalContainer } from './theme.js';
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('createBoMuiTheme', () => {
   it('builds a MUI theme from the palette, typography and mode of the back office', () => {
@@ -37,10 +39,31 @@ describe('createBoMuiTheme', () => {
       createBoMuiTheme({ palette: {}, typography: {}, mode: 'dark' }).palette.primary.main,
     );
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('not a valid MUI theme'),
+      expect.stringContaining('MUI cannot use the back office theme'),
       expect.any(Error),
     );
-    warn.mockRestore();
+  });
+
+  it('keeps the typography when only the palette is rejected', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const theme = createBoMuiTheme({
+      palette: { primary: { main: 'not-a-color' } },
+      typography: { fontFamily: 'Lato, sans-serif' },
+      mode: 'light',
+    });
+    expect(theme.typography.fontFamily).toBe('Lato, sans-serif');
+  });
+
+  it('rethrows an error that is not about a malformed theme', () => {
+    const palette = Object.defineProperty({}, 'primary', {
+      enumerable: true,
+      get: () => {
+        throw new TypeError('broken getter');
+      },
+    });
+    expect(() => createBoMuiTheme({ palette, typography: {}, mode: 'light' })).toThrow(
+      'broken getter',
+    );
   });
 });
 

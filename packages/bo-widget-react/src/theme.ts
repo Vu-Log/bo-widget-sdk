@@ -1,27 +1,42 @@
-import { createTheme, type Theme } from '@mui/material';
+import { createTheme, type Theme, type ThemeOptions } from '@mui/material';
 import type { BoTheme } from '@vulog/bo-widget-sdk';
+
+// MUI throws errors whose message starts with "MUI:" (or "Minified MUI error" in production) for a
+// color or a palette it cannot use. Any other error is a bug, not a malformed theme: it is not
+// hidden.
+const isMuiThemeError = (error: unknown): boolean =>
+  error instanceof Error && /^(Minified )?MUI\b/.test(error.message);
+
+const tryCreateTheme = (options: ThemeOptions): Theme | null => {
+  try {
+    return createTheme(options);
+  } catch (error) {
+    if (!isMuiThemeError(error)) throw error;
+    console.warn(
+      '@vulog/bo-widget-react: MUI cannot use the back office theme, part of it is ignored',
+      error,
+    );
+    return null;
+  }
+};
 
 /**
  * Builds a MUI theme from the back office theme (`getTheme`): its palette, its typography and its
  * mode. The result lives in the widget only: it never changes the back office.
  *
- * A theme MUI cannot build (malformed palette sent by the back office) falls back to the default
- * MUI theme in the same mode, with a warning, so that the widget still renders.
+ * When MUI rejects the palette or the typography sent by the back office, the theme is built
+ * without the rejected part, with a warning, so that the widget still renders: first without the
+ * palette, then with the default MUI theme in the same mode.
+ *
+ * @throws Any error of MUI that is not about a malformed theme.
  */
 export const createBoMuiTheme = (boTheme: BoTheme): Theme => {
   const mode = boTheme.mode === 'dark' ? 'dark' : 'light';
-  try {
-    return createTheme({
-      palette: { ...boTheme.palette, mode },
-      typography: boTheme.typography,
-    });
-  } catch (error) {
-    console.warn(
-      '@vulog/bo-widget-react: the back office theme is not a valid MUI theme, the default theme is used',
-      error,
-    );
-    return createTheme({ palette: { mode } });
-  }
+  return (
+    tryCreateTheme({ palette: { ...boTheme.palette, mode }, typography: boTheme.typography }) ??
+    tryCreateTheme({ palette: { mode }, typography: boTheme.typography }) ??
+    createTheme({ palette: { mode } })
+  );
 };
 
 /**

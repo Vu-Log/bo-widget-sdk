@@ -1,7 +1,8 @@
 /**
  * React bindings for Vulog back office widgets. Export {@link toCustomElement}`(App)` as a Web
  * Component, or call {@link renderIframeWidget}`(App)` in an iframe, then read the back office from
- * the hooks (`useBoContext`, `useCurrentUser`, `useAuthFetch`, `useBoTheme`, `useBoRouter`).
+ * the hooks (`useBoContext`, `useCurrentUser`, `useAuthFetch`, `useBoTheme`, `useBoRouter`,
+ * `useBoClient`).
  *
  * @packageDocumentation
  */
@@ -12,7 +13,12 @@ export {
 } from './toCustomElement.js';
 export { renderIframeWidget, type IframeWidgetOptions } from './renderIframeWidget.js';
 export type { WidgetRenderOptions } from './WidgetRoot.js';
-export { WidgetProvider, type BoLocation, type WidgetProviderProps } from './WidgetProvider.js';
+export {
+  WidgetProvider,
+  type BoLocation,
+  type WidgetFallbacks,
+  type WidgetProviderProps,
+} from './WidgetProvider.js';
 export {
   useAuthFetch,
   useBoClient,

@@ -1,25 +1,30 @@
 import { CssBaseline, ScopedCssBaseline, ThemeProvider, type Theme } from '@mui/material';
 import { connect, type BoClient, type ConnectOptions } from '@vulog/bo-widget-sdk';
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import { useBoTheme } from './hooks.js';
-import { defaultErrorFallback, WidgetProvider } from './WidgetProvider.js';
 import { withPortalContainer } from './theme.js';
+import { WidgetErrorBoundary } from './WidgetErrorBoundary.js';
+import {
+  defaultErrorFallback,
+  logError,
+  renderErrorFallback,
+  WidgetProvider,
+  type WidgetFallbacks,
+} from './WidgetProvider.js';
 
 /** Options shared by `toCustomElement` and `renderIframeWidget`. */
-export interface WidgetRenderOptions {
-  /** Shown while the widget connects to the back office and loads its state. Nothing by default. */
-  fallback?: ReactNode;
-  /** Shown when the widget cannot connect or load its state. A short message by default. */
-  errorFallback?: (error: unknown) => ReactNode;
+export interface WidgetRenderOptions extends WidgetFallbacks {
   /**
    * Customizes the MUI theme. Receives the theme built from the back office theme, and returns the
    * one to render with, such as `(boTheme) => createTheme(boTheme, { shape: { borderRadius: 8 } })`.
-   * The portal container of a Web Component is set on top of it. Called again on `themeChanged`.
+   * Do not mutate `boTheme`. The portal container of a Web Component is set on top of the result.
+   * Called again on `themeChanged`.
    */
-  theme?: ((boTheme: Theme) => Theme) | undefined;
+  customizeTheme?: ((boTheme: Theme) => Theme) | undefined;
 }
 
-interface WidgetRootProps extends WidgetRenderOptions {
+/** @internal */
+export interface WidgetRootProps extends WidgetRenderOptions {
   App: ComponentType;
   /** The element, as a Web Component; `null` in an iframe. */
   element: HTMLElement | null;
@@ -28,7 +33,10 @@ interface WidgetRootProps extends WidgetRenderOptions {
   portalContainer?: HTMLElement | undefined;
 }
 
-type Connection = { client: BoClient } | { error: unknown } | null;
+type Connection =
+  | { status: 'connecting' }
+  | { status: 'connected'; client: BoClient }
+  | { status: 'error'; error: unknown };
 
 // Fills the element and lays out its content in a column, so that the widget follows the layout of
 // the back office content zone (toolbar `flex: none`, main area `flex: 1; min-height: 0`).
@@ -41,14 +49,14 @@ const scopedBaselineSx = {
 
 const ThemedApp = ({
   App,
-  theme: customize,
+  customizeTheme,
   portalContainer,
-}: Pick<WidgetRootProps, 'App' | 'theme' | 'portalContainer'>) => {
+}: Pick<WidgetRootProps, 'App' | 'customizeTheme' | 'portalContainer'>) => {
   const boTheme = useBoTheme();
   const theme = useMemo(() => {
-    const base = customize ? customize(boTheme) : boTheme;
+    const base = customizeTheme ? customizeTheme(boTheme) : boTheme;
     return portalContainer ? withPortalContainer(base, portalContainer) : base;
-  }, [boTheme, customize, portalContainer]);
+  }, [boTheme, customizeTheme, portalContainer]);
   return (
     <ThemeProvider theme={theme}>
       {portalContainer ? (
@@ -66,8 +74,9 @@ const ThemedApp = ({
 };
 
 /**
- * Connects to the back office, then renders the widget with its providers. Unmounting it
- * disconnects the client, including one that connects after the unmount. Internal to the package.
+ * Connects to the back office, then renders the widget with its providers, inside an error
+ * boundary. Unmounting it disconnects the client, including one that connects after the unmount.
+ * @internal
  */
 export const WidgetRoot = ({
   App,
@@ -76,9 +85,9 @@ export const WidgetRoot = ({
   portalContainer,
   fallback = null,
   errorFallback = defaultErrorFallback,
-  theme,
+  customizeTheme,
 }: WidgetRootProps) => {
-  const [connection, setConnection] = useState<Connection>(null);
+  const [connection, setConnection] = useState<Connection>({ status: 'connecting' });
 
   useEffect(() => {
     let active = true;
@@ -90,24 +99,30 @@ export const WidgetRoot = ({
           return;
         }
         client = connected;
-        setConnection({ client });
+        setConnection({ status: 'connected', client });
       },
       (error: unknown) => {
-        if (active) setConnection({ error });
+        if (!active) return;
+        logError('cannot connect to the back office', error);
+        setConnection({ status: 'error', error });
       },
     );
     return () => {
       active = false;
       client?.disconnect();
-      setConnection(null);
+      setConnection({ status: 'connecting' });
     };
   }, [element, connectOptions]);
 
-  if (!connection) return <>{fallback}</>;
-  if ('error' in connection) return <>{errorFallback(connection.error)}</>;
-  return (
-    <WidgetProvider client={connection.client} fallback={fallback} errorFallback={errorFallback}>
-      <ThemedApp App={App} theme={theme} portalContainer={portalContainer} />
-    </WidgetProvider>
-  );
+  const content =
+    connection.status === 'connecting' ? (
+      fallback
+    ) : connection.status === 'error' ? (
+      renderErrorFallback(errorFallback, connection.error)
+    ) : (
+      <WidgetProvider client={connection.client} fallback={fallback} errorFallback={errorFallback}>
+        <ThemedApp App={App} customizeTheme={customizeTheme} portalContainer={portalContainer} />
+      </WidgetProvider>
+    );
+  return <WidgetErrorBoundary errorFallback={errorFallback}>{content}</WidgetErrorBoundary>;
 };

@@ -3,6 +3,7 @@ import { CacheProvider } from '@emotion/react';
 import type { ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { WidgetRoot, type WidgetRenderOptions } from './WidgetRoot.js';
+import { logError } from './WidgetProvider.js';
 
 /** Options of {@link toCustomElement}. */
 export type WidgetElementOptions = WidgetRenderOptions;
@@ -25,19 +26,22 @@ const EMOTION_KEY = 'bo-widget';
  * - renders `App` in an open Shadow DOM, which it fills (`:host` is a block at 100 %) with a column
  *   layout;
  * - inserts the Emotion styles (MUI) into the shadow root, never into `document.head`;
- * - renders the MUI portals (Dialog, Menu, Popover, Tooltip…) into a container of the shadow root,
- *   so that they keep the widget's styles and still cover the whole page;
+ * - renders the MUI portals (Dialog, Drawer, Menu, Select, Popover, Tooltip…) into a container of
+ *   the shadow root, so that they keep the widget's styles; the Modal-based ones (Dialog, Drawer,
+ *   Menu, Select) still cover the whole page;
  * - wraps `App` in `ScopedCssBaseline` and in a MUI theme built from the back office theme;
  * - connects to the back office (`connect(this)`), and provides the hooks (`useBoContext`,
  *   `useAuthFetch`…);
- * - unmounts React and disconnects once removed from the page. The unmount is deferred to the end
- *   of the current task, so that moving the element (removed, then inserted again) keeps the same
- *   React tree and connection.
+ * - unmounts React and disconnects once removed from the page. The unmount is deferred to a later
+ *   task (`setTimeout`), so that an element moved within the same task (removed, then inserted
+ *   again, even after an `await`) keeps the same React tree and connection.
+ *
+ * Requires MUI 7.3.6 or later: earlier versions trap the focus of a dialog outside a shadow root.
  *
  * Fonts are not loaded: the widget relies on the Roboto font the back office already loads.
  *
  * @param App - Root component of the widget. It uses the hooks of this package, not props.
- * @param options - Fallbacks and theme customization.
+ * @param options - Fallbacks and theme customization (`fallback`, `errorFallback`, `customizeTheme`).
  * @returns The class, not registered.
  *
  * @example
@@ -54,7 +58,7 @@ const EMOTION_KEY = 'bo-widget';
  */
 export const toCustomElement = (
   App: ComponentType,
-  options: WidgetElementOptions = {},
+  { fallback, errorFallback, customizeTheme }: WidgetElementOptions = {},
 ): WidgetElementClass =>
   class BoWidgetElement extends HTMLElement {
     #root: Root | null = null;
@@ -72,11 +76,21 @@ export const toCustomElement = (
       portals.dataset.boWidgetPortals = '';
       shadow.replaceChildren(style, mount, portals);
 
-      const cache = createCache({ key: EMOTION_KEY, container: shadow });
+      // `speedy: false` keeps the rules as text in the <style> elements: the browser drops the rules
+      // inserted with `insertRule` (Emotion's production mode) when the element leaves the
+      // document, and would not restore them when it is inserted again.
+      const cache = createCache({ key: EMOTION_KEY, container: shadow, speedy: false });
       this.#root = createRoot(mount);
       this.#root.render(
         <CacheProvider value={cache}>
-          <WidgetRoot App={App} element={this} portalContainer={portals} {...options} />
+          <WidgetRoot
+            App={App}
+            element={this}
+            portalContainer={portals}
+            fallback={fallback}
+            errorFallback={errorFallback}
+            customizeTheme={customizeTheme}
+          />
         </CacheProvider>,
       );
     }
@@ -84,12 +98,18 @@ export const toCustomElement = (
     disconnectedCallback(): void {
       if (this.#unmountScheduled) return;
       this.#unmountScheduled = true;
-      queueMicrotask(() => {
+      setTimeout(() => {
         this.#unmountScheduled = false;
-        if (this.isConnected || !this.#root) return;
-        this.#root.unmount();
+        const root = this.#root;
+        if (this.isConnected || !root) return;
         this.#root = null;
-        this.shadowRoot?.replaceChildren();
-      });
+        try {
+          root.unmount();
+        } catch (error) {
+          logError('failed to unmount the widget', error);
+        } finally {
+          this.shadowRoot?.replaceChildren();
+        }
+      }, 0);
     }
   };

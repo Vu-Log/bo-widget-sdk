@@ -6,9 +6,9 @@ import { WidgetRoot, type WidgetRenderOptions } from './WidgetRoot.js';
 /** Options of {@link renderIframeWidget}. */
 export interface IframeWidgetOptions extends WidgetRenderOptions {
   /** Element to render into. Defaults to `#root`. */
-  container?: Element;
-  /** Options of the iframe channel (`widgetId`, `targetOrigin`, timeouts). */
-  connect?: ConnectOptions;
+  container?: Element | undefined;
+  /** Options of the iframe channel (`widgetId`, `widgetVersion`, `targetOrigin`, timeouts). */
+  connect?: ConnectOptions | undefined;
 }
 
 /**
@@ -33,7 +33,7 @@ export interface IframeWidgetOptions extends WidgetRenderOptions {
  */
 export const renderIframeWidget = (
   App: ComponentType,
-  { container, connect, ...options }: IframeWidgetOptions = {},
+  { container, connect, fallback, errorFallback, customizeTheme }: IframeWidgetOptions = {},
 ): (() => void) => {
   const target = container ?? document.getElementById('root');
   if (!target) {
@@ -42,6 +42,15 @@ export const renderIframeWidget = (
     );
   }
   const root = createRoot(target);
-  root.render(<WidgetRoot App={App} element={null} connectOptions={connect} {...options} />);
+  root.render(
+    <WidgetRoot
+      App={App}
+      element={null}
+      connectOptions={connect}
+      fallback={fallback}
+      errorFallback={errorFallback}
+      customizeTheme={customizeTheme}
+    />,
+  );
   return () => root.unmount();
 };
