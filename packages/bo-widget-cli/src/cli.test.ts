@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runCli, type CliIo } from './cli.js';
+import { BoWidgetCliError } from './errors.js';
 import { createZip } from './zip.js';
 
 const MANIFEST = {
@@ -23,7 +24,8 @@ const VALID_FILES = [
 let root: string;
 let out: string[];
 let err: string[];
-let io: CliIo;
+/** The tests replace some functions of the IO. */
+let io: { -readonly [Key in keyof CliIo]: CliIo[Key] };
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'bo-widget-cli-run-'));
@@ -168,6 +170,22 @@ describe('runCli', () => {
       );
     });
 
+    it('packs a bundle with warnings, and prints them', async () => {
+      await writeDist();
+      await writeFile(join(root, 'dist', 'index.js'), 'customElements.define("a-b", X)');
+
+      expect(await runCli(['pack'], io)).toBe(0);
+      expect(err).toEqual([expect.stringMatching(/^warning custom-element-define: "index\.js"/)]);
+    });
+
+    it('packs twice into the build folder itself, leaving out the earlier zip', async () => {
+      await writeDist();
+
+      expect(await runCli(['pack', '--out-dir', 'dist'], io)).toBe(0);
+      expect(await runCli(['pack', '--out-dir', 'dist'], io)).toBe(0);
+      expect(err).toEqual([]);
+    });
+
     it('prints the errors and fails when the bundle would be refused', async () => {
       await mkdir(join(root, 'dist'));
       await writeFile(join(root, 'dist', 'index.js'), 'x');
@@ -181,7 +199,9 @@ describe('runCli', () => {
 
     it('fails when the folder does not exist', async () => {
       expect(await runCli(['pack'], io)).toBe(1);
-      expect(err[0]).toMatch(/^bo-widget pack: ENOENT/);
+      expect(err).toEqual([
+        `bo-widget pack: ${join(root, 'dist')} does not exist or is not a folder: build the widget first`,
+      ]);
     });
 
     it('refuses --out-dir without value', async () => {
@@ -244,9 +264,30 @@ describe('runCli', () => {
       expect(io.runVite).not.toHaveBeenCalled();
     });
 
+    it('prints the stack and causes of an unexpected error, as a bug to report', async () => {
+      io.runVite = vi.fn(async () => {
+        throw new TypeError('boom', { cause: new Error('root cause') });
+      });
+
+      expect(await runCli(['dev'], io)).toBe(1);
+      expect(err[0]).toMatch(
+        /^bo-widget dev: unexpected error, please report it\nTypeError: boom\n {4}at /,
+      );
+      expect(err[0]).toContain('Caused by: Error: root cause');
+    });
+
+    it('prints a value thrown that is not an error', async () => {
+      io.runVite = vi.fn(async () => {
+        throw 'nope';
+      });
+
+      expect(await runCli(['dev'], io)).toBe(1);
+      expect(err).toEqual(['bo-widget dev: nope']);
+    });
+
     it('fails with the error of vite when it cannot run', async () => {
       io.runVite = vi.fn(async () => {
-        throw new Error(`vite is not installed in ${root}: run npm install first`);
+        throw new BoWidgetCliError(`vite is not installed in ${root}: run npm install first`);
       });
 
       expect(await runCli(['dev'], io)).toBe(1);

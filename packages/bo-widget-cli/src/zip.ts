@@ -20,8 +20,9 @@ const MAX_32 = 0xffffffff;
 
 /**
  * Writes a plain zip archive: no ZIP64, no data descriptor, no encryption, each file stored or
- * deflated (whichever is smaller), with a fixed date. The same files in the same order always
- * give the same bytes.
+ * deflated (whichever is smaller), with a fixed date. The same files in the same order give the
+ * same bytes with a given zlib (Node.js) version. The paths are written as given, not checked:
+ * run `validateWidgetArchive` on the result to know whether the back office accepts it.
  *
  * @param files - The files, in the order they are written. Folders are not written: their path
  * is part of the file paths.

@@ -2,7 +2,7 @@
 
 Command line of the widgets of the Vulog back office (BO): `bo-widget`.
 
-- **`bo-widget validate`** checks a widget zip with the rules the BO applies when you publish it, so you find every problem before the upload.
+- **`bo-widget validate`** checks a widget zip with the rules the BO applies when you publish it, so you find the problems before the upload.
 - **`bo-widget pack`** zips your build into `{id}-{version}.zip`, the archive to publish, after the same checks.
 - **`bo-widget dev --token`** runs the Vite dev server with the fake BO against a real Vulog API, with a token pasted from its BO.
 
@@ -22,7 +22,7 @@ Requires Node.js `^20.19` or `>=22.12`. `dev` also needs `vite` and [`@vulog/bo-
 
 Zips the **content** of `dir` (default: `dist`), so that `widget.json` is at the root of the zip, into `{id}-{version}.zip` in `--out-dir` (default: the current folder). The id and version come from `widget.json`.
 
-The archive is checked as `validate` does before it is written: when the BO would refuse it, nothing is written, the errors are printed and the command exits with `1`. `.DS_Store` files are left out. The zip is reproducible (files in path order, fixed dates): the same build gives the same bytes, so you can check with its sha256 that the zip published in production is the one tested in dev.
+The archive is checked as `validate` does before it is written: when the BO would refuse it, nothing is written, the errors are printed and the command exits with `1`. `.DS_Store` files are left out, and so are the `.zip` files of `--out-dir` when it is inside `dir` (an earlier `pack`). The zip is reproducible (files in path order, fixed dates): the same build packed with the same Node.js version gives the same bytes, so you can check with its sha256 that the zip published in production is the one tested in dev.
 
 ```jsonc
 // package.json
@@ -55,7 +55,7 @@ What only the BO knows is checked at publication only: that the widget id belong
 
 ### `bo-widget dev [--token <jwt>] [--api-url <url>] [--api-key <key>] [-- <vite args>]`
 
-Runs the `vite` of the project with the `BO_WIDGET_TOKEN`, `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY` variables given, which switch the fake BO of `@vulog/bo-widget-vite` to token mode (see its README). An option left out keeps the value of the environment or of `.env.local`. Without `--token`, the fake BO stays in mock mode, unless `BO_WIDGET_TOKEN` is set elsewhere.
+Runs the `vite` of the project with the `BO_WIDGET_TOKEN`, `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY` variables given, which switch the fake BO of `@vulog/bo-widget-vite` to token mode (see its README). An option left out keeps the value of the environment or of `.env.local`. Without `--token`, the fake BO stays in mock mode, unless `BO_WIDGET_TOKEN` is set elsewhere or `dev.mode` is `'token'`.
 
 `--token -` reads the token from the standard input, so that it does not stay in your shell history:
 
@@ -65,11 +65,11 @@ pbpaste | npx bo-widget dev --token -
 npx bo-widget dev --token - -- --port 4000   # arguments after -- go to vite
 ```
 
-The exit code is the one of `vite`.
+The exit code is the one of `vite` (128 + the signal number when a signal stopped it). `SIGINT`, `SIGTERM` and `SIGHUP` are passed on to `vite`.
 
 ### Exit codes
 
-`0` success, `1` failure (archive refused, file not found…), `2` wrong command line.
+`0` success, `1` failure (archive refused, file or folder not found…), `2` wrong command line (including `validate` without argument when the current folder holds no `.zip`, or several). An unexpected error is printed with its stack trace: please report it.
 
 ## In scripts
 
@@ -83,9 +83,9 @@ if (!result.ok) throw new Error(result.errors.map((error) => error.message).join
 const check = validateWidgetArchive(await readFile('release/fleet-report-1.2.0.zip'));
 ```
 
-- `validateWidgetArchive(archive, limits?)` returns `{ ok: true, manifest, files, warnings }` or `{ ok: false, errors, warnings }`; each issue has a stable `code`, an English `message` and, when it is about a file, its `path`. It throws a `TypeError` for an invalid `limits` override.
-- `packWidget({ dir, outDir })` returns `{ ok: true, file, manifest, warnings }` or `{ ok: false, errors, warnings }`, and throws when `dir` cannot be read or holds a symbolic link.
-- `createZip(files)` writes a plain, reproducible zip.
+- `validateWidgetArchive(archive, limits?)` returns `{ ok: true, manifest, files, warnings }` or `{ ok: false, errors, warnings }`; each issue has a stable `code`, an English `message` and, when it is about a file, its `path`. It throws a `TypeError` for an unknown `limits` override, or one that is not a positive integer.
+- `packWidget({ dir, outDir })` returns `{ ok: true, file, manifest, warnings }` or `{ ok: false, errors, warnings }`, and throws a `BoWidgetCliError` when `dir` is missing or holds a symbolic link (or another file that is not a regular file).
+- `createZip(files)` writes a plain, reproducible zip. It does not check the paths: validate the result.
 
 ## License
 

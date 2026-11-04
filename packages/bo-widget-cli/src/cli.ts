@@ -3,29 +3,31 @@ import { createRequire } from 'node:module';
 import { relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { validateWidgetArchive, type WidgetArchiveIssue } from './archive.js';
-import { devEnv } from './dev.js';
+import { devEnv, type runVite } from './dev.js';
+import { BoWidgetCliError } from './errors.js';
 import { packWidget } from './pack.js';
 
 /** What the CLI reads from and writes to: the real process in `bin.ts`, fakes in tests. */
 export interface CliIo {
   /** Folder the paths of the command line are relative to. */
-  cwd: string;
+  readonly cwd: string;
   /** Environment passed on to `vite`. */
-  env: NodeJS.ProcessEnv;
+  readonly env: NodeJS.ProcessEnv;
   /** Writes a line of output. */
-  out: (line: string) => void;
+  readonly out: (line: string) => void;
   /** Writes a line of error. */
-  err: (line: string) => void;
+  readonly err: (line: string) => void;
   /** Reads the first line of the standard input (`--token -`). */
-  readStdinLine: () => Promise<string>;
+  readonly readStdinLine: () => Promise<string>;
   /** Runs `vite` in a folder and resolves with its exit code. */
-  runVite: (cwd: string, args: readonly string[], env: NodeJS.ProcessEnv) => Promise<number>;
+  readonly runVite: typeof runVite;
 }
 
 /** Exit code of a wrong command line. */
 const USAGE_ERROR = 2;
 
 const HELP = `Usage: bo-widget <command> [options]
+       bo-widget --help | --version
 
 Commands:
   validate [zip]       Checks a widget zip with the rules applied on publication.
@@ -36,10 +38,10 @@ Commands:
   dev [-- vite args]   Runs the vite dev server with the fake back office.
       --token <jwt>    Token pasted from the back office of a Vulog environment ("-" reads
                        it from the standard input), to call its API (token mode).
-      --api-url <url>  Base URL of its API, ending with /boapi/proxy/.
+      --api-url <url>  Base URL of its API (.../boapi/proxy/).
       --api-key <key>  Its API key.
 
-Options:
+Instead of a command:
   -h, --help           Shows this help.
   -v, --version        Shows the version.
 
@@ -136,12 +138,34 @@ const devCommand = async (args: string[], io: CliIo): Promise<number> => {
     token = token.trim();
     if (token === '') throw new UsageError('--token is empty');
   }
-  const env = devEnv(io.env, {
-    ...(token !== undefined ? { token } : {}),
-    ...(values['api-url'] !== undefined ? { apiUrl: values['api-url'] } : {}),
-    ...(values['api-key'] !== undefined ? { apiKey: values['api-key'] } : {}),
-  });
+  const env = devEnv(io.env, { token, apiUrl: values['api-url'], apiKey: values['api-key'] });
   return io.runVite(io.cwd, positionals, env);
+};
+
+/**
+ * Error lines of a failed command. An expected failure (wrong command line, a file the user can
+ * fix, a Node.js file system error) prints its message; anything else is a bug, printed with its
+ * stack and causes so that it can be reported.
+ */
+const describeError = (command: string, error: unknown): string => {
+  if (!(error instanceof Error)) return `bo-widget ${command}: ${String(error)}`;
+  const expected =
+    error instanceof UsageError ||
+    error instanceof BoWidgetCliError ||
+    typeof (error as NodeJS.ErrnoException).code === 'string';
+  if (expected) return `bo-widget ${command}: ${error.message}`;
+  const causes: string[] = [];
+  for (let cause = error.cause; cause !== undefined; cause = (cause as Error).cause) {
+    causes.push(
+      `Caused by: ${cause instanceof Error ? (cause.stack ?? cause.message) : String(cause)}`,
+    );
+    if (!(cause instanceof Error)) break;
+  }
+  return [
+    `bo-widget ${command}: unexpected error, please report it`,
+    error.stack ?? error.message,
+    ...causes,
+  ].join('\n');
 };
 
 const COMMANDS: Record<string, (args: string[], io: CliIo) => Promise<number>> = {
@@ -176,7 +200,7 @@ export const runCli = async (argv: readonly string[], io: CliIo): Promise<number
   try {
     return await run(args, io);
   } catch (error) {
-    io.err(`bo-widget ${command}: ${(error as Error).message}`);
+    io.err(describeError(command, error));
     return error instanceof UsageError ? USAGE_ERROR : 1;
   }
 };

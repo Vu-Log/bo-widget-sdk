@@ -1,8 +1,9 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { devEnv, resolveViteBin, runVite } from './dev.js';
+import { BoWidgetCliError } from './errors.js';
 
 let root: string;
 
@@ -25,6 +26,12 @@ afterEach(async () => {
 });
 
 describe('devEnv', () => {
+  it('treats an option set to undefined as not given', () => {
+    expect(devEnv({ BO_WIDGET_TOKEN: 'env' }, { token: undefined, apiUrl: undefined })).toEqual({
+      BO_WIDGET_TOKEN: 'env',
+    });
+  });
+
   it('sets the BO_WIDGET_* variables of the options given', () => {
     const env = devEnv(
       { PATH: '/bin' },
@@ -63,7 +70,15 @@ describe('resolveViteBin', () => {
   });
 
   it('throws a clear error when vite is not installed', () => {
+    expect(() => resolveViteBin(root)).toThrow(BoWidgetCliError);
     expect(() => resolveViteBin(root)).toThrow(`vite is not installed in ${root}`);
+  });
+
+  it('throws without blaming the install when the vite package.json is invalid', async () => {
+    await installFakeVite({ vite: 'bin/vite.js' });
+    await writeFile(join(root, 'node_modules', 'vite', 'package.json'), '{oops');
+
+    expect(() => resolveViteBin(root)).toThrow(`cannot resolve vite from ${root}: `);
   });
 
   it('throws when the vite package declares no executable', async () => {
@@ -92,6 +107,29 @@ describe('runVite', () => {
       args: ['--port', '4000'],
       token: 'jwt',
     });
+  });
+
+  it('returns 128 + the signal number when a signal stops vite', async () => {
+    await installFakeVite({ vite: 'bin/vite.js' }, `process.kill(process.pid, 'SIGTERM');`);
+
+    expect(await runVite(root, [], process.env)).toBe(143);
+  });
+
+  it('passes on a SIGTERM received while vite runs, and stops forwarding afterwards', async () => {
+    await installFakeVite(
+      { vite: 'bin/vite.js' },
+      `require('node:fs').writeFileSync('ready', ''); setInterval(() => {}, 1000);`,
+    );
+    const listeners = process.listenerCount('SIGTERM');
+
+    const running = runVite(root, [], process.env);
+    const { existsSync } = await import('node:fs');
+    await vi.waitFor(() => expect(existsSync(join(root, 'ready'))).toBe(true), { timeout: 5000 });
+    expect(process.listenerCount('SIGTERM')).toBe(listeners + 1);
+    process.emit('SIGTERM', 'SIGTERM');
+
+    expect(await running).toBe(143);
+    expect(process.listenerCount('SIGTERM')).toBe(listeners);
   });
 
   it('rejects when vite is not installed', async () => {

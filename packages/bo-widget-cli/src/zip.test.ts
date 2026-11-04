@@ -47,6 +47,15 @@ describe('createZip', () => {
     expect(zip.length).toBeLessThan(repeated.length);
   });
 
+  it('writes the fixed date 1980-01-01 00:00 in both headers, never the current one', () => {
+    const zip = createZip([{ path: 'a.js', data: text('x') }]);
+    const central = zip.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+
+    // Local header: time at 10, date at 12. Central header: time at 12, date at 14.
+    expect([zip.readUInt16LE(10), zip.readUInt16LE(12)]).toEqual([0, 0x21]);
+    expect([zip.readUInt16LE(central + 12), zip.readUInt16LE(central + 14)]).toEqual([0, 0x21]);
+  });
+
   it('gives the same bytes for the same files', () => {
     const files = [
       { path: 'widget.json', data: text(MANIFEST) },

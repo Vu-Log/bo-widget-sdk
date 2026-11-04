@@ -13,8 +13,8 @@ import {
  *
  * This is a copy of the validation run by the Vulog server, which stays the
  * source of truth: same limits, rules, codes and messages, so that an archive
- * this module accepts is accepted on publication. A rule changed there must be
- * changed here.
+ * this module accepts passes the same checks on publication (the namespace and
+ * version checks excepted). A rule changed there must be changed here.
  *
  * The zip is read here rather than with `unzip-stream` or a similar library on
  * purpose: those trust the uncompressed size declared in the headers, so a zip
@@ -80,7 +80,7 @@ export type WidgetArchiveErrorCode =
   | 'manifest-invalid'
   | 'entry-missing';
 
-/** Stable code of each rule, for the upload page of the BO to translate or explain. */
+/** Stable code of each rule, the same as the one the BO returns on publication. */
 export type WidgetArchiveIssueCode = WidgetArchiveErrorCode | WidgetArchiveWarningCode;
 
 /** One error or warning: a stable `code`, an English message for humans, and the file concerned if any. */
@@ -98,7 +98,7 @@ export type WidgetArchiveError = WidgetArchiveIssue<WidgetArchiveErrorCode>;
 export type WidgetArchiveWarning = WidgetArchiveIssue<WidgetArchiveWarningCode>;
 
 /**
- * A file of the bundle, with its path relative to the version's folder. Its
+ * A file of the bundle, with its path relative to the root of the archive. Its
  * `data` is a copy: it does not share memory with the uploaded archive.
  */
 export interface WidgetArchiveFile {
@@ -514,7 +514,7 @@ const readEntries = (
  * `customElements.define` gets a warning. macOS metadata (`__MACOSX/`,
  * `.DS_Store`) is skipped.
  *
- * Errors are gathered so the admin can fix them all at once, except the
+ * Errors are gathered so that they can all be fixed at once, except the
  * structural ones (`archive-too-large`, `invalid-archive`, `too-many-files`,
  * `zip-bomb`): validation stops there, and an `invalid-archive` raised while
  * reading an entry replaces the errors gathered so far.
@@ -522,11 +522,11 @@ const readEntries = (
  * What only the back office can check is left out: the widget id against the
  * client's namespace, and the version against the versions already published.
  *
- * @param archive The raw bytes of the zip.
- * @param limits Overrides of {@link WIDGET_ARCHIVE_LIMITS}, each a positive integer.
+ * @param archive - The raw bytes of the zip.
+ * @param limits - Overrides of {@link WIDGET_ARCHIVE_LIMITS}, each a positive integer.
  * @returns The manifest and the files (folders left out) on success, or the
  *   errors; the warnings in both cases.
- * @throws {TypeError} When a limit override is not a positive integer.
+ * @throws {TypeError} When a limit override is not a positive integer, or not a known limit.
  */
 export const validateWidgetArchive = (
   archive: Buffer,

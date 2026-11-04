@@ -20,5 +20,6 @@ export {
   type WidgetArchiveWarning,
   type WidgetArchiveWarningCode,
 } from './archive.js';
+export { BoWidgetCliError } from './errors.js';
 export { packWidget, type PackOptions, type PackResult } from './pack.js';
 export { createZip, type ZipInputFile } from './zip.js';

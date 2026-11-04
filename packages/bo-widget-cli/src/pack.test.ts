@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { validateWidgetArchive } from './archive.js';
+import { BoWidgetCliError } from './errors.js';
 import { packWidget } from './pack.js';
 
 const MANIFEST = {
@@ -63,11 +64,10 @@ describe('packWidget', () => {
 
     const result = await packWidget({ dir: dist, outDir: out });
 
-    const archive = result.ok && validateWidgetArchive(await readFile(result.file));
-    expect(archive && archive.ok && archive.files.map(({ path }) => path)).not.toContain(
-      '.DS_Store',
-    );
-    expect(archive && archive.ok && archive.files).toHaveLength(3);
+    // The validator skips .DS_Store too: check the raw bytes, which must not change with it.
+    expect(result.ok).toBe(true);
+    const zip = await readFile(join(out, 'fleet-report-1.2.0.zip'));
+    expect(zip.includes(Buffer.from('.DS_Store'))).toBe(false);
   });
 
   it('gives the same zip when packed twice', async () => {
@@ -113,8 +113,12 @@ describe('packWidget', () => {
     expect(!result.ok && result.errors[0].message).toContain('found "dist/widget.json"');
   });
 
-  it('throws when the folder does not exist', async () => {
-    await expect(packWidget({ dir: join(root, 'missing'), outDir: out })).rejects.toThrow(/ENOENT/);
+  it('throws a clear error when the folder does not exist', async () => {
+    const missing = join(root, 'missing');
+
+    await expect(packWidget({ dir: missing, outDir: out })).rejects.toThrow(
+      new BoWidgetCliError(`${missing} does not exist or is not a folder: build the widget first`),
+    );
   });
 
   it('throws on a symbolic link, rather than packing what it points to', async () => {
