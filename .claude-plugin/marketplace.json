@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "bo-widget-sdk",
+  "description": "Agent skills to build Vulog back-office widgets with the bo-widget SDK.",
+  "owner": {
+    "name": "Vulog"
+  },
+  "plugins": [
+    {
+      "name": "bo-widget",
+      "description": "Skills for AI agents writing Vulog BO widgets: the Vulog admin API endpoints a widget can call with authFetch, generated weekly from the public AIMA swagger.",
+      "author": {
+        "name": "Vulog"
+      },
+      "category": "development",
+      "source": "./plugins/bo-widget"
+    }
+  ]
+}

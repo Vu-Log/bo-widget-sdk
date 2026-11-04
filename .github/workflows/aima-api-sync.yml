@@ -1,0 +1,149 @@
+name: aima-api sync
+
+# Regenerates the aima-api skill (plugins/bo-widget/skills/aima-api) from the public AIMA swagger
+# and opens (or updates) a pull request when the regenerated files differ from main.
+# Pull requests opened with the default token do not trigger CI, which main requires: set the
+# RELEASE_GITHUB_TOKEN secret (fine-grained token with contents and pull-requests write) so that
+# the push and the pull request are made with it. Without it, the default token is used and
+# "Allow GitHub Actions to create and approve pull requests" must be enabled.
+on:
+  schedule:
+    - cron: '0 6 * * 1' # every Monday, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: aima-api-sync
+  cancel-in-progress: false
+
+env:
+  BRANCH: chore/aima-api-sync
+  SKILL_DIR: plugins/bo-widget/skills/aima-api
+  BOT_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+
+jobs:
+  sync:
+    name: Regenerate the aima-api skill
+    # The PR targets main and the diff is taken against the checkout: run on main only.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check the release GitHub token
+        run: |
+          if [ -z "$RELEASE_GITHUB_TOKEN" ]; then
+            echo "::warning::RELEASE_GITHUB_TOKEN is not set: the sync pull request will not trigger CI"
+          fi
+        env:
+          RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          # No token left in .git/config while npm ci and the checks run: the push step passes its own.
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - name: Regenerate the skill
+        run: npm run -s aima-api:generate -- --summary "$RUNNER_TEMP/aima-api-summary.json"
+
+      - name: Detect changes
+        id: diff
+        run: |
+          # --porcelain also lists new (untracked) generated files, unlike `git diff --quiet`.
+          if [ -z "$(git status --porcelain -- "$SKILL_DIR")" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Report the result in the PR body, and fail the run at the end when a check fails.
+      - name: Check the regenerated skill
+        if: steps.diff.outputs.changed == 'true'
+        id: checks
+        continue-on-error: true
+        run: |
+          status=0
+          npm test || status=1
+          npm run lint || status=1
+          npm run format:check || status=1
+          exit "$status"
+
+      - name: Refuse to overwrite commits not made by this workflow on the sync branch
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          set -o pipefail
+          if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
+            git fetch origin "$BRANCH"
+            AUTHORS=$(git log --format='%ae' "origin/main..origin/$BRANCH")
+            OTHERS=$(printf '%s\n' "$AUTHORS" | grep -v '^$' | grep -vcxF "$BOT_EMAIL" || true)
+            if [ "$OTHERS" -gt 0 ]; then
+              echo "::error::$BRANCH has $OTHERS commit(s) not made by this workflow: merge or close its PR first."
+              exit 1
+            fi
+          fi
+
+      - name: Open or update the pull request
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          # Pushed and opened with this token, so that the pull request triggers CI.
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          CHECKS_OUTCOME: ${{ steps.checks.outcome }}
+        run: |
+          SUMMARY="$RUNNER_TEMP/aima-api-summary.json"
+          RELEASE=$(SUMMARY="$SUMMARY" node -p 'require(process.env.SUMMARY).stats.release')
+          {
+            echo "Automatic regeneration of the \`aima-api\` skill from the public AIMA swagger https://vulog-doc-api.web.app/swagger/sta.yaml (release $RELEASE)."
+            echo
+            if [ "$CHECKS_OUTCOME" = "success" ]; then
+              echo "Tests, lint and format: passed."
+            else
+              echo "**Tests, lint or format: FAILED** -- see the run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            fi
+            echo
+            SUMMARY="$SUMMARY" node -e '
+              const s = require(process.env.SUMMARY);
+              // Warnings quote swagger text: code-format them so Markdown or @mentions are not rendered.
+              const code = (x) => "`" + String(x).replace(/`/g, "\x27") + "`";
+              const list = (items) => (items.length ? items.map((x) => "- " + code(x)).join("\n") : "None.");
+              const MAX = 200;
+              const warnings = s.warnings.slice(0, MAX);
+              console.log("Endpoints: " + s.stats.endpointCount + " (" + s.stats.excludedCount + " left out), schemas: " + s.stats.schemaCount + ".\n");
+              console.log("### Removed generated files\n" + list(s.removed) + "\n");
+              console.log("### Generator warnings (" + s.warnings.length + ")\n" + list(warnings));
+              if (s.warnings.length > MAX) console.log("\n…and " + (s.warnings.length - MAX) + " more (see the run log).");
+            '
+            echo
+            echo "Unmapped tags go to \`admin-other.md\`: map them in \`scripts/aima-api/config.mjs\`."
+          } > "$RUNNER_TEMP/pr-body.md"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "$BOT_EMAIL"
+          LEASE=$(git rev-parse --verify --quiet "origin/$BRANCH" || true)
+          git checkout -B "$BRANCH"
+          git add "$SKILL_DIR"
+          git commit -m "chore(aima-api): regenerate skill from swagger release $RELEASE"
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" \
+            push --force-with-lease="$BRANCH:$LEASE" origin "$BRANCH"
+
+          PR=$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')
+          TITLE="chore(aima-api): sync with swagger release $RELEASE"
+          if [ -n "$PR" ]; then
+            gh pr edit "$PR" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
+          else
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
+          fi
+
+      - name: Fail the run when a check failed
+        if: steps.diff.outputs.changed == 'true' && steps.checks.outcome == 'failure'
+        run: |
+          echo "::error::Tests, lint or format failed on the regenerated aima-api skill (the PR was opened with the failure noted)."
+          exit 1

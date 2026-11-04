@@ -45,6 +45,8 @@ describe('templates', () => {
 
     it('has the files of a widget project', () => {
       for (const file of [
+        'AGENTS.md',
+        'CLAUDE.md',
         'README.md',
         '_gitignore',
         '_gitlab-ci.yml',
@@ -63,6 +65,15 @@ describe('templates', () => {
         path.split(/[\\/]/).some((segment) => segment.startsWith('.')),
       );
       expect(dotFiles).toEqual([]);
+    });
+
+    it('gives AI coding agents the contract of the SDK, and Claude Code the same file', () => {
+      const agents = readFileSync(join(dir, 'AGENTS.md'), 'utf8');
+      expect(agents).toMatch(/^# AGENTS\.md\n/);
+      expect(agents).toContain('node_modules/@vulog/bo-widget-sdk/AGENTS.md');
+      expect(agents).toContain('`aima-api` skill');
+      expect(agents).toContain(packageJson.scripts?.build?.split(' ')[0] ?? 'missing build script');
+      expect(readFileSync(join(dir, 'CLAUDE.md'), 'utf8')).toBe('@AGENTS.md\n');
     });
 
     it('builds, tests and packs the zip with its scripts', () => {
