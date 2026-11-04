@@ -1,6 +1,6 @@
 {
   "name": "@vulog/bo-widget-cli",
-  "version": "0.1.0-next.0",
+  "version": "0.1.0-next.1",
   "description": "Command line of Vulog back office widgets: validate and pack the zip to publish, run the fake back office against a real API.",
   "license": "MIT",
   "author": "Vulog",
@@ -47,7 +47,7 @@
     "check:package": "publint --strict && attw --pack . --profile esm-only && node --input-type=module -e \"const m = await import('@vulog/bo-widget-cli'); if (typeof m.validateWidgetArchive !== 'function' || typeof m.packWidget !== 'function') throw new Error('@vulog/bo-widget-cli: exports not resolved from dist');\" && node dist/bin.js --version"
   },
   "dependencies": {
-    "@vulog/bo-widget-sdk": "^0.1.0-next.2"
+    "@vulog/bo-widget-sdk": "^0.1.0-next.3"
   },
   "devDependencies": {
     "@vulog/bo-widget-vite": "^0.1.0-next.0",

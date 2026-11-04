@@ -1,5 +1,13 @@
 # @vulog/bo-widget-cli
 
+## 0.1.0-next.1
+
+### Patch Changes
+
+- a9a88f8: `bo-widget validate` without argument no longer fails when the folder holds the zips of several versions: it validates the one of the version in `package.json` (`{id}-{version}.zip`).
+- Updated dependencies [a9a88f8]
+  - @vulog/bo-widget-sdk@0.1.0-next.3
+
 ## 0.1.0-next.0
 
 ### Minor Changes

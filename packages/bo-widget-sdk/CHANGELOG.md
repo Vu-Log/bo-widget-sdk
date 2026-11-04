@@ -1,5 +1,11 @@
 # @vulog/bo-widget-sdk
 
+## 0.1.0-next.3
+
+### Patch Changes
+
+- a9a88f8: `AGENTS.md` tells AI coding agents where to find the Vulog admin API endpoints a widget can call with `authFetch`: the `aima-api` skill of the SDK repository, regenerated every week.
+
 ## 0.1.0-next.2
 
 ### Minor Changes
