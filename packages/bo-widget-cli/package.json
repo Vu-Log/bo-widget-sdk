@@ -1,0 +1,56 @@
+{
+  "name": "@vulog/bo-widget-cli",
+  "version": "0.0.0",
+  "description": "Command line of Vulog back office widgets: validate and pack the zip to publish, run the fake back office against a real API.",
+  "license": "MIT",
+  "author": "Vulog",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vu-Log/bo-widget-sdk.git",
+    "directory": "packages/bo-widget-cli"
+  },
+  "homepage": "https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-cli#readme",
+  "bugs": "https://github.com/Vu-Log/bo-widget-sdk/issues",
+  "keywords": [
+    "vulog",
+    "back-office",
+    "widget",
+    "cli",
+    "zip"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "bin": {
+    "bo-widget": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": "^20.19 || >=22.12"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check:package": "publint --strict && attw --pack . --profile esm-only && node --input-type=module -e \"const m = await import('@vulog/bo-widget-cli'); if (typeof m.validateWidgetArchive !== 'function' || typeof m.packWidget !== 'function') throw new Error('@vulog/bo-widget-cli: exports not resolved from dist');\" && node dist/bin.js --version"
+  },
+  "dependencies": {
+    "@vulog/bo-widget-sdk": "^0.1.0-next.2"
+  },
+  "devDependencies": {
+    "@vulog/bo-widget-vite": "^0.1.0-next.0",
+    "vite": "^8.3.5"
+  }
+}

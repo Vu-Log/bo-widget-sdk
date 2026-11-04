@@ -5,7 +5,8 @@
     "types": ["node"],
     "paths": {
       "@vulog/bo-widget-sdk": ["./packages/bo-widget-sdk/src/index.ts"],
-      "@vulog/bo-widget-sdk/manifest": ["./packages/bo-widget-sdk/src/manifest/index.ts"]
+      "@vulog/bo-widget-sdk/manifest": ["./packages/bo-widget-sdk/src/manifest/index.ts"],
+      "@vulog/bo-widget-vite": ["./packages/bo-widget-vite/src/index.ts"]
     }
   },
   "include": ["packages/*/src", "packages/*/vitest.config.ts", "vitest.config.ts"]
