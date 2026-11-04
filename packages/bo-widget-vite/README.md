@@ -4,7 +4,7 @@ Vite plugin to build widgets for the Vulog back office (BO), as a Web Component 
 
 - **`widget.json` generated and validated** from your widget configuration and `package.json`, with the rules applied on publication: an invalid configuration fails `vite` and `vite build`.
 - **The bundle the BO loads**: `index.js` (ES module whose default export is the element class) or `index.html`, with `base: './'`.
-- **A warning on `customElements.define`**, once per module, dependencies included: the BO registers your class under its own tag.
+- **A warning on `customElements.define`**, once per module, dependencies included: the BO registers your class under its own tag. Not under Vitest (dev server in the `test` mode), whose tests register the widget to mount it.
 - **A fake BO in dev**: `vite` displays the widget the way the BO does, with mock data or against a real Vulog API.
 
 ## Install

@@ -30,6 +30,62 @@ jobs:
       - run: npm run build
       - run: npm run check:package
 
+  templates:
+    name: Template ${{ matrix.template }}
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [react-mui, svelte, vue, lit, vanilla]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Pack the packages of this commit
+        run: mkdir -p "$RUNNER_TEMP/packs" && npm pack --workspaces --pack-destination "$RUNNER_TEMP/packs"
+      # From the packed generator, outside the checkout so that its node_modules/.bin is not used:
+      # a template file left out of the package fails here.
+      - name: Create a project from the template
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          packs=("$RUNNER_TEMP"/packs/vulog-create-bo-widget-[0-9]*.tgz)
+          [ "${#packs[@]}" -eq 1 ] || { echo "expected one create-bo-widget tarball, found ${#packs[@]}" >&2; exit 1; }
+          npx --yes --package "${packs[0]}" create-bo-widget ci-widget --template "$TEMPLATE"
+        env:
+          TEMPLATE: ${{ matrix.template }}
+      # The @vulog packages of the project come from this commit, not from npm: a missing tarball
+      # fails the job instead of installing the published version.
+      - name: Install, with the packages of this commit
+        working-directory: ${{ runner.temp }}/ci-widget
+        run: |
+          set -euo pipefail
+          tarballs=$(node -e "
+            const { globSync } = require('node:fs');
+            const { dependencies = {}, devDependencies = {} } = require('./package.json');
+            const names = Object.keys({ ...dependencies, ...devDependencies }).filter((name) => name.startsWith('@vulog/'));
+            const paths = names.map((name) => {
+              const [path] = globSync(process.env.RUNNER_TEMP + '/packs/' + name.slice(1).replace('/', '-') + '-[0-9]*.tgz');
+              if (!path) throw new Error('no tarball of ' + name + ' in ' + process.env.RUNNER_TEMP + '/packs');
+              return path;
+            });
+            console.log(paths.join(' '));
+          ")
+          test -n "$tarballs"
+          npm install --no-audit --no-fund $tarballs
+      - run: npm test
+        working-directory: ${{ runner.temp }}/ci-widget
+      - run: npm run build
+        working-directory: ${{ runner.temp }}/ci-widget
+      - run: npx bo-widget validate
+        working-directory: ${{ runner.temp }}/ci-widget
+
   publish-dry-run:
     name: Publish dry-run (next)
     needs: verify

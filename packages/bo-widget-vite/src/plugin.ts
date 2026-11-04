@@ -208,8 +208,12 @@ export const boWidget = (config: WidgetConfig): Plugin => {
       // Before the TypeScript or framework compilers, so that the lines are the source's.
       order: 'pre',
       handler(code, id) {
-        // The fake back office registers the widget class, as the back office does.
-        if (id.startsWith('\0') || warned.has(id) || id === hostModuleId) return null;
+        // The tests of a widget register its class to mount it: Vitest serves them in the `test`
+        // mode. A build in that mode (`vite build --mode test`) is still checked.
+        if (resolvedConfig.command === 'serve' && resolvedConfig.mode === 'test') return null;
+        // The fake back office registers the widget class, as the back office does. Vite adds a
+        // query to the modules of node_modules (`host.js?v=…`).
+        if (id.startsWith('\0') || warned.has(id) || id.split('?')[0] === hostModuleId) return null;
         const lines = findCustomElementsDefine(code);
         if (lines.length > 0) {
           warned.add(id);
