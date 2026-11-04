@@ -2,9 +2,9 @@ import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { widgetManifestSchema } from '@vulog/bo-widget-sdk/manifest';
-import { build, createLogger, type InlineConfig, type Logger } from 'vite';
+import { build, createLogger, normalizePath, type InlineConfig, type Logger } from 'vite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BoWidgetConfigError, type WidgetConfig } from './manifest.js';
 import { boWidget, defineWidgetConfig, MANIFEST_FILE } from './plugin.js';
@@ -246,6 +246,59 @@ describe('boWidget build', () => {
     expect(warnings).toContainEqual(
       expect.stringMatching(/src\/main\.ts:8 calls customElements\.define/),
     );
+  });
+
+  it('still warns on customElements.define in a build in the test mode', async () => {
+    const root = await project({
+      'src/main.ts': `${ELEMENT_ENTRY}\ncustomElements.define('fleet-report', FleetReport);\n`,
+    });
+    const customLogger = silentLogger();
+
+    await buildWidget(root, { name: 'Report' }, { customLogger, mode: 'test' });
+
+    const warnings = customLogger.warn.mock.calls.map(([message]) => String(message));
+    expect(warnings).toContainEqual(expect.stringMatching(/calls customElements\.define/));
+  });
+});
+
+describe('boWidget transform', () => {
+  type Hook = (this: { warn: (message: string) => void }, code: string, id: string) => unknown;
+
+  /** The plugin, configured as the dev server does it, with its transform hook. */
+  const servedPlugin = async (mode = 'development') => {
+    const root = await project({ 'src/main.ts': ELEMENT_ENTRY });
+    const plugin = boWidget({ name: 'Report' });
+    (plugin.config as (config: object, env: object) => unknown)(
+      { root },
+      { command: 'serve', mode },
+    );
+    (plugin.configResolved as (config: object) => void)({ root, mode, command: 'serve' });
+    const warn = vi.fn();
+    const transform = (code: string, id: string) =>
+      (plugin.transform as { handler: Hook }).handler.call({ warn }, code, id);
+    return { root, warn, transform };
+  };
+
+  it('does not warn on the customElements.define of the fake back office, whatever its query', async () => {
+    const { root, warn, transform } = await servedPlugin();
+    const host = normalizePath(fileURLToPath(new URL('./dev/host.ts', import.meta.url)));
+    const code = 'customElements.define(tag, Widget);';
+
+    // Vite gives the modules of node_modules a version query.
+    transform(code, `${host}?v=0123abcd`);
+    transform(code, host);
+    transform(code, normalizePath(join(root, 'src/main.ts')));
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^src\/main\.ts:1 calls/));
+  });
+
+  it('does not warn under Vitest, whose tests register the widget to mount it', async () => {
+    const { root, warn, transform } = await servedPlugin('test');
+
+    transform('customElements.define(tag, Widget);', normalizePath(join(root, 'src/main.test.ts')));
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

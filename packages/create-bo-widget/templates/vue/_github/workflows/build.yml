@@ -1,0 +1,29 @@
+# Tests and builds the widget, and keeps the zip to publish in the back office as an artifact.
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # Type-checks, builds dist/ and packs it into {id}-{version}.zip.
+      - run: npm run build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: widget
+          path: '*.zip'
+          if-no-files-found: error

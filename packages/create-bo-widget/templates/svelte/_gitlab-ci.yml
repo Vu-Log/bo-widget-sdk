@@ -1,0 +1,15 @@
+# Tests and builds the widget, and keeps the zip to publish in the back office as an artifact.
+build:
+  image: node:24
+  cache:
+    key:
+      files: [package-lock.json]
+    paths: [.npm/]
+  script:
+    - npm ci --cache .npm --prefer-offline
+    - npm test
+    # Type-checks, builds dist/ and packs it into {id}-{version}.zip.
+    - npm run build
+  artifacts:
+    paths:
+      - '*.zip'

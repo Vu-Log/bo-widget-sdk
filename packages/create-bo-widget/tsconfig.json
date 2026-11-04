@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@vulog/bo-widget-sdk/manifest": ["../bo-widget-sdk/src/manifest/index.ts"]
+    }
+  },
+  "include": ["src", "vitest.config.ts"]
+}

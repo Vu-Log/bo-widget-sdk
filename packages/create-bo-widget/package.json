@@ -1,0 +1,55 @@
+{
+  "name": "@vulog/create-bo-widget",
+  "version": "0.0.0",
+  "description": "Creates the project of a Vulog back office widget: npm create @vulog/bo-widget, with React + MUI, Svelte, Vue, Lit or plain Web Component templates.",
+  "license": "MIT",
+  "author": "Vulog",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vu-Log/bo-widget-sdk.git",
+    "directory": "packages/create-bo-widget"
+  },
+  "homepage": "https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/create-bo-widget#readme",
+  "bugs": "https://github.com/Vu-Log/bo-widget-sdk/issues",
+  "keywords": [
+    "vulog",
+    "back-office",
+    "widget",
+    "create",
+    "template",
+    "scaffold"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "bin": {
+    "create-bo-widget": "dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "templates"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": "^20.19 || >=22.12"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check:package": "publint --strict && attw --pack . --profile esm-only && node --input-type=module -e \"const m = await import('@vulog/create-bo-widget'); if (typeof m.createWidgetProject !== 'function' || typeof m.TEMPLATES?.vue !== 'string') throw new Error('@vulog/create-bo-widget: exports not resolved from dist');\" && node dist/bin.js --version"
+  },
+  "devDependencies": {
+    "semver": "^7.8.6",
+    "@types/semver": "^7.8.0"
+  }
+}

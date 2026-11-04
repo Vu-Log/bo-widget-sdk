@@ -1,0 +1,27 @@
+{
+  "name": "{{name}}",
+  "version": "0.1.0",
+  "description": "{{title}}, a widget of the Vulog back office.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build && bo-widget pack",
+    "test": "vitest run",
+    "typecheck": "vue-tsc"
+  },
+  "dependencies": {
+    "@vulog/bo-widget-sdk": "^0.1.0-next.2",
+    "vue": "^3.5.44"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.10",
+    "@vulog/bo-widget-cli": "^0.1.0-next.0",
+    "@vulog/bo-widget-vite": "^0.1.0-next.0",
+    "happy-dom": "^21.0.4",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0",
+    "vue-tsc": "^3.3.14"
+  }
+}
