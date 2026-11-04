@@ -1,0 +1,56 @@
+{
+  "name": "@vulog/bo-widget-vite",
+  "version": "0.0.0",
+  "description": "Vite plugin to build Vulog back office widgets: widget.json, bundle layout and a fake back office in dev.",
+  "license": "MIT",
+  "author": "Vulog",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vu-Log/bo-widget-sdk.git",
+    "directory": "packages/bo-widget-vite"
+  },
+  "homepage": "https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-vite#readme",
+  "bugs": "https://github.com/Vu-Log/bo-widget-sdk/issues",
+  "keywords": [
+    "vulog",
+    "back-office",
+    "widget",
+    "vite",
+    "vite-plugin"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": "^20.19 || >=22.12"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check:package": "publint --strict && attw --pack . --profile esm-only && node --input-type=module -e \"const m = await import('@vulog/bo-widget-vite'); if (typeof m.boWidget !== 'function' || typeof m.defineWidgetConfig !== 'function') throw new Error('@vulog/bo-widget-vite: exports not resolved from dist');\""
+  },
+  "dependencies": {
+    "@vulog/bo-widget-sdk": "^0.1.0-next.2"
+  },
+  "peerDependencies": {
+    "vite": "^7.0.0 || ^8.0.0"
+  },
+  "devDependencies": {
+    "happy-dom": "^21.0.4",
+    "vite": "^8.3.5"
+  }
+}
