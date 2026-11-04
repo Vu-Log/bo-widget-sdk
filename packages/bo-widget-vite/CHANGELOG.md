@@ -1,5 +1,11 @@
 # @vulog/bo-widget-vite
 
+## 0.1.0-next.1
+
+### Patch Changes
+
+- cdcb479: Fewer false `customElements.define` warnings: none under Vitest (dev server in the `test` mode), whose tests register the widget class to mount it; and none for the fake back office of the dev server when the plugin is installed from npm (Vite then adds a version query to the module).
+
 ## 0.1.0-next.0
 
 ### Minor Changes

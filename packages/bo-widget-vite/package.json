@@ -1,6 +1,6 @@
 {
   "name": "@vulog/bo-widget-vite",
-  "version": "0.1.0-next.0",
+  "version": "0.1.0-next.1",
   "description": "Vite plugin to build Vulog back office widgets: widget.json, bundle layout and a fake back office in dev.",
   "license": "MIT",
   "author": "Vulog",
