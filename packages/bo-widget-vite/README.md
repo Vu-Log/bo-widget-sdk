@@ -60,7 +60,7 @@ export default class FleetReport extends HTMLElement {
 ```
 
 - `vite` serves the fake BO on `http://localhost:5173/__bo-widget/` and prints its URL. For a Web Component, `/` redirects there; for an iframe, `/` is the widget page the fake BO displays.
-- `vite build` writes `dist/` with `index.js` and `widget.json`. Zip the content of `dist/` and publish it in the BO, Configuration > Widgets.
+- `vite build` writes `dist/` with `index.js` and `widget.json`. `npx bo-widget pack` ([`@vulog/bo-widget-cli`](../bo-widget-cli/)) zips it into `{id}-{version}.zip`, checked with the rules applied on publication; publish that zip in the BO, Configuration > Widgets.
 
 ## Configuration
 
@@ -120,6 +120,8 @@ BO_WIDGET_TOKEN=eyJ…
 BO_WIDGET_API_URL=https://…/boapi/proxy/
 BO_WIDGET_API_KEY=…
 ```
+
+Or keep the API URL and key in `.env.local` and pass the short-lived token through the standard input, with [`@vulog/bo-widget-cli`](../bo-widget-cli/): `pbpaste | npx bo-widget dev --token -`.
 
 The mode switches to `token` when `BO_WIDGET_TOKEN` is set; `dev.mode: 'token'` forces it, and `vite` then fails to start without the three variables. `dev.responses` are ignored in this mode. The dev server forwards each call to `BO_WIDGET_API_URL` and adds `Authorization: Bearer` when the widget did not; the API key reaches the API through `getApiInfo`, as `authFetch` sends it. Context and user stay the `dev` fixtures.
 
