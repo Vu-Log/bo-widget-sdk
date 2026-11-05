@@ -723,6 +723,35 @@ describe('fake back office dev server', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/dev\.settings curency: not declared/));
   });
 
+  it('warns about a dev basename outside the fake back office page, but not about one under it', async () => {
+    const outside = await serve({
+      name: 'Fleet report',
+      dev: { context: { basename: '/widgets/fleet-report' } },
+    });
+    const under = await serve({
+      name: 'Fleet report',
+      dev: { context: { basename: `${FAKE_BO_BASENAME}/report` } },
+    });
+
+    expect(outside.warn).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /dev\.context\.basename \/widgets\/fleet-report is outside \/__bo-widget/,
+      ),
+    );
+    expect(under.warn).not.toHaveBeenCalled();
+  });
+
+  it('answers the local API, not the page, to a browser tab that asks for HTML', async () => {
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const response = await fetch(`${origin}${FAKE_API_PATH}fleets`, {
+      headers: { accept: 'text/html' },
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error: 'mock-not-found' });
+  });
+
   it('refuses the calls of a page from another origin', async () => {
     const api = await upstream();
     stubTokenEnv(api.url);

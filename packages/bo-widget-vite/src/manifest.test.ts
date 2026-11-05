@@ -202,6 +202,15 @@ describe('buildManifest', () => {
     ]);
   });
 
+  it('refuses a dev.context.basename without a leading slash, which would lose its first segment', () => {
+    expect(issuesOf({ name: 'Report', dev: { context: { basename: 'widgets/x' } } })).toEqual([
+      'dev.context.basename: must start with "/" (the default is "/__bo-widget")',
+    ]);
+    expect(() =>
+      buildManifest({ name: 'Report', dev: { context: { basename: '/__bo-widget/x' } } }, pkg),
+    ).not.toThrow();
+  });
+
   it('accepts a mock key whose path has spaces', () => {
     expect(() =>
       buildManifest({ name: 'Report', dev: { responses: { 'GET files/my report.pdf': {} } } }, pkg),

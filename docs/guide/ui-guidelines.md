@@ -32,7 +32,7 @@ To pick your own translations, try the exact locale, then its language (`locale.
 
 `locale`, `timezone` and `currency` can be `null`: have a fallback.
 
-Labels of the manifest (`menu.label`, `settings[].label`) are records keyed by language (`en`, `fr`) or by exact BO locale (`fr_FR`). The BO takes the exact locale, then its language, then `en`: give one per language your users use.
+Labels of the manifest (`menu.label`, `settings[].label`) are records keyed by language (`en`, `fr`) or by exact BO locale (`fr_FR`). For the menu entry, the BO takes the exact locale, then its language, then `en`: give one per language your users use.
 
 ## Feedback
 
@@ -65,7 +65,7 @@ The widget needs the `navigate` permission. An external URL rejects with `INVALI
 
 ### Sub-routes
 
-The BO shows the widget on its view and on every sub-route of it, so a widget with several screens can keep them in the URL: a deep link or a reload opens the same screen. Give `basename` to your router:
+The BO shows the widget on its view and on every sub-route of it. A Web Component shares the BO page URL, so a widget with several screens can keep them in it: a deep link or a reload opens the same screen. Give `basename` to your router:
 
 ```tsx
 import { useMemo } from 'react';
@@ -79,9 +79,11 @@ const Routes = () => {
 };
 ```
 
-`navigate({ path: 'details/1' })` resolves under `basename`, and the BO then pushes `routeChanged` with the full path. In an iframe, the widget page has its own URL: route from `routeChanged` (`location` of `useBoRouter()`), not from the iframe URL.
+Move between the screens of the widget with the router itself (`Link`, `router.navigate`): the router does not see `navigate` of the BO, which changes the URL without telling it. Keep `navigate` for the routes of the BO (`/app/vehicles`). `navigate({ path: 'details/1' })` still resolves under `basename`, and the BO then pushes `routeChanged` with the full path.
 
-In dev, the fake BO uses `/__bo-widget` as `basename`, the path of its page, and serves its sub-routes on reload. Keep that default: with another `dev.context.basename`, the page URL is outside it and the router matches nothing (the fake BO warns in its log).
+In an iframe, the widget page has its own URL, which stays the same: no request gives the BO route, and a reload opens the first screen. Route from `routeChanged` (`location` of `useBoRouter()`, `null` until the first one), with a memory router, not from the iframe URL.
+
+In dev, the fake BO uses `/__bo-widget` as `basename`, the path of its page, and serves its sub-routes on reload. Keep that default: with another `dev.context.basename`, the page URL is outside it and the router matches nothing (the dev server and the fake BO warn).
 
 ## Accessibility
 

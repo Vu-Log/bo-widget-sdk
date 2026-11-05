@@ -45,7 +45,7 @@ Every `label` is a record, never a plain string, keyed by language (`en`) or by 
 { "en": "Fleet report", "fr": "Rapport de flotte" }
 ```
 
-The BO shows the label of its exact locale, then of its language, then `en`.
+The menu entry shows the label of the exact BO locale, then of its language, then `en`, then the widget `name`.
 
 ### `settings`
 

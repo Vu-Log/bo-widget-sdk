@@ -66,7 +66,7 @@ stop();
 | `themeChanged`  | The theme, as `getTheme()`      |
 | `routeChanged`  | `{ pathname, search, hash }`    |
 
-`locale` is the language of the BO as `language_COUNTRY`, with an underscore: `en_GB` (the default), `fr_FR`, `de_DE`… It is not a BCP 47 tag, and `Intl` throws a `RangeError` on `en_GB`: replace the underscore before formatting (`locale.replace('_', '-')`).
+`locale` is the language of the BO as `language_COUNTRY`, with an underscore: `en_GB` (the BO default), `fr_FR`, `de_DE`… It is not a BCP 47 tag, and `Intl` throws a `RangeError` on `en_GB`: replace the underscore before formatting (`locale.replace('_', '-')`).
 
 ## The initial state is not pushed
 

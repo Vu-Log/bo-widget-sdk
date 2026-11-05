@@ -12,7 +12,7 @@ export interface BoContext {
   fleetId: string | null;
   host: string | null;
   /**
-   * Language of the back office, as `language_COUNTRY` with an underscore: `en_GB` (the default),
+   * Language of the back office, as `language_COUNTRY` with an underscore: `en_GB` (the BO default),
    * `fr_FR`, `de_DE`… Not a BCP 47 tag: `Intl` refuses `en_GB`, so replace the underscore first
    * (`locale.replace('_', '-')`).
    */

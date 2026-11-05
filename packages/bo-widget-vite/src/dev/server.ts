@@ -8,14 +8,14 @@ import type { Logger, ViteDevServer } from 'vite';
 import type { FakeBoConfig } from './host.js';
 import type { FakeBoMode, WidgetDevOptions } from './options.js';
 
-/** Path the fake back office is served on. */
-export const FAKE_BO_PATH = '/__bo-widget/';
-
 /**
  * Default `basename` of the fake back office: the path of its page, so that a router with this
  * basename matches the page URL, and its sub-routes are served on reload.
  */
-export const FAKE_BO_BASENAME = FAKE_BO_PATH.slice(0, -1);
+export const FAKE_BO_BASENAME = '/__bo-widget';
+
+/** Path the fake back office is served on. */
+export const FAKE_BO_PATH = `${FAKE_BO_BASENAME}/`;
 
 /** URL of the module that starts the fake back office in the page. */
 export const FAKE_BO_MODULE_URL = `${FAKE_BO_PATH}fake-bo.js`;

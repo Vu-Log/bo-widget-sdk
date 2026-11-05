@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { BoError, connect, type BoClient } from '@vulog/bo-widget-sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildManifest } from '../manifest.js';
+import { FAKE_BO_PATH, fakeBoConfig } from './server.js';
 import {
   createFakeBackOffice,
   isInView,
@@ -285,6 +287,57 @@ describe('startFakeBo as a Web Component', () => {
     );
     expect(options()[0]).toBe('pt_PT');
     expect((document.querySelector('select') as HTMLSelectElement).value).toBe('pt_PT');
+  });
+
+  it('rejects a path that the browser would read as another host, backslashes included', async () => {
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig(), load(Widget));
+    const bo = await client();
+
+    for (const path of ['\\\\evil.example/x', '/\\evil.example/x', '//evil.example/x']) {
+      await expect(bo.navigate({ path })).rejects.toMatchObject({ code: 'INVALID_PAYLOAD' });
+    }
+    expect(location.pathname).toBe('/__bo-widget/');
+  });
+
+  it('pushes no routeChanged, with a warning, when the history goes back outside the widget view', async () => {
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig(), load(Widget));
+    const bo = await client();
+    const routes: unknown[] = [];
+    bo.on('routeChanged', (data) => routes.push(data));
+
+    history.replaceState(null, '', '/app/vehicles');
+    globalThis.dispatchEvent(new PopStateEvent('popstate'));
+
+    expect(routes).toEqual([]);
+    expect(document.querySelector('.bo-log .warning')?.textContent).toContain(
+      "/app/vehicles is outside the widget's view: no routeChanged",
+    );
+  });
+
+  it('warns about a locale that is not in the back office format', async () => {
+    await startFakeBo(
+      fakeConfig({ context: { ...fakeConfig().context, locale: 'en' } }),
+      load(widgetClass().Widget),
+    );
+
+    expect(document.querySelector('.bo-log .warning')?.textContent).toContain(
+      'the locale en is not in the format of the back office, language_COUNTRY',
+    );
+  });
+
+  it('matches its page with the default context of the dev server, without warning', async () => {
+    const manifest = buildManifest(
+      { name: 'Fleet report' },
+      { name: 'fleet-report', version: '1.0.0' },
+    );
+    history.replaceState(null, '', `${FAKE_BO_PATH}stations/1`);
+
+    await startFakeBo(fakeBoConfig(manifest, {}, { mode: 'mock' }), load(widgetClass().Widget));
+
+    expect(document.querySelector('.bo-log .warning')).toBeNull();
+    expect(document.querySelector('.bo-route')?.textContent).toBe(`${FAKE_BO_PATH}stations/1`);
   });
 
   it('rejects an external URL to navigate with INVALID_PAYLOAD', async () => {
@@ -761,6 +814,12 @@ describe('resolveRoute', () => {
     );
   });
 
+  it('keeps a query or a hash alone under the widget view', () => {
+    expect(resolveRoute('/__bo-widget', '?tab=2')).toBe('/__bo-widget/?tab=2');
+    expect(resolveRoute('/__bo-widget', '#top')).toBe('/__bo-widget/#top');
+    expect(isInView('/__bo-widget', '/__bo-widget/?tab=2')).toBe(true);
+  });
+
   it('lets .. leave the widget view', () => {
     expect(resolveRoute('/widgets/fleet-report', '../other')).toBe('/widgets/other');
   });
@@ -772,6 +831,10 @@ describe('isInView', () => {
     expect(isInView('/__bo-widget/', '/__bo-widget/a?b#c')).toBe(true);
     expect(isInView('/__bo-widget', '/__bo-widget-other')).toBe(false);
     expect(isInView('/__bo-widget', '/app/vehicles')).toBe(false);
+  });
+
+  it('compares a basename that needs encoding with the encoded route', () => {
+    expect(isInView('/w x', resolveRoute('/w x', 'a'))).toBe(true);
   });
 
   it('accepts every route for the root basename', () => {

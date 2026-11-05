@@ -11,6 +11,7 @@ import {
 } from 'vite';
 import { defineWarning, findCustomElementsDefine } from './defineCheck.js';
 import {
+  FAKE_BO_BASENAME,
   FAKE_BO_MODULE_URL,
   fakeBoConfig,
   fakeBoModule,
@@ -184,6 +185,16 @@ export const boWidget = (config: WidgetConfig): Plugin => {
       if (unknownSettings.length > 0) {
         server.config.logger.warn(
           `[bo-widget] dev.settings ${unknownSettings.join(', ')}: not declared in settings, the back office would never send them.`,
+        );
+      }
+      const basename = config.dev?.context?.basename;
+      if (
+        basename !== undefined &&
+        basename !== FAKE_BO_BASENAME &&
+        !basename.startsWith(`${FAKE_BO_BASENAME}/`)
+      ) {
+        server.config.logger.warn(
+          `[bo-widget] dev.context.basename ${basename} is outside ${FAKE_BO_BASENAME}, the path of the fake back office: a widget router matches nothing, and its sub-routes are not served on reload. Keep the default.`,
         );
       }
       installFakeBo(server, { runtime, responses: config.dev?.responses ?? {}, resolved: devMode });
