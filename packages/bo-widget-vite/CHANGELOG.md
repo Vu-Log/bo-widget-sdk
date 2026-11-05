@@ -1,5 +1,16 @@
 # @vulog/bo-widget-vite
 
+## 0.1.0-next.2
+
+### Minor Changes
+
+- 2fe97a0: Fake back office: serve the sub-routes of its page, so that a widget router reloads and opens deep links, and default the `basename` to `/__bo-widget`, the path of that page (it was `/widgets/<id>`, which no router could match). `navigate` to a route of the widget view now pushes it to the history and pushes `routeChanged`, as back and forward do; a route outside the view warns in the log. The locale defaults to `en_GB` and the bar offers the BO locales (`en_GB`, `fr_FR`…) instead of bare languages.
+
+### Patch Changes
+
+- Updated dependencies [2fe97a0]
+  - @vulog/bo-widget-sdk@0.1.0-next.4
+
 ## 0.1.0-next.1
 
 ### Patch Changes
