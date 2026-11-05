@@ -13,9 +13,6 @@ authFetch path: `business/fleets/{fleetId}/billing/entity/{entityId}/balance` (b
 - `fleetId`: string (required)
 - `entityId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsBalanceDTO`
 
 ### GET `/business/fleets/{fleetId}/billing/entity/{entityId}/product`
@@ -31,9 +28,6 @@ authFetch path: `business/fleets/{fleetId}/billing/entity/{entityId}/product` (b
 - `period`: string (required)
 - `productDetailsType`: string: `UNIT`, `ACCUMULATIVE`, `DEFAULT` (optional)
 - `pageable`: BusinessWsPageable (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `BusinessWsPageBilledBusinessWSProductDTO`
 
@@ -51,9 +45,6 @@ authFetch path: `business/fleets/{fleetId}/billing/entity/{entityId}/trip` (base
 - `period`: string (required)
 - `pageable`: BusinessWsPageable (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsPageBilledBusinessWSTripDTO`
 
 ### GET `/business/fleets/{fleetId}/billing/entity/{entityId}/trips/cost`
@@ -70,9 +61,6 @@ authFetch path: `business/fleets/{fleetId}/billing/entity/{entityId}/trips/cost`
 - `tripId`: string (optional)
 - `pageable`: BusinessWsPageable (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsPageTripAndCostBreakdownDTO`
 
 ### GET `/business/fleets/{fleetId}/billing/groups`
@@ -81,9 +69,6 @@ authFetch path: `business/fleets/{fleetId}/billing/groups` (base path `/boapi/pr
 
 **Path params:**
 - `fleetId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `BusinessWsBillingBusinessWSGroupDTO[]`
 
@@ -95,9 +80,6 @@ authFetch path: `business/fleets/{fleetId}/business` (base path `/boapi/proxy`)
 
 **Path params:**
 - `fleetId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `BusinessWsBusinessCreationDTO`
 | Field | Type | Required | Notes |
@@ -141,9 +123,6 @@ authFetch path: `business/fleets/{fleetId}/business/{businessId}` (base path `/b
 - `fleetId`: string (required)
 - `businessId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsBusinessWSDTO`
 
 ### GET `/business/fleets/{fleetId}/business/{businessId}/contacts`
@@ -153,9 +132,6 @@ authFetch path: `business/fleets/{fleetId}/business/{businessId}/contacts` (base
 **Path params:**
 - `fleetId`: string (required)
 - `businessId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `BusinessWsBusinessContactsDTO`
 
@@ -167,9 +143,6 @@ authFetch path: `business/fleets/{fleetId}/business/{businessId}/costcenter` (ba
 - `fleetId`: string (required)
 - `businessId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsCostCenterDTO[]`
 
 ### POST `/business/fleets/{fleetId}/business/{businessId}/costcenter`
@@ -179,9 +152,6 @@ authFetch path: `business/fleets/{fleetId}/business/{businessId}/costcenter` (ba
 **Path params:**
 - `fleetId`: string (required)
 - `businessId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `BusinessWsCostCenterAddDTO`
 | Field | Type | Required | Notes |
@@ -200,9 +170,6 @@ authFetch path: `business/fleets/{fleetId}/business/{businessId}/costcenter/{id}
 - `businessId`: string (required)
 - `id`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsCostCenterDTO`
 
 ### PUT `/business/fleets/{fleetId}/business/{businessId}/costcenter/{id}`
@@ -213,9 +180,6 @@ authFetch path: `business/fleets/{fleetId}/business/{businessId}/costcenter/{id}
 - `fleetId`: string (required)
 - `businessId`: string (required)
 - `id`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `BusinessWsCostCenterUpdateDTO`
 | Field | Type | Required | Notes |
@@ -234,9 +198,6 @@ authFetch path: `business/fleets/{fleetId}/business/{businessId}/costcenter/{id}
 - `businessId`: string (required)
 - `id`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200`
 
 ### POST `/business/fleets/{fleetId}/business/{businessId}/paymentDetails/wireTransfer`
@@ -247,9 +208,6 @@ authFetch path: `business/fleets/{fleetId}/business/{businessId}/paymentDetails/
 **Path params:**
 - `fleetId`: string (required)
 - `businessId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `BusinessWsWireTransferBusinessDTO`
 | Field | Type | Required | Notes |
@@ -267,9 +225,6 @@ authFetch path: `business/fleets/{fleetId}/business/{businessId}/product` (base 
 **Path params:**
 - `fleetId`: string (required)
 - `businessId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `BusinessWsProductChargeDTO`
 | Field | Type | Required | Notes |
@@ -292,9 +247,6 @@ authFetch path: `business/fleets/{fleetId}/business/{businessId}/profiles/{profi
 - `fleetId`: string (required)
 - `profileId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200`, `404`
 
 ### DELETE `/business/fleets/{fleetId}/business/{businessId}/user/{userId}/profile/{profileId}`
@@ -308,9 +260,6 @@ authFetch path: `business/fleets/{fleetId}/business/{businessId}/user/{userId}/p
 - `fleetId`: string (required)
 - `profileId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `202`, `404`
 
 ### PUT `/business/fleets/{fleetId}/business/{id}`
@@ -320,9 +269,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}` (base path `/boapi/pro
 **Path params:**
 - `fleetId`: string (required)
 - `id`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `BusinessWsBusinessUpdateDTO`
 | Field | Type | Required | Notes |
@@ -372,7 +318,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/credit` (base path `/bo
 
 **Header params:**
 - `x-boapi-ctx`: string (optional)
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `BusinessWsWalletCreationDTO`
 | Field | Type | Required | Notes |
@@ -390,9 +335,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/paymentDetails` (base p
 - `fleetId`: string (required)
 - `id`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsPaymentBusinessDTO`
 
 ### PUT `/business/fleets/{fleetId}/business/{id}/profile/user/profile/status/{status}`
@@ -403,9 +345,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/profile/user/profile/st
 - `fleetId`: string (required)
 - `id`: string (required)
 - `status`: string: `PENDING`, `APPROVED`, `REJECTED`, `SUSPENDED`, `INACTIVE`, `ARCHIVED` (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `string[]`
 
@@ -419,9 +358,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/promoCodes/redeem/{refe
 - `fleetId`: string (required)
 - `id`: string (required)
 - `reference`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `string`
 
@@ -438,9 +374,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/user` (base path `/boap
 - `status`: string (optional)
 - `pageable`: BusinessWsPageable (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsPageUserListDTO`
 
 ### POST `/business/fleets/{fleetId}/business/{id}/user/bulk`
@@ -453,9 +386,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/user/bulk` (base path `
 
 **Query params:**
 - `locale`: string (optional)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `object`
 | Field | Type | Required | Notes |
@@ -479,9 +409,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/user/invite` (base path
 - `costCenterId`: string (optional)
 - `locale`: string (optional)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `string`
 
 ### GET `/business/fleets/{fleetId}/business/{id}/user/{userId}`
@@ -493,9 +420,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}` (base pa
 - `id`: string (required)
 - `userId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsUserBusinessDTO`
 
 ### POST `/business/fleets/{fleetId}/business/{id}/user/{userId}`
@@ -506,9 +430,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}` (base pa
 - `fleetId`: string (required)
 - `id`: string (required)
 - `userId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional)
 
 **Request body:** `BusinessWsCreateUserProfileDTO`
 | Field | Type | Required | Notes |
@@ -529,9 +450,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}/delegated
 - `id`: string (required)
 - `userId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200`
 
 ### DELETE `/business/fleets/{fleetId}/business/{id}/user/{userId}/delegatedAdmin`
@@ -542,9 +460,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}/delegated
 - `fleetId`: string (required)
 - `id`: string (required)
 - `userId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `boolean`
 
@@ -557,9 +472,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}/owner` (b
 - `id`: string (required)
 - `userId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200`
 
 ### DELETE `/business/fleets/{fleetId}/business/{id}/user/{userId}/owner`
@@ -570,9 +482,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}/owner` (b
 - `fleetId`: string (required)
 - `id`: string (required)
 - `userId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200`
 
@@ -585,9 +494,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/user/{userId}/profile/{
 - `id`: string (required)
 - `userId`: string (required)
 - `profileId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `BusinessWsUpdateUserProfileDTO`
 | Field | Type | Required | Notes |
@@ -613,9 +519,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/users/name` (base path 
 - `fullname`: string (optional)
 - `pageable`: BusinessWsPageable (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsUserBusinessDTO[]`
 
 ### GET `/business/fleets/{fleetId}/business/{id}/wallet`
@@ -628,9 +531,6 @@ authFetch path: `business/fleets/{fleetId}/business/{id}/wallet` (base path `/bo
 
 **Query params:**
 - `pageable`: BusinessWsPageable (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `BusinessWsPageWalletDTO`
 
@@ -1013,9 +913,6 @@ authFetch path: `business/fleets/{fleetId}/invitationRequest/{id}` (base path `/
 - `fleetId`: string (required)
 - `id`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200`
 
 ### DELETE `/business/fleets/{fleetId}/invitationRequest/{id}`
@@ -1025,9 +922,6 @@ authFetch path: `business/fleets/{fleetId}/invitationRequest/{id}` (base path `/
 **Path params:**
 - `fleetId`: string (required)
 - `id`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200`
 
@@ -1046,9 +940,6 @@ authFetch path: `business/fleets/{fleetId}/entities/{entityId}/businessInvoices`
 - `toDate`: string (date-time) (optional)
 - `pageable`: BusinessWsPageable (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsPageInvoiceCumulativeBusinessDTO`
 
 ### GET `/business/fleets/{fleetId}/entities/{entityId}/businessInvoices/{invoiceId}/products`
@@ -1062,9 +953,6 @@ authFetch path: `business/fleets/{fleetId}/entities/{entityId}/businessInvoices/
 
 **Query params:**
 - `page`: BusinessWsPageable (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `BusinessWsPageAccountingBusinessWSProductDTO`
 
@@ -1080,9 +968,6 @@ authFetch path: `business/fleets/{fleetId}/entities/{entityId}/businessInvoices/
 **Query params:**
 - `page`: BusinessWsPageable (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsPageAccountingBusinessWSTripDTO`
 
 ### GET `/business/fleets/{fleetId}/invoices/{invoiceId}/creditNote`
@@ -1096,9 +981,6 @@ authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/creditNote` (bas
 - `fleetId`: any (required) — The fleet Id of your account
 - `invoiceId`: any (required) — The invoice id
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `string (byte)`, `404` → `string (byte)`
 
 ### PUT `/business/fleets/{fleetId}/invoices/{invoiceId}/externalPayment`
@@ -1109,9 +991,6 @@ authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/externalPayment`
 **Path params:**
 - `fleetId`: string (required)
 - `invoiceId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `BusinessWsExternalPaymentDTO`
 | Field | Type | Required | Notes |
@@ -1130,9 +1009,6 @@ authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/pdf` (base path 
 - `fleetId`: string (required)
 - `invoiceId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `string (byte)`
 
 ### POST `/business/fleets/{fleetId}/invoices/{invoiceId}/refund`
@@ -1142,9 +1018,6 @@ authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/refund` (base pa
 **Path params:**
 - `fleetId`: string (required)
 - `invoiceId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `BusinessWsRefundAmountBaseDTO`
 | Field | Type | Required | Notes |
@@ -1169,9 +1042,6 @@ authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/refundNote` (bas
 **Query params:**
 - `paymentRefundPspReference`: any (optional) — The psp reference of the refund
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `string (byte)`, `404` → `string (byte)`
 
 ### GET `/business/fleets/{fleetId}/invoices/{invoiceId}/refundableAmount`
@@ -1181,9 +1051,6 @@ authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/refundableAmount
 **Path params:**
 - `fleetId`: string (required)
 - `invoiceId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `BusinessWsInvoiceRefundDTO`
 
@@ -1195,9 +1062,6 @@ authFetch path: `business/fleets/{fleetId}/invoices/{invoiceId}/status/{status}`
 - `fleetId`: string (required)
 - `invoiceId`: string (required)
 - `status`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200`
 
@@ -1398,9 +1262,6 @@ authFetch path: `business/fleets/{fleetId}/product` (base path `/boapi/proxy`)
 **Path params:**
 - `fleetId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsProductBusinessDTO[]`
 
 ## stripe-controller (2 endpoints)
@@ -1413,9 +1274,6 @@ authFetch path: `business/fleets/{fleetId}/stripe/businesses/{businessId}/add` (
 - `fleetId`: any (required) — The fleetId of your account
 - `businessId`: any (required) — The business id you are adding the mop to
 
-**Header params:**
-- `x-user-id`: string (optional)
-
 **Responses:** `200` → `BusinessWsAddBusinessWSCreditCardResponseDTO`
 
 ### GET `/business/fleets/{fleetId}/stripe/config/key`
@@ -1425,9 +1283,6 @@ authFetch path: `business/fleets/{fleetId}/stripe/config/key` (base path `/boapi
 
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
-
-**Header params:**
-- `x-user-id`: string (optional)
 
 **Responses:** `200` → `string`
 
@@ -1788,12 +1643,11 @@ post attach info to service desk to retrieve upload urls etc
 
 authFetch path: `fleetadmin/fleets/{fleetId}/tickets/{ticketId}/attachments` (base path `/boapi/proxy`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 - `ticketId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (required)
 
 **Request body:** `FleetAdminTicketAttachmentRequestDTO`
 | Field | Type | Required | Notes |
@@ -1812,9 +1666,6 @@ authFetch path: `business/fleets/{fleetId}/ongoingTrip/{tripId}/notes` (base pat
 - `fleetId`: string (required)
 - `tripId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsTripNoteDTO`
 
 ### GET `/business/fleets/{fleetId}/trip/ongoing`
@@ -1828,9 +1679,6 @@ authFetch path: `business/fleets/{fleetId}/trip/ongoing` (base path `/boapi/prox
 - `business`: string (required)
 - `pageable`: BusinessWsPageable (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsPageOngoingTripDTO`
 
 ### GET `/business/fleets/{fleetId}/trip/{tripId}`
@@ -1841,9 +1689,6 @@ authFetch path: `business/fleets/{fleetId}/trip/{tripId}` (base path `/boapi/pro
 - `fleetId`: string (required)
 - `tripId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsTripDetailDTO`
 
 ### POST `/business/fleets/{fleetId}/trip/{tripId}/notes`
@@ -1853,9 +1698,6 @@ authFetch path: `business/fleets/{fleetId}/trip/{tripId}/notes` (base path `/boa
 **Path params:**
 - `fleetId`: string (required)
 - `tripId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Request body:** `BusinessWsTripNoteDTO`
 | Field | Type | Required | Notes |
@@ -1873,9 +1715,6 @@ authFetch path: `business/fleets/{fleetId}/users/list` (base path `/boapi/proxy`
 **Path params:**
 - `fleetId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Request body:** `string[]`
 
 **Responses:** `200` → `BusinessWsUserBusinessDTO[]`
@@ -1891,9 +1730,6 @@ authFetch path: `business/fleets/{fleetId}/users/search` (base path `/boapi/prox
 - `name`: string (optional)
 - `pageable`: BusinessWsPageable (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
-
 **Responses:** `200` → `BusinessWsPageUserBusinessDTO`
 
 ### GET `/business/fleets/{fleetId}/users/{id}`
@@ -1903,9 +1739,6 @@ authFetch path: `business/fleets/{fleetId}/users/{id}` (base path `/boapi/proxy`
 **Path params:**
 - `fleetId`: string (required)
 - `id`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `BusinessWsUserInfoDTO`
 

@@ -10,6 +10,8 @@ List all RFID cards for a fleet
 
 authFetch path: `user/by-service/fleets/{fleetId}/vehicles/rfids` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId
 
@@ -17,7 +19,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/vehicles/rfids` (base path `/b
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `RFIDCardDTO`, `400` → `RFIDCardDTO[]`, `500` → `RFIDCardDTO[]`
@@ -27,6 +28,8 @@ List RFID cards linked to a vehicle
 
 authFetch path: `user/by-service/fleets/{fleetId}/vehicles/{vehicleId}/rfids` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId
 - `vehicleId`: any (required) — The vehicleId
@@ -35,7 +38,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/vehicles/{vehicleId}/rfids` (b
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `RFIDCardDTO[]`, `400` → `RFIDCardDTO[]`, `500` → `RFIDCardDTO[]`
@@ -50,7 +52,6 @@ authFetch path: `user/fleets/{fleetId}/tokens/vehicles/createdAt/{date}` (base p
 - `date`: string (required) — The created at date
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleToken[]`
@@ -65,7 +66,6 @@ authFetch path: `user/fleets/{fleetId}/tokens/vehicles/validAt/{date}` (base pat
 - `date`: string (required) — The valid at date
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleToken[]`
@@ -79,7 +79,6 @@ authFetch path: `user/fleets/{fleetId}/tokens/vehicles/{vehicleId}` (base path `
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleToken[]`
@@ -93,7 +92,6 @@ authFetch path: `user/fleets/{fleetId}/tokens/vehicles/{vehicleId}` (base path `
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string`
@@ -112,7 +110,6 @@ authFetch path: `user/fleets/{fleetId}/vehicles/rfids` (base path `/boapi/proxy/
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `RFIDCardDTO`, `400` → `RFIDCardDTO[]`, `500` → `RFIDCardDTO[]`
@@ -126,7 +123,6 @@ authFetch path: `user/fleets/{fleetId}/vehicles/rfids` (base path `/boapi/proxy/
 - `fleetId`: string (required) — The fleetId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `RFIDCardDTO`
@@ -151,7 +147,6 @@ authFetch path: `user/fleets/{fleetId}/vehicles/rfids/{tag}` (base path `/boapi/
 - `tag`: string (required) — tag
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `RFIDCardDTO`, `400` → `RFIDCardDTO`, `500` → `RFIDCardDTO`
@@ -166,7 +161,6 @@ authFetch path: `user/fleets/{fleetId}/vehicles/rfids/{tag}` (base path `/boapi/
 - `tag`: string (required) — tag
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `RFIDCardDTO`
@@ -191,7 +185,6 @@ authFetch path: `user/fleets/{fleetId}/vehicles/{vehicleId}/pinCode` (base path 
 - `vehicleId`: string (required) — id of the vehicle
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`, `400` → `string`, `500` → `string`
@@ -209,7 +202,6 @@ authFetch path: `user/fleets/{fleetId}/vehicles/{vehicleId}/rfids` (base path `/
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `RFIDCardDTO`, `400` → `RFIDCardDTO[]`, `500` → `RFIDCardDTO[]`
@@ -225,7 +217,6 @@ authFetch path: `user/fleets/{fleetId}/vehicles/{vehicleId}/rfids/{tag}` (base p
 - `tag`: string (required) — tag
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `RFIDCardDTO`, `400` → `RFIDCardDTO`, `500` → `RFIDCardDTO`
@@ -241,7 +232,6 @@ authFetch path: `user/fleets/{fleetId}/vehicles/{vehicleId}/rfids/{tag}` (base p
 - `tag`: string (required) — tag
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `RFIDCardDTO`, `400` → `RFIDCardDTO`, `500` → `RFIDCardDTO`
@@ -251,6 +241,8 @@ Get a all VehicleGroup for a specific fleet
 
 authFetch path: `user/vehicle/by-service/fleets/{fleetId}/groups` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 
@@ -258,7 +250,6 @@ authFetch path: `user/vehicle/by-service/fleets/{fleetId}/groups` (base path `/b
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleGroupDTO[]`, `400` → `VehicleGroupDTO[]`
@@ -268,6 +259,8 @@ Get the list of the groups with the list of vehicles id associated
 
 authFetch path: `user/vehicle/by-service/fleets/{fleetId}/groups/vehicles` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleet id
 
@@ -275,7 +268,6 @@ authFetch path: `user/vehicle/by-service/fleets/{fleetId}/groups/vehicles` (base
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Group2VehiclesDTO[]`
@@ -284,6 +276,8 @@ authFetch path: `user/vehicle/by-service/fleets/{fleetId}/groups/vehicles` (base
 List all the vehicles
 
 authFetch path: `user/vehicle/by-service/fleets/{fleetId}/vehicles` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: any (required) — The fleet id
@@ -294,7 +288,6 @@ authFetch path: `user/vehicle/by-service/fleets/{fleetId}/vehicles` (base path `
 - `onlyActive`: boolean (optional)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO[]`
@@ -304,6 +297,8 @@ List all the models
 
 authFetch path: `user/vehicle/by-service/fleets/{fleetId}/vehicles/models` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleet id
 
@@ -311,7 +306,6 @@ authFetch path: `user/vehicle/by-service/fleets/{fleetId}/vehicles/models` (base
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ModelDTO[]`
@@ -321,12 +315,13 @@ Get vehicle administrative info by vehicleId
 
 authFetch path: `user/vehicle/by-service/fleets/{fleetId}/vehicles/{vehicleId}` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `vehicleId`: any (required) — The unique id of the vehicle
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO`
@@ -340,7 +335,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/categories` (base path `/boapi/pr
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ModelCategoryResponseDTO[]`
@@ -356,7 +350,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/categories` (base path `/boapi/pr
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `ModelCategoryRequestDTO`
@@ -379,7 +372,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/categories/{categoryId}` (base pa
 - `categoryId`: string (required) — The unique id of the category
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ModelCategoryResponseDTO`
@@ -396,7 +388,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/categories/{categoryId}` (base pa
 - `categoryId`: string (required) — The unique id of the category
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `ModelCategoryRequestDTO`
@@ -419,7 +410,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/categories/{categoryId}` (base pa
 - `categoryId`: string (required) — The unique id of the category
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204`
@@ -434,7 +424,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/categories/{categoryId}/models` (
 - `categoryId`: string (required) — The unique id of the category
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `CategoryModelsAssociationDTO`
@@ -455,7 +444,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/categories/{categoryId}/models/{m
 - `modelId`: integer (int64) (required) — The model ID to dissociate
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204`
@@ -472,7 +460,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/groups` (base path `/boapi/proxy/
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleGroupDTO[]`, `400` → `VehicleGroupDTO[]`
@@ -486,7 +473,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/groups` (base path `/boapi/proxy/
 - `fleetId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `CreateVehicleGroupDTO`
@@ -510,7 +496,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/groups/vehicles` (base path `/boa
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Group2VehiclesDTO[]`, `400` → `Group2VehiclesDTO[]`
@@ -524,7 +509,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/groups/vehicles` (base path `/boa
 - `fleetId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `Vehicle2GroupBatchDTO`
@@ -551,7 +535,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/groups/{groupId}/vehicles/{vehicl
 - `vehicleId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `Vehicle2GroupDTO`
@@ -575,7 +558,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/groups/{groupId}/vehicles/{vehicl
 - `vehicleId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`, `201`, `400`
@@ -590,7 +572,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/groups/{id}` (base path `/boapi/p
 - `id`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleGroupDTO`, `400` → `VehicleGroupDTO`
@@ -605,7 +586,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/groups/{id}` (base path `/boapi/p
 - `id`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`, `400`
@@ -628,7 +608,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles` (base path `/boapi/prox
 
 **Header params:**
 - `Last-Modified`: string (optional)
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO[]`
@@ -645,7 +624,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles` (base path `/boapi/prox
 - `check`: boolean (optional)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `Vehicle`
@@ -685,7 +663,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/models` (base path `/boa
 - `fleetId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ModelDTO[]`
@@ -699,7 +676,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/models` (base path `/boa
 - `fleetId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `ModelDTO`
@@ -745,7 +721,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/models/modelvehicles` (b
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ServiceModelVehiclesDTO[]`
@@ -760,7 +735,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/models/{modelId}` (base 
 - `modelId`: integer (int64) (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ModelDTO`
@@ -775,7 +749,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/models/{modelId}` (base 
 - `modelId`: integer (int64) (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `Model`
@@ -818,7 +791,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/models/{modelId}` (base 
 - `modelId`: integer (int64) (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `JsonPatch`
@@ -835,7 +807,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/models/{modelId}` (base 
 - `modelId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ModelDTO`
@@ -849,7 +820,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/options` (base path `/bo
 - `fleetId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Option[]`
@@ -863,7 +833,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/options` (base path `/bo
 - `fleetId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `Option`
@@ -889,7 +858,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/options/{optionId}` (bas
 - `optionId`: integer (int64) (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Option`
@@ -904,7 +872,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/options/{optionId}` (bas
 - `optionId`: integer (int64) (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `UpdateOptionDTO`
@@ -932,7 +899,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/search` (base path `/boa
 - `vuboxId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO`
@@ -947,7 +913,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{id}` (base path `/boapi
 - `id`: string (required) — The unique id of the vehicle
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO`
@@ -962,7 +927,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{id}` (base path `/boapi
 - `id`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `Vehicle`
@@ -1003,7 +967,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{id}` (base path `/boapi
 - `id`: string (required) — The unique id of the vehicle
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string`
@@ -1020,7 +983,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{id}` (base path `/boapi
 - `id`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO`
@@ -1036,7 +998,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{id}/options/{optionId}`
 - `optionId`: integer (int64) (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO`
@@ -1052,7 +1013,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{id}/options/{optionId}`
 - `optionId`: integer (int64) (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO`
@@ -1067,7 +1027,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{id}/removeVubox` (base 
 - `id`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO`
@@ -1076,6 +1035,8 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{id}/removeVubox` (base 
 Extend the Lock of a locked vehicle
 
 authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{vehicleId}/extendLock` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: string (required) — The fleetId of the subscription
@@ -1086,7 +1047,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{vehicleId}/extendLock` 
 - `userId`: string (required) — The id of the user who wants to extend the lock of the vehicle
 
 **Header params:**
-- `x-user-id`: string (required) — The header telling where the request is coming from
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `LockVehicleDTO`, `400` → `LockVehicleDTO`
@@ -1095,6 +1055,8 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{vehicleId}/extendLock` 
 Lock a vehicle for pre reservation
 
 authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{vehicleId}/putLock` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: string (required) — The fleetId of the subscription
@@ -1105,7 +1067,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{vehicleId}/putLock` (ba
 - `userId`: string (required) — The id of the user who wants to lock the vehicle
 
 **Header params:**
-- `x-user-id`: string (required) — The header telling where the request is coming from
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `LockVehicleWithTimersDTO`, `400` → `LockVehicleWithTimersDTO`
@@ -1114,6 +1075,8 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{vehicleId}/putLock` (ba
 Unlock a vehicle for pre reservation
 
 authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{vehicleId}/releaseLock` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: string (required) — The fleetId of the subscription
@@ -1124,7 +1087,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles/{vehicleId}/releaseLock`
 - `userId`: string (required) — The id of the user who wants to unlock the vehicle
 
 **Header params:**
-- `x-user-id`: string (required) — The header telling where the request is coming from
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `LockVehicleDTO`, `400` → `LockVehicleDTO`
@@ -1138,7 +1100,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/wakeupProvider` (base path `/boap
 - `fleetId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `SwitchWakeupCmd`
@@ -1164,7 +1125,6 @@ authFetch path: `user/vehicle/v2/fleets/{fleetId}/vehicles` (base path `/boapi/p
 
 **Header params:**
 - `Last-Modified`: string (optional)
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `CursorPaginationSliceVehicleDTO`

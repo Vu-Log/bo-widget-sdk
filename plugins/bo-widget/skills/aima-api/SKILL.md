@@ -56,9 +56,10 @@ grep -n 'authFetch path: `fleetmanager/' "${CLAUDE_SKILL_DIR}/admin-fleet.md"
 
 Each endpoint lists its `authFetch` path and base path, its path/query/header params, the request
 body (first-level fields) and its responses as `status → SchemaName`. Look a schema up in
-`schemas.md` to see the shape of a request or a response. Header params such as `x-user-id` or
-`x-boapi-ctx` describe the session and are normally filled in by the admin gateway: a widget does
-not send them.
+`schemas.md` to see the shape of a request or a response. An endpoint marked **Auth: needs a
+user token** must be called with the token of a user, which `authFetch` sends: the gateway reads
+the user from it. Header params such as `x-boapi-ctx` describe the session and are normally filled
+in by the admin gateway: a widget does not send them.
 
 ### Sub-files
 

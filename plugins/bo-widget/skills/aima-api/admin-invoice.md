@@ -12,12 +12,13 @@ This endpoint returns the last computed balance for an entity. The balance is th
 
 authFetch path: `user/billing/by-service/fleets/{fleetId}/entity/{entityId}/balance` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `entityId`: any (required) — The entityId of your account
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Balance`, `400` → `Balance`, `404` → `Balance`
@@ -29,6 +30,8 @@ This endpoint will return the balance information of an entity, within you will 
 
 authFetch path: `user/billing/by-service/fleets/{fleetId}/entity/{entityId}/invoices/tripDetails` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `entityId`: any (required) — entityId
@@ -38,7 +41,6 @@ authFetch path: `user/billing/by-service/fleets/{fleetId}/entity/{entityId}/invo
 - `endDate`: any (required) — end of the range
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BilledFullInvoicesBalanceDTO`, `400` → `BilledFullInvoicesBalanceDTO`, `404` → `BilledFullInvoicesBalanceDTO`
@@ -50,12 +52,13 @@ This endpoint retrieves all the invoice details associated with a trip
 
 authFetch path: `user/billing/by-service/fleets/{fleetId}/trips/{tripId}/invoiceDetails` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `tripId`: any (required) — The tripId linked to the invoice to retrieve
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BilledFullInvoicesBalanceDTO`
@@ -69,7 +72,6 @@ authFetch path: `user/billing/fleets/{fleetId}/bulk-invoices/handle-event` (base
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PaymentEvent`
@@ -93,7 +95,6 @@ authFetch path: `user/billing/fleets/{fleetId}/bulk/productInvoices` (base path 
 - `simulation`: boolean (required)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `object`
@@ -113,7 +114,6 @@ authFetch path: `user/billing/fleets/{fleetId}/bulk/{bulkInvoiceReferenceId}/inv
 - `bulkInvoiceReferenceId`: string (required) — The bulkInvoiceReferenceId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string[]`, `404` → `string[]`
@@ -134,7 +134,6 @@ authFetch path: `user/billing/fleets/{fleetId}/business/instant/entities/{entity
 - `endDate`: string (required) — end of the range
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BilledFullInvoicesBalanceDTO`, `400` → `BilledFullInvoicesBalanceDTO`, `404` → `BilledFullInvoicesBalanceDTO`
@@ -162,7 +161,6 @@ authFetch path: `user/billing/fleets/{fleetId}/businessInvoices` (base path `/bo
 - `page`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `IncludeNonNull[]`
@@ -172,6 +170,8 @@ Bulk re-generate Cumulative B2B invoice PDFs
 
 authFetch path: `user/billing/fleets/{fleetId}/businessInvoices/type/{typeId}/pdf/generate` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 - `typeId`: string: `INVOICE`, `REFUND_NOTE`, `CREDIT_NOTE` (required)
@@ -180,7 +180,6 @@ authFetch path: `user/billing/fleets/{fleetId}/businessInvoices/type/{typeId}/pd
 - `reason`: string (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string[]`
@@ -199,7 +198,6 @@ authFetch path: `user/billing/fleets/{fleetId}/businessInvoices/{id}/externalPay
 - `id`: string (required) — The id of the business invoice to be updated
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `ManualInvoiceUpdateDTO`
@@ -227,7 +225,6 @@ authFetch path: `user/billing/fleets/{fleetId}/businessInvoices/{id}/status/{sta
 - `forcedNbAttempts`: Integer (optional) — The value you want to set in the invoice attempts
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `InvoiceCumulative`
@@ -245,7 +242,6 @@ authFetch path: `user/billing/fleets/{fleetId}/businessInvoices/{invoiceId}/cred
 
 **Header params:**
 - `x-boapi-ctx`: string (optional)
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `string (byte)`, `400` → `string (byte)`, `404` → `string (byte)`
 
@@ -253,6 +249,8 @@ authFetch path: `user/billing/fleets/{fleetId}/businessInvoices/{invoiceId}/cred
 Re-generate a single Cumulative B2B invoice PDF
 
 authFetch path: `user/billing/fleets/{fleetId}/businessInvoices/{invoiceId}/type/{typeId}/pdf/generate` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: string (required)
@@ -263,7 +261,6 @@ authFetch path: `user/billing/fleets/{fleetId}/businessInvoices/{invoiceId}/type
 - `reason`: string (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`, `400`
@@ -291,7 +288,6 @@ authFetch path: `user/billing/fleets/{fleetId}/entities/{entityIds}/businessInvo
 - `page`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `InvoiceCumulativeDTO[]`
@@ -314,7 +310,6 @@ authFetch path: `user/billing/fleets/{fleetId}/entities/{entityId}/businessInvoi
 - `cursor`: InstantRangeCursorRequestString (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `AccountingBusinessProductDTO[]`
@@ -337,7 +332,6 @@ authFetch path: `user/billing/fleets/{fleetId}/entities/{entityId}/businessInvoi
 - `cursor`: InstantRangeCursorRequestString (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `AccountingBusinessTripDTO[]`
@@ -352,7 +346,6 @@ authFetch path: `user/billing/fleets/{fleetId}/entities/{entityId}/wallets` (bas
 - `entityId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `WalletRequestDTO`
@@ -384,7 +377,6 @@ authFetch path: `user/billing/fleets/{fleetId}/entity/{entityId}/balance` (base 
 - `entityId`: string (required) — The entityId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Balance`, `400` → `Balance`, `404` → `Balance`
@@ -405,7 +397,6 @@ authFetch path: `user/billing/fleets/{fleetId}/entity/{entityId}/invoices/tripDe
 - `endDate`: string (required) — end of the range
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BilledFullInvoicesBalanceDTO`, `400` → `BilledFullInvoicesBalanceDTO`, `404` → `BilledFullInvoicesBalanceDTO`
@@ -421,7 +412,6 @@ authFetch path: `user/billing/fleets/{fleetId}/giftcards` (base path `/boapi/pro
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `BillGiftCardInputDTO`
@@ -460,7 +450,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices` (base path `/boapi/prox
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `AccountingBilledInvoiceDto[]`, `400` → `AccountingBilledInvoiceDto[]`, `404` → `AccountingBilledInvoiceDto[]`
@@ -474,7 +463,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/handle-event` (base path
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PaymentEvent`
@@ -497,7 +485,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/product` (base path `/bo
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `BillProductInputDTO`
@@ -528,7 +515,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/status/{status}` (base p
 - `status`: string (required) — The status of the invoices to retrieve
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Invoice[]`
@@ -545,7 +531,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/status/{status}` (base p
 - `status`: string (required) — The status of the invoices to retrieve
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `any[]`
@@ -568,7 +553,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/statusHistory` (base pat
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `InvoiceHistoryByStatusesDTO[]`, `400` → `InvoiceHistoryByStatusesDTO[]`
@@ -578,6 +562,8 @@ Bulk re-generate B2C or Instant B2B invoice PDFs
 
 authFetch path: `user/billing/fleets/{fleetId}/invoices/type/{typeId}/pdf/generate` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 - `typeId`: string: `INVOICE`, `REFUND_NOTE`, `CREDIT_NOTE` (required)
@@ -586,7 +572,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/type/{typeId}/pdf/genera
 - `reason`: string (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string[]`
@@ -603,7 +588,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{id}/payment` (base path
 - `id`: string (required) — id of the invoice
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `ManualPaymentDTO`
@@ -634,7 +618,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{id}/status/{status}` (b
 - `forcedNbAttempts`: Integer (optional) — The value you want to set in the invoice attempts
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `integer (int32)`, `400` → `Invoice`, `403` → `Invoice`
@@ -649,7 +632,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}` (base path 
 - `invoiceId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Invoice`, `400` → `Invoice`, `404` → `Invoice`
@@ -664,7 +646,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/audit` (base
 - `invoiceId`: string (required) — The id of the invoice
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `InvoiceStatusHistory[]`, `404` → `InvoiceStatusHistory[]`
@@ -681,7 +662,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/cancel` (bas
 - `invoiceId`: string (required) — The id of the invoice
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Invoice`
@@ -696,7 +676,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/clear-paymen
 - `invoiceId`: string (required) — The invoiceId of the invoice
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `400` → `InvoiceDTO`, `404` → `InvoiceDTO`
@@ -713,7 +692,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/creditNote` 
 - `invoiceId`: string (required) — The id of the invoice
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StreamingResponseBody`, `400` → `StreamingResponseBody`, `404` → `StreamingResponseBody`
@@ -730,7 +708,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/externalPaym
 - `invoiceId`: string (required) — The id of the invoice
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `ManualInvoiceUpdateDTO`
@@ -755,7 +732,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/pdf` (base p
 
 **Header params:**
 - `x-boapi-ctx`: string (optional)
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `string (byte)`, `400` → `string (byte)`, `404` → `string (byte)`
 
@@ -771,7 +747,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/refund` (bas
 - `invoiceId`: string (required) — The id of the invoice
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `RefundAmountDTO`
@@ -800,7 +775,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/refundNote` 
 
 **Header params:**
 - `x-boapi-ctx`: string (optional)
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `200` → `StreamingResponseBody`, `400` → `StreamingResponseBody`, `404` → `StreamingResponseBody`
 
@@ -816,7 +790,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/refundableAm
 - `invoiceId`: string (required) — The id of the invoice
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `RefundableAmountDTO`
@@ -832,7 +805,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/retry-paymen
 
 **Header params:**
 - `x-boapi-ctx`: string (optional)
-- `x-user-id`: string (optional) — the id of the authenticated user
 
 **Responses:** `400` → `InvoiceDTO`, `404` → `InvoiceDTO`
 
@@ -848,7 +820,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/tripDetails`
 - `invoiceId`: string (required) — The invoiceId to be retrieved
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BilledFullInvoicesBalanceDTO`, `400` → `BilledFullInvoicesBalanceDTO`
@@ -857,6 +828,8 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/tripDetails`
 Re-generate a single B2C or Instant B2B invoice PDF
 
 authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/type/{typeId}/pdf/generate` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: string (required)
@@ -867,7 +840,6 @@ authFetch path: `user/billing/fleets/{fleetId}/invoices/{invoiceId}/type/{typeId
 - `reason`: string (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`, `400`
@@ -884,7 +856,6 @@ authFetch path: `user/billing/fleets/{fleetId}/trips/{tripId}` (base path `/boap
 - `tripId`: string (required) — The trip to be updated
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `ModifyTripDTO`
@@ -909,7 +880,6 @@ authFetch path: `user/billing/fleets/{fleetId}/trips/{tripId}/invoiceDetails` (b
 - `tripId`: string (required) — The tripId linked to the invoice to retrieve
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BilledFullInvoicesBalanceDTO`
@@ -924,7 +894,6 @@ authFetch path: `user/billing/fleets/{fleetId}/trips/{tripId}/invoices` (base pa
 - `tripId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BilledFullInvoicesBalanceDTO`, `400` → `BilledFullInvoicesBalanceDTO`
@@ -941,7 +910,6 @@ authFetch path: `user/billing/fleets/{fleetId}/trips/{tripId}/triggerBilling` (b
 - `tripId`: string (required) — The trip to be updated
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`, `400` → `Invoice`, `404` → `Invoice`
@@ -957,7 +925,6 @@ authFetch path: `user/billing/fleets/{fleetId}/user/{userId}/entity/{entityId}/i
 - `entityId`: string (required) — The entityId to pay all the invoices
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `400` → `string`, `404` → `string`
@@ -978,7 +945,6 @@ authFetch path: `user/billing/fleets/{fleetId}/wallet/entity/{entityId}` (base p
 - `type`: string: `LOCAL`, `GLOBAL`, `PERIODIC`[] (optional)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `WalletResponseDTO[]`
@@ -995,7 +961,6 @@ authFetch path: `user/billing/fleets/{fleetId}/wallets/{walletId}` (base path `/
 - `walletId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `JsonPatch`
@@ -1014,7 +979,6 @@ authFetch path: `user/fleets/{fleetId}/pricing/timeranges` (base path `/boapi/pr
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `TimeRangeDto[]`, `404` → `TimeRangeDto[]`
@@ -1030,7 +994,6 @@ authFetch path: `user/fleets/{fleetId}/taxes` (base path `/boapi/proxy/user`)
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `TaxDTO[]`, `404` → `TaxDTO[]`
@@ -1046,7 +1009,6 @@ authFetch path: `user/fleets/{fleetId}/taxes` (base path `/boapi/proxy/user`)
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `TaxCreateDTO`
@@ -1067,7 +1029,6 @@ authFetch path: `user/fleets/{fleetId}/taxes/zones` (base path `/boapi/proxy/use
 - `fleetId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Zone[]`
@@ -1084,7 +1045,6 @@ authFetch path: `user/fleets/{fleetId}/taxes/{id}` (base path `/boapi/proxy/user
 - `id`: string (required) — The tax id of the tax to update
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `TaxUpdateDTO`
@@ -1104,7 +1064,6 @@ authFetch path: `user/fleets/{fleetId}/taxes/{taxId}` (base path `/boapi/proxy/u
 - `taxId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `TaxDTO`, `404` → `TaxDTO`
@@ -1121,7 +1080,6 @@ authFetch path: `user/fleets/{fleetId}/taxes/{taxId}` (base path `/boapi/proxy/u
 - `taxId`: string (required) — The taxId to be associated with the product
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204` → `string`, `404` → `string`
@@ -1138,7 +1096,6 @@ authFetch path: `user/fleets/{fleetId}/taxes/{taxId}/products` (base path `/boap
 - `taxId`: string (required) — The taxId associated with the products
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ProductDTO | CancellationPolicyResponseDTO[]`, `404` → `ProductDTO | CancellationPolicyResponseDTO[]`
@@ -1155,7 +1112,6 @@ authFetch path: `user/fleets/{fleetId}/taxes/{taxId}/products` (base path `/boap
 - `taxId`: string (required) — The taxId to be associated with the product
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204` → `string`
@@ -1173,7 +1129,6 @@ authFetch path: `user/fleets/{fleetId}/taxes/{taxId}/products/{productId}` (base
 - `productId`: string (required) — The productId to be dissociated with the tax
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204` → `string`
@@ -1188,7 +1143,6 @@ authFetch path: `user/fleets/{fleetId}/taxes/{taxId}/zones` (base path `/boapi/p
 - `taxId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string[]`, `404` → `string[]`
@@ -1204,7 +1158,6 @@ authFetch path: `user/fleets/{fleetId}/taxes/{taxId}/zones/{zoneId}` (base path 
 - `taxId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204` → `string`, `404` → `string`, `409` → `string`
@@ -1220,7 +1173,6 @@ authFetch path: `user/fleets/{fleetId}/taxes/{taxId}/zones/{zoneId}` (base path 
 - `taxId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204` → `string`, `404` → `string`
@@ -1235,7 +1187,6 @@ authFetch path: `user/fleets/{fleetId}/zones/{zoneId}/taxes` (base path `/boapi/
 - `zoneId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `TaxDTO[]`, `404` → `TaxDTO[]`
