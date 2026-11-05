@@ -10,11 +10,12 @@ List services linked to the master entity
 
 authFetch path: `user/by-service/fleets/{fleetId}/master/services` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EntityDTO`
@@ -24,6 +25,8 @@ Get all plans for a given fleet
 
 authFetch path: `user/by-service/fleets/{fleetId}/plans` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 
@@ -32,7 +35,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/plans` (base path `/boapi/prox
 - `page`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PlanResponseDTO[]`, `400` → `PlanResponseDTO[]`
@@ -42,11 +44,12 @@ create a new plan
 
 authFetch path: `user/by-service/fleets/{fleetId}/plans` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PlanRequestDTO`
@@ -71,12 +74,13 @@ Once the services are registered, the operator can confirm or reject the subscri
 
 authFetch path: `user/by-service/fleets/{fleetId}/profiles/{profileId}/serviceRegistrations` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `profileId`: any (required) — The profileId of the user who wants to register to the service. A user can have different profilesregistered to different services.
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `ServiceRegistrationBatchDTO`
@@ -95,13 +99,14 @@ Once the service registered, the operator can confirm or reject the subscription
 
 authFetch path: `user/by-service/fleets/{fleetId}/profiles/{profileId}/services/{id}/result` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `profileId`: any (required) — The profileId of the user who wants to register to the service. A user can have different profilesregistered to different services.
 - `id`: any (required) — Id of the service
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `ServiceRegistrationResultDTO`
@@ -120,6 +125,8 @@ This endpoint will retrieve an overview of the service statuses for a list of us
 
 authFetch path: `user/by-service/fleets/{fleetId}/serviceRegistrationOverview` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 
@@ -127,7 +134,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/serviceRegistrationOverview` (
 - `userIds`: string[] (required) — List of userIds to check
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserServiceRegistrationDTO[]`
@@ -138,6 +144,8 @@ List all the users of the fleet
 It's a paginated end point
 
 authFetch path: `user/by-service/fleets/{fleetId}/users` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
@@ -152,7 +160,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/users` (base path `/boapi/prox
 
 **Header params:**
 - `version`: string (optional)
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserServiceRegistrationNestedDTO[]`
@@ -164,6 +171,8 @@ the number of users is limited to 100 per call
 
 authFetch path: `user/by-service/fleets/{fleetId}/users/list` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 
@@ -171,7 +180,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/users/list` (base path `/boapi
 - `ids`: string[] (required) — List of userIds
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserPIDTO[]`
@@ -183,11 +191,12 @@ the number of users is limited to 100 per call
 
 authFetch path: `user/by-service/fleets/{fleetId}/users/list` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string[]`
@@ -199,6 +208,8 @@ Find users by username, phone number, or email
 
 authFetch path: `user/by-service/fleets/{fleetId}/users/pi/find` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 
@@ -206,7 +217,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/users/pi/find` (base path `/bo
 - `types`: string: `IDENTITY`, `USERNAME`, `BIRTH`, `NATIONALITY`, `NOTES`, `GENDER`, `PERSONAL_COMPANY`, `FISCAL`, `ADDRESS`, `MEMBERSHIP`[] (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PersonalInformationSearchRequestDTO`
@@ -223,6 +233,8 @@ Get personal information for a list of users
 
 authFetch path: `user/by-service/fleets/{fleetId}/users/pi/list` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 
@@ -230,7 +242,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/users/pi/list` (base path `/bo
 - `types`: string: `IDENTITY`, `USERNAME`, `BIRTH`, `NATIONALITY`, `NOTES`, `GENDER`, `PERSONAL_COMPANY`, `FISCAL`, `ADDRESS`, `MEMBERSHIP`[] (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PersonalInformationForUserIdsRequestDTO`
@@ -245,12 +256,13 @@ Get users info including its service registration status
 
 authFetch path: `user/by-service/fleets/{fleetId}/users/{id}/status` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `id`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserStatusDTO`
@@ -260,12 +272,13 @@ Get user by ID
 
 authFetch path: `user/by-service/fleets/{fleetId}/users/{userId}` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 - `userId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserWithProfileDTO`
@@ -275,6 +288,8 @@ Get personal information by user ID
 
 authFetch path: `user/by-service/fleets/{fleetId}/users/{userId}/pi` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 - `userId`: string (required)
@@ -283,7 +298,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/users/{userId}/pi` (base path 
 - `types`: string: `IDENTITY`, `USERNAME`, `BIRTH`, `NATIONALITY`, `NOTES`, `GENDER`, `PERSONAL_COMPANY`, `FISCAL`, `ADDRESS`, `MEMBERSHIP`[] (optional)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PersonalInformationUserDTO`
@@ -293,13 +307,14 @@ Get payment details (credit card or bank account) of a user profile
 
 authFetch path: `user/by-service/fleets/{fleetId}/users/{userId}/profiles/{profileId}/paymentMethodDetails` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `userId`: any (required) — userId
 - `profileId`: any (required) — profileId
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PaymentDetail`, `400` → `PaymentDetail`, `404` → `PaymentDetail`
@@ -318,7 +333,6 @@ authFetch path: `user/fleets/{fleetId}/billingGroup` (base path `/boapi/proxy/us
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BillingGroup[]`, `204` → `BillingGroup[]`, `400` → `BillingGroup[]`
@@ -334,7 +348,6 @@ authFetch path: `user/fleets/{fleetId}/billingGroup` (base path `/boapi/proxy/us
 - `fleetId`: any (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `BillingGroup`
@@ -362,7 +375,6 @@ authFetch path: `user/fleets/{fleetId}/billingGroup/{billingGroupId}` (base path
 - `billingGroupId`: any (required) — The billing group to retrieve
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BillingGroup`, `204` → `BillingGroup`, `400` → `BillingGroup`
@@ -379,7 +391,6 @@ authFetch path: `user/fleets/{fleetId}/billingGroup/{billingGroupId}` (base path
 - `billingGroupId`: any (required) — The billing group to update
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `BillingGroup`
@@ -407,7 +418,6 @@ authFetch path: `user/fleets/{fleetId}/billingGroup/{billingGroupId}/entities` (
 - `billingGroupId`: any (required) — The billing group to link
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string[]`
@@ -427,7 +437,6 @@ authFetch path: `user/fleets/{fleetId}/billingGroup/{billingGroupId}/entities/{e
 - `entityId`: any (required) — The entity to unlink
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`, `204`, `400`
@@ -444,7 +453,6 @@ authFetch path: `user/fleets/{fleetId}/billingGroup/{billingGroupId}/removeEntit
 - `billingGroupId`: any (required) — The billing group to unlink
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string[]`
@@ -462,7 +470,6 @@ authFetch path: `user/fleets/{fleetId}/cities/{id}/users/{userId}/agreements` (b
 - `userId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserAgreementDTO[]`
@@ -479,7 +486,6 @@ authFetch path: `user/fleets/{fleetId}/documents/{documentId}` (base path `/boap
 - `documentId`: any (required) — the document ID
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `DocumentStatusReview`
@@ -505,7 +511,6 @@ authFetch path: `user/fleets/{fleetId}/documents/{status}` (base path `/boapi/pr
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ConnectedAccountLinkDTO[]`, `404` → `UserByDocumentStatusDTO[]`
@@ -525,7 +530,6 @@ authFetch path: `user/fleets/{fleetId}/entities/list` (base path `/boapi/proxy/u
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string`
@@ -542,7 +546,6 @@ authFetch path: `user/fleets/{fleetId}/entities/master/add/services/{serviceId}`
 - `serviceId`: string (required) — serviceId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EntityDTO`
@@ -557,7 +560,6 @@ authFetch path: `user/fleets/{fleetId}/entities/master/remove/services/{serviceI
 - `serviceId`: string (required) — serviceId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EntityDTO`
@@ -572,7 +574,6 @@ authFetch path: `user/fleets/{fleetId}/entities/{entityId}` (base path `/boapi/p
 - `entityId`: string (required) — entityId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EntityDTO`
@@ -587,7 +588,6 @@ authFetch path: `user/fleets/{fleetId}/entities/{entityId}` (base path `/boapi/p
 - `entityId`: string (required) — entityId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `UpdateEntityXDTO`
@@ -613,7 +613,6 @@ authFetch path: `user/fleets/{fleetId}/entities/{entityId}/paymentMethodDetails`
 - `entityId`: string (required) — entityId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EntityPaymentMethodDTO`
@@ -628,7 +627,6 @@ authFetch path: `user/fleets/{fleetId}/entities/{entityId}/paymentMethodDetails`
 - `entityId`: string (required) — entityId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PaymentDetail`, `404` → `PaymentDetail`
@@ -643,7 +641,6 @@ authFetch path: `user/fleets/{fleetId}/entities/{entityId}/services` (base path 
 - `entityId`: string (required) — entityId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ServiceFull[]`
@@ -659,7 +656,6 @@ authFetch path: `user/fleets/{fleetId}/entities/{entityId}/services/{serviceId}`
 - `serviceId`: string (required) — service id to add
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EntityDTO`
@@ -675,7 +671,6 @@ authFetch path: `user/fleets/{fleetId}/entities/{entityId}/services/{serviceId}`
 - `serviceId`: string (required) — service id to add
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EntityDTO`
@@ -690,7 +685,6 @@ authFetch path: `user/fleets/{fleetId}/entities/{entityId}/users` (base path `/b
 - `entityId`: string (required) — entityId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserPIDTO[]`
@@ -705,7 +699,6 @@ authFetch path: `user/fleets/{fleetId}/invitation/check/{referralCode}` (base pa
 - `referralCode`: string (required) — The invitation code
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ReferralInfoDTO`, `404` → `ReferralInfoDTO`
@@ -721,7 +714,6 @@ authFetch path: `user/fleets/{fleetId}/invitation/users/{userId}/entity/{entityI
 - `entityId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `InvitationDTO`, `404` → `InvitationDTO`
@@ -738,7 +730,6 @@ authFetch path: `user/fleets/{fleetId}/invitation/users/{userId}/entity/{entityI
 - `referralCode`: string (required) — The invitation code
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`
@@ -752,7 +743,6 @@ authFetch path: `user/fleets/{fleetId}/master/services` (base path `/boapi/proxy
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EntityDTO`
@@ -765,7 +755,6 @@ authFetch path: `user/fleets/{fleetId}/myProfile` (base path `/boapi/proxy/user`
 - `fleetId`: any (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional)
 
 **Responses:** `200` → `MyProfileDTO`
@@ -780,7 +769,6 @@ authFetch path: `user/fleets/{fleetId}/oldCustomers/{oldCustomerId}` (base path 
 - `oldCustomerId`: string (required) — oldCustomerId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserPIDTO`
@@ -794,7 +782,6 @@ authFetch path: `user/fleets/{fleetId}/profiles` (base path `/boapi/proxy/user`)
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `SimpleProfileDTO`
@@ -826,7 +813,6 @@ authFetch path: `user/fleets/{fleetId}/profiles/{id}` (base path `/boapi/proxy/u
 - `id`: string (required) — profileId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ProfilePiDTO`
@@ -841,7 +827,6 @@ authFetch path: `user/fleets/{fleetId}/profiles/{id}` (base path `/boapi/proxy/u
 - `id`: string (required) — profileId
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional)
 - `x-client-id`: string (optional)
 
@@ -874,7 +859,6 @@ authFetch path: `user/fleets/{fleetId}/profiles/{profileId}/archive` (base path 
 - `profileId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `202`, `400`
@@ -889,7 +873,6 @@ authFetch path: `user/fleets/{fleetId}/profiles/{profileId}/deactivate` (base pa
 - `profileId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `202`, `400`
@@ -906,7 +889,6 @@ authFetch path: `user/fleets/{fleetId}/profiles/{profileId}/serviceRegistrations
 - `profileId`: any (required) — The profileId of the user who wants to register to the service. A user can have different profilesregistered to different services.
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `ServiceRegistrationBatchDTO`
@@ -931,7 +913,6 @@ authFetch path: `user/fleets/{fleetId}/profiles/{profileId}/services/{id}` (base
 - `id`: any (required) — Id of the service
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`
@@ -943,13 +924,14 @@ Once the service is REJECTED or SUSPENDED, the operator can add/update a note co
 
 authFetch path: `user/fleets/{fleetId}/profiles/{profileId}/services/{id}/statusNote` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `profileId`: any (required) — The profileId of the user
 - `id`: any (required) — Id of the service
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `StatusNote`
@@ -969,7 +951,6 @@ authFetch path: `user/fleets/{fleetId}/rfids/{rfid}` (base path `/boapi/proxy/us
 - `rfid`: string (required) — user rfid
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserPIDTO`
@@ -984,7 +965,6 @@ authFetch path: `user/fleets/{fleetId}/rfids/{rfid}/status` (base path `/boapi/p
 - `rfid`: string (required) — user rfid
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserStatusDTO`
@@ -998,7 +978,6 @@ authFetch path: `user/fleets/{fleetId}/roles/available` (base path `/boapi/proxy
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string[]`
@@ -1017,7 +996,6 @@ authFetch path: `user/fleets/{fleetId}/roles/{roleName}` (base path `/boapi/prox
 - `limit`: integer (int32) (optional)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserPIDTO[]`
@@ -1036,7 +1014,6 @@ authFetch path: `user/fleets/{fleetId}/serviceRegistrationOverview` (base path `
 - `userId`: string[] (required) — List of userIds to check
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserServiceRegistrationDTO[]`
@@ -1054,7 +1031,6 @@ authFetch path: `user/fleets/{fleetId}/services/{id}/profiles/{profileId}/status
 - `id`: any (required) — Id of the service
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`
@@ -1071,7 +1047,6 @@ authFetch path: `user/fleets/{fleetId}/services/{id}/rightsPropagation` (base pa
 - `id`: any (required) — Id of the service
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ServiceRightsPropagationDTO`
@@ -1091,7 +1066,6 @@ authFetch path: `user/fleets/{fleetId}/userDefault` (base path `/boapi/proxy/use
 - `skipUserNotification`: boolean (optional)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `SimpleUserDTO`
@@ -1138,7 +1112,6 @@ authFetch path: `user/fleets/{fleetId}/usernames/{userName}` (base path `/boapi/
 - `userName`: string (required) — userName
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserPIDTO`
@@ -1163,7 +1136,6 @@ authFetch path: `user/fleets/{fleetId}/users` (base path `/boapi/proxy/user`)
 
 **Header params:**
 - `version`: string (optional)
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserServiceRegistrationNestedDTO[]`
@@ -1177,7 +1149,6 @@ authFetch path: `user/fleets/{fleetId}/users-exist` (base path `/boapi/proxy/use
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `IdsDTOString`
@@ -1196,7 +1167,6 @@ authFetch path: `user/fleets/{fleetId}/users/documentTypes` (base path `/boapi/p
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `DocumentTypeDTO[]`
@@ -1210,7 +1180,6 @@ authFetch path: `user/fleets/{fleetId}/users/documentTypes` (base path `/boapi/p
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `DocumentType`
@@ -1242,7 +1211,6 @@ authFetch path: `user/fleets/{fleetId}/users/documentTypes/{documentTypeId}` (ba
 - `documentTypeId`: string (required) — The Id of documentType
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `DocumentType`
@@ -1278,7 +1246,6 @@ authFetch path: `user/fleets/{fleetId}/users/documents/expired` (base path `/boa
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ExpiredDocumentsPerUserDTO[]`
@@ -1298,7 +1265,6 @@ authFetch path: `user/fleets/{fleetId}/users/entity/{entityId}` (base path `/boa
 - `profileStatus`: string (optional) — profile's status
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserAndProfileDTO[]`
@@ -1313,7 +1279,6 @@ authFetch path: `user/fleets/{fleetId}/users/entity/{entityId}/externalBilling/p
 - `entityId`: string (required) — entityId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string`
@@ -1330,7 +1295,6 @@ authFetch path: `user/fleets/{fleetId}/users/entity/{entityId}/externalBilling/p
 - `entityId`: string (required) — entityId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string`
@@ -1347,7 +1311,6 @@ authFetch path: `user/fleets/{fleetId}/users/entity/{entityId}/paymentMethodDeta
 - `entityId`: string (required) — entityId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PaymentDetail`, `400` → `PaymentDetail`
@@ -1362,7 +1325,6 @@ authFetch path: `user/fleets/{fleetId}/users/entity/{entityId}/paymentMethodDeta
 - `entityId`: string (required) — entityId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string`
@@ -1380,7 +1342,6 @@ authFetch path: `user/fleets/{fleetId}/users/list` (base path `/boapi/proxy/user
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string[]`
@@ -1397,7 +1358,6 @@ authFetch path: `user/fleets/{fleetId}/users/phoneNumbers/{phoneNumber}` (base p
 - `phoneNumber`: string (required) — phone number
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserBasicDTO`
@@ -1414,7 +1374,6 @@ authFetch path: `user/fleets/{fleetId}/users/pi/find` (base path `/boapi/proxy/u
 - `types`: string: `IDENTITY`, `USERNAME`, `BIRTH`, `NATIONALITY`, `NOTES`, `GENDER`, `PERSONAL_COMPANY`, `FISCAL`, `ADDRESS`, `MEMBERSHIP`[] (required)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PersonalInformationSearchRequestDTO`
@@ -1438,7 +1397,6 @@ authFetch path: `user/fleets/{fleetId}/users/pi/list` (base path `/boapi/proxy/u
 - `types`: string: `IDENTITY`, `USERNAME`, `BIRTH`, `NATIONALITY`, `NOTES`, `GENDER`, `PERSONAL_COMPANY`, `FISCAL`, `ADDRESS`, `MEMBERSHIP`[] (required)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PersonalInformationForUserIdsRequestDTO`
@@ -1458,7 +1416,6 @@ authFetch path: `user/fleets/{fleetId}/users/resetLostPassword/{tokenId}` (base 
 - `tokenId`: string (required) — token provided in the reset password link
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PasswordDTO`
@@ -1481,7 +1438,6 @@ authFetch path: `user/fleets/{fleetId}/users/status/{accountStatus}` (base path 
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserPIDTO[]`
@@ -1494,7 +1450,6 @@ authFetch path: `user/fleets/{fleetId}/users/uploadBaseUrl` (base path `/boapi/p
 - `fleetId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`
@@ -1509,7 +1464,6 @@ authFetch path: `user/fleets/{fleetId}/users/{email}/sendLostPasswordEmail` (bas
 - `email`: string (required) — Email's address which will received the reset password link
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`
@@ -1524,7 +1478,6 @@ authFetch path: `user/fleets/{fleetId}/users/{id}` (base path `/boapi/proxy/user
 - `id`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional)
 - `x-caller-id`: string (optional)
 - `x-client-id`: string (optional)
@@ -1583,7 +1536,6 @@ authFetch path: `user/fleets/{fleetId}/users/{id}/address` (base path `/boapi/pr
 - `id`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional)
 - `x-client-id`: string (optional)
 
@@ -1614,7 +1566,6 @@ authFetch path: `user/fleets/{fleetId}/users/{id}/individualBusiness` (base path
 - `id`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional)
 - `x-client-id`: string (optional)
 
@@ -1642,7 +1593,6 @@ authFetch path: `user/fleets/{fleetId}/users/{id}/individualBusiness` (base path
 - `id`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional)
 - `x-client-id`: string (optional)
 
@@ -1658,7 +1608,6 @@ authFetch path: `user/fleets/{fleetId}/users/{id}/reset` (base path `/boapi/prox
 - `id`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional)
 - `x-client-id`: string (optional)
 
@@ -1679,7 +1628,6 @@ authFetch path: `user/fleets/{fleetId}/users/{id}/status` (base path `/boapi/pro
 - `id`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserStatusDTO`
@@ -1694,7 +1642,6 @@ authFetch path: `user/fleets/{fleetId}/users/{id}/userLabels` (base path `/boapi
 - `id`: string (required) — user id
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `LabelDTO[]`
@@ -1709,7 +1656,6 @@ authFetch path: `user/fleets/{fleetId}/users/{id}/userLabels` (base path `/boapi
 - `id`: string (required) — user id
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional)
 
 **Request body:** `CreateUserLabelRequestDto`
@@ -1730,7 +1676,6 @@ authFetch path: `user/fleets/{fleetId}/users/{id}/userLabels/{userLabelId}` (bas
 - `userLabelId`: integer (int64) (required) — user label id
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional)
 
 **Responses:** `200` → `UserWithProfileDTO`, `404` → `UserWithProfileDTO`
@@ -1745,7 +1690,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/archive` (base path `/boap
 - `userId`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional)
 - `x-client-id`: string (optional)
 
@@ -1761,7 +1705,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/documents` (base path `/bo
 - `userId`: string (required) — document's owner
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `DocumentSummaryDTO`
@@ -1776,7 +1719,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/documents` (base path `/bo
 - `userId`: string (required) — document's owner
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `DocumentDTO`
@@ -1804,7 +1746,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/documents` (base path `/bo
 - `userId`: string (required) — document's owner
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `DocumentUpdateDto`
@@ -1832,7 +1773,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/documents/{documentId}` (b
 - `documentId`: string (required) — document id
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`
@@ -1848,7 +1788,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/documents/{documentId}/fil
 - `documentId`: string (required) — id of the document
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `DocumentNotification`
@@ -1873,7 +1812,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/documents/{documentId}/pi`
 - `types`: string: `DOCUMENT_NUMBER_1`[] (optional)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PersonalInformationDocumentDTO`
@@ -1891,7 +1829,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/documents/{documentId}/pi`
 - `documentId`: integer (int64) (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PatchOperationDTO[]`
@@ -1908,7 +1845,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/lostPasswordEmail` (base p
 - `userId`: string (required) — The user ID to send the password reset link to
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`
@@ -1926,7 +1862,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/notes` (base path `/boapi/
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `userNoteHistory`, `400` → `userNoteHistory[]`
@@ -1941,7 +1876,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/notes` (base path `/boapi/
 - `userId`: string (required) — user's id
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `userNoteHistory`
@@ -1966,7 +1900,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/notes/{noteId}` (base path
 - `noteId`: string (required) — notes's id to updated
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `userNoteHistory`
@@ -1990,7 +1923,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/paymentMethodDetails` (bas
 - `userId`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PaymentDetail[]`
@@ -2008,7 +1940,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/pi` (base path `/boapi/pro
 - `types`: string: `IDENTITY`, `USERNAME`, `BIRTH`, `NATIONALITY`, `NOTES`, `GENDER`, `PERSONAL_COMPANY`, `FISCAL`, `ADDRESS`, `MEMBERSHIP`[] (optional)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PersonalInformationUserDTO`
@@ -2025,7 +1956,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/pi` (base path `/boapi/pro
 - `userId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PatchOperationDTO[]`
@@ -2046,7 +1976,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/profiles/{id}/pi` (base pa
 - `types`: string: `ID_NUMBER`, `PHONE_NUMBER`, `EMAIL`, `BILLING_ADDRESS`[] (optional)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PersonalInformationProfileDTO`
@@ -2062,7 +1991,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/profiles/{profileId}` (bas
 - `profileId`: string (required) — profileId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ProfileBasicDTO`
@@ -2078,7 +2006,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/profiles/{profileId}/payme
 - `profileId`: string (required) — profileId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PaymentDetail`, `400` → `PaymentDetail`, `404` → `PaymentDetail`
@@ -2096,7 +2023,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/profiles/{profileId}/pi` (
 - `profileId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PatchOperationDTO[]`
@@ -2113,7 +2039,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/roles` (base path `/boapi/
 - `userId`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string[]`
@@ -2129,7 +2054,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/roles/{roleName}` (base pa
 - `roleName`: string (required) — role
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`
@@ -2145,7 +2069,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/roles/{roleName}` (base pa
 - `roleName`: string (required) — role
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`
@@ -2160,7 +2083,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/sendPinCode` (base path `/
 - `userId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PinCodeDTO`
@@ -2182,7 +2104,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/services` (base path `/boa
 - `userId`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserServiceRegistrationDTO`
@@ -2197,7 +2118,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/statusNote` (base path `/b
 - `userId`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `UserStatusNoteDTO`
@@ -2212,7 +2132,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/statusNote` (base path `/b
 - `userId`: string (required) — userId
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `UserStatusNoteUpdateDTO`
@@ -2232,7 +2151,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/unlock` (base path `/boapi
 - `userId`: string (required) — userId to unlock
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `201`, `204`, `400`, `403`, `404`
@@ -2248,7 +2166,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/list` (b
 - `fleetId`: any (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string[]`
@@ -2264,7 +2181,6 @@ authFetch path: `user/vehicle/fleets/{fleetId}/vehicles-exist` (base path `/boap
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `IdsDTOString`

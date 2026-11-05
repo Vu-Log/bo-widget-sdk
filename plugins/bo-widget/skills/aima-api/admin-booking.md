@@ -9,6 +9,8 @@
 
 authFetch path: `user/by-service/fleets/{fleetId}/bookingrequests/stations/{stationId}/planning` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `stationId`: any (required) — The stationId of desired requests
@@ -20,7 +22,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/bookingrequests/stations/{stat
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `DboPlannerDTO`
@@ -29,6 +30,8 @@ authFetch path: `user/by-service/fleets/{fleetId}/bookingrequests/stations/{stat
 Get the calendar of booking requests for a station
 
 authFetch path: `user/by-service/fleets/{fleetId}/services/{serviceId}/stations/{stationId}/models/{modelId}/bookingRequests` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: string (required)
@@ -42,7 +45,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/services/{serviceId}/stations/
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestCalendarDTO[]`
@@ -52,6 +54,8 @@ Get List of Stations/Models by the given services
 
 authFetch path: `user/by-service/fleets/{fleetId}/stations/details` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 
@@ -60,7 +64,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/stations/details` (base path `
 - `showTimetable`: any (optional) — Whether or not to show also the opening hours timetable for each station
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StationServiceOverviewDTO`
@@ -82,7 +85,6 @@ authFetch path: `user/fleets/{fleetId}/services/{serviceId}/stations/{stationId}
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestCalendarDTO[]`
@@ -102,7 +104,6 @@ authFetch path: `user/fleets/{fleetId}/stations/{stationId}/unavailability` (bas
 - `serviceId`: string (required) — Service UUID
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `400` → `VehicleCalendarResponseDTO`
@@ -122,7 +123,6 @@ authFetch path: `user/scheduleATrip/fleets/{fleetId}/bookingrequests/users/{user
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO[]`
@@ -133,7 +133,6 @@ callback from payment gateway to complete booking request prepayment flow
 authFetch path: `user/scheduledBooking/bookingrequests/paymentevent` (base path `/boapi/proxy/user`)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PaymentEvent`
@@ -152,6 +151,8 @@ This endpoint will retrieve the booking request information for the given status
 
 authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/bookingrequests/status/{status}` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `status`: string (required)
@@ -160,7 +161,6 @@ authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/bookingreques
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO[]`
@@ -169,6 +169,8 @@ authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/bookingreques
 Get all the booking requests filtered for fleet and status
 
 authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/bookingrequests/status/{status}/filters` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: string (required)
@@ -188,7 +190,6 @@ authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/bookingreques
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `X-V-PAGETYPE`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
@@ -201,12 +202,13 @@ This endpoint will retrieve the booking request information
 
 authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/bookingrequests/{id}` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `id`: any (required) — id of the booking request
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO`
@@ -218,12 +220,13 @@ In case no element is found, an exception is thrown
 
 authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/bookingrequests/{id}/preallocation` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `id`: any (required) — Booking request id
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PreallocatedVehiclesDTO`
@@ -235,6 +238,8 @@ This endpoint will retrieve all stations.
 
 authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/stations` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 
@@ -243,7 +248,6 @@ authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/stations` (ba
 - `showDescription`: any (optional) — Whether or not to show also the descriptions for each station
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StationWithTimetableDTO[]`
@@ -254,6 +258,8 @@ get available models grouped by station in a given time range filtered by servic
 This endpoint will retrieve the available model for a given station and a time range filtered by service.
 
 authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/stations/models` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
@@ -268,7 +274,6 @@ authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/stations/mode
 - `showUnavailableModels`: boolean (optional)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StationDTO[]`, `400` → `StationDTO[]`
@@ -280,12 +285,13 @@ This endpoint will retrieve a station for a given station Id
 
 authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/stations/{stationId}` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `stationId`: any (required) — id of the station
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StationWithTimetableDTO`
@@ -295,12 +301,13 @@ Get the description of the station with different languages by given services
 
 authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/stations/{stationId}/description` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 - `stationId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StationDescription`, `400` → `StationDescription`
@@ -312,12 +319,13 @@ This endpoint will retrieve all vehicles assigned to the given station
 
 authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/stations/{stationId}/vehicles` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `stationId`: any (required) — id of the station
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO[]`, `400` → `VehicleDTO[]`
@@ -329,6 +337,8 @@ This endpoint will retrieve available vehicles for the given model and station f
 
 authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/vehicles` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 
@@ -338,7 +348,6 @@ authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/vehicles` (ba
 - `brId`: string (optional)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO`, `400` → `VehicleDTO[]`
@@ -350,6 +359,8 @@ This endpoint will retrieve the vehicles not assigned to a station.
 
 authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/vehiclesWithoutStation` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 
@@ -357,7 +368,6 @@ authFetch path: `user/scheduledBooking/by-service/fleets/{fleetId}/vehiclesWitho
 - `serviceId`: string (optional)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO[]`
@@ -376,7 +386,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests` (base p
 - `userStatusCheckRequired`: boolean (optional) — Allow to bypass the user status check of the user for an operator
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `BookingRequestDTO`
@@ -456,7 +465,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/cancel/{
 - `billing`: boolean (optional)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO`
@@ -476,7 +484,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/dateRang
 - `endDate`: string (optional) — end of the range
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO[]`
@@ -497,7 +504,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/dateRang
 - `endDate`: string (optional) — end of the range
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `400` → `BookingRequestDTO[]`
@@ -517,7 +523,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/expired`
 - `maxDelayBeforeExpiring`: integer (int32) (optional)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO[]`
@@ -532,7 +537,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/referenc
 - `id`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO`
@@ -549,7 +553,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/reminder
 - `startInXHours`: integer (int64) (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestReminderDTO[]`
@@ -570,7 +573,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/startDat
 - `serviceId`: string (optional)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO[]`
@@ -591,7 +593,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/startDat
 - `startDateTo`: string (optional) — end of the range
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO[]`, `400` → `BookingRequestDTO[]`
@@ -615,7 +616,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/stations
 - `endDate`: string (required) — End of the range
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `FlexibleCalendarResponseDto`
@@ -635,7 +635,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/status/{
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO[]`
@@ -663,7 +662,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/status/{
 
 **Header params:**
 - `X-V-PAGETYPE`: string (optional)
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO[]`
@@ -680,7 +678,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/trip/{tr
 - `tripId`: string (required) — TripId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO`, `400` → `BookingRequestDTO`
@@ -697,7 +694,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/users/{u
 - `userId`: string (required) — id of the user
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO[]`
@@ -717,7 +713,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/users/{u
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestResponseWithPricingInfoDTO[]`
@@ -734,7 +729,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{booking
 - `bookingId`: string (required) — Booking request id
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204`, `400`, `404`
@@ -752,7 +746,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{booking
 - `pspReference`: string (required) — Reference id from payment provider
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `400`, `404`
@@ -769,7 +762,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{id}` (b
 - `id`: string (required) — id of the booking request
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO`
@@ -786,7 +778,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{id}` (b
 - `id`: string (required) — Booking request id
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional)
 
 **Request body:** `BookingRequestDTO`
@@ -863,7 +854,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{id}/est
 - `id`: string (required) — Booking request id
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PrePaymentEstimationRequestDTO`
@@ -884,7 +874,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{id}/pay
 - `id`: string (required) — id of the booking request
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `BookingRequestManualPaymentDTO`
@@ -912,7 +901,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{id}/pos
 - `id`: string (required) — Booking request id
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PossibleExtensionDateResponseDTO`
@@ -929,7 +917,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{id}/pre
 - `id`: string (required) — Booking request id
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PreallocatedVehiclesDTO`
@@ -949,7 +936,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{id}/pre
 - `vehicleId`: string (required) — id of the vehicle to allocate to the booking request
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `PreallocatedVehiclesDTO`
@@ -966,7 +952,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{id}/pre
 - `id`: string (required) — Booking request id
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`
@@ -984,7 +969,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{id}/pre
 - `vehicleId`: string (required) — id of the vehicle to allocate to the booking request
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `201` → `PreallocatedVehiclesDTO`, `400` → `PreallocatedVehiclesDTO`, `401` → `PreallocatedVehiclesDTO`, `403` → `PreallocatedVehiclesDTO`, `404` → `PreallocatedVehiclesDTO`
@@ -1002,7 +986,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{id}/sta
 - `journeyId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestDTO`
@@ -1019,7 +1002,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/bookingrequests/{id}/sta
 - `id`: string (required) — Booking request id
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `BookingRequest`
@@ -1092,7 +1074,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/schedulednotifications/n
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ScheduledNotification[]`, `400` → `ScheduledNotificationDTO[]`
@@ -1111,7 +1092,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/securitymargins` (base p
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `SecurityMarginDTO[]`, `400` → `SecurityMarginDTO[]`
@@ -1127,7 +1107,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/securitymargins` (base p
 - `fleetId`: string (required) — The fleetId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `SecurityMarginDTO`
@@ -1151,7 +1130,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/securitymargins/{marginI
 - `marginId`: string (required) — Id of the security margin
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `SecurityMarginDTO`, `400` → `SecurityMarginDTO`, `404` → `SecurityMarginDTO`
@@ -1168,7 +1146,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/securitymargins/{marginI
 - `marginId`: string (required) — The security margin to update
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `SecurityMarginDTO`
@@ -1190,7 +1167,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/securitymargins/{marginI
 - `marginId`: string (required) — The security margin to update
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`, `400`
@@ -1210,7 +1186,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations` (base path `/b
 - `showDescription`: string (optional) — Whether or not to show also the descriptions for each station
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StationWithTimetableDTO[]`
@@ -1226,7 +1201,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations` (base path `/b
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `Station`
@@ -1263,7 +1237,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/dropOff/availab
 - `serviceId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StationAvailabilityDTO[]`
@@ -1280,7 +1253,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}` (b
 - `stationId`: string (required) — id of the station
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StationWithTimetableDTO`
@@ -1297,7 +1269,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}` (b
 - `stationId`: string (required) — id of the station
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `Station`
@@ -1326,7 +1297,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}/ass
 - `zoneId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StationDTO`, `400` → `StationDTO`, `404` → `StationDTO`
@@ -1344,7 +1314,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}/ass
 - `vehicleId`: string (required) — id of the vehicle to assign to the station
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Station`, `400` → `Station`, `404` → `Station`
@@ -1362,7 +1331,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}/ass
 - `vehicleId`: string (required) — Id of the vehicle to remove from the booking request. It's not possible to remove a vehicle if the trip has already been started
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`, `400`, `404`
@@ -1377,7 +1345,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}/des
 - `stationId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StationDescription`, `400` → `StationDescription`
@@ -1392,7 +1359,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}/des
 - `stationId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `StationDescription`
@@ -1414,7 +1380,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}/des
 - `stationId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204`
@@ -1430,7 +1395,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}/des
 - `languageTag`: string (required) — the language can be use for the description
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `StationDescriptionInfo`
@@ -1453,7 +1417,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}/des
 - `languageTag`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204`
@@ -1468,7 +1431,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}/dis
 - `stationId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `StationDTO`, `400` → `StationDTO`, `404` → `StationDTO`
@@ -1492,7 +1454,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/stations/{stationId}/mod
 - `pricingId`: string (optional)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `BookingRequestModelDTO`, `400` → `BookingRequestModelDTO`, `404` → `BookingRequestModelDTO`
@@ -1509,7 +1470,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/subscription/bookingrequ
 - `bookingId`: string (required) — Booking request id
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204`, `400`, `404`
@@ -1530,7 +1490,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/vehicles` (base path `/b
 - `brId`: string (optional)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO`, `400` → `VehicleDTO[]`
@@ -1544,7 +1503,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/vehicles/available` (bas
 - `fleetId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `VehicleUnavailabilityRequestDTO`
@@ -1571,7 +1529,6 @@ authFetch path: `user/scheduledBooking/fleets/{fleetId}/vehiclesWithoutStation` 
 - `serviceId`: string (optional)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `VehicleDTO[]`
@@ -1584,7 +1541,6 @@ This endpoint will notify booking requests that have exceeded their end date
 authFetch path: `user/scheduledBooking/schedulednotifications/overdueReturn` (base path `/boapi/proxy/user`)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ScheduledNotification[]`, `400` → `ScheduledNotificationDTO[]`

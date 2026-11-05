@@ -12,11 +12,12 @@ Beware this response can be huge, if you have a large fleet with a lot of vehicl
 
 authFetch path: `user/by-service/fleets/{fleetId}/services` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleet id
 
 **Header params:**
-- `x-user-id`: string (required)
 - `If-None-Match`: string (optional) — Previous ETag; returns 304 when the representation is unchanged
 - `x-boapi-ctx`: string (optional) — the boapi context
 
@@ -29,13 +30,14 @@ A vehicle must be with the status FREE and assigned to a service to appears in t
 
 authFetch path: `user/by-service/fleets/{fleetId}/services/{id}/vehicles/{vehicleId}` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required)
 - `id`: string (required)
 - `vehicleId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`
@@ -45,12 +47,13 @@ Get service by id
 
 authFetch path: `user/by-service/fleets/{fleetId}/services/{serviceId}` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleet id
 - `serviceId`: any (required) — The serviceId
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ServiceFull`
@@ -67,7 +70,6 @@ authFetch path: `user/fleets/{fleetId}/services` (base path `/boapi/proxy/user`)
 
 **Header params:**
 - `If-None-Match`: string (optional) — Previous ETag; returns 304 when the representation is unchanged
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ServiceFull[]`, `304` → `ServiceFull[]`, `404` → `ServiceFull[]`
@@ -86,7 +88,6 @@ authFetch path: `user/fleets/{fleetId}/services` (base path `/boapi/proxy/user`)
 - `forceGracePeriod`: boolean (optional) — if true, skip proximity-check validation for grace period during service creation
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `ServiceDTO`
@@ -146,7 +147,6 @@ authFetch path: `user/fleets/{fleetId}/services/overview` (base path `/boapi/pro
 - `fleetId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ServicesOverviewResponse`
@@ -162,7 +162,6 @@ authFetch path: `user/fleets/{fleetId}/services/pois` (base path `/boapi/proxy/u
 - `fleetId`: string (required) — The fleetId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `object`
@@ -178,7 +177,6 @@ authFetch path: `user/fleets/{fleetId}/services/zones` (base path `/boapi/proxy/
 - `fleetId`: string (required) — The fleetId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `object`
@@ -193,7 +191,6 @@ authFetch path: `user/fleets/{fleetId}/services/{id}` (base path `/boapi/proxy/u
 - `id`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ServiceFull`
@@ -213,7 +210,6 @@ authFetch path: `user/fleets/{fleetId}/services/{id}` (base path `/boapi/proxy/u
 - `forceGracePeriod`: boolean (optional) — if true, skip proximity-check validation for grace period during service update
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `UpdateServiceDTO`
@@ -272,7 +268,6 @@ authFetch path: `user/fleets/{fleetId}/services/{id}/pois/{poiId}` (base path `/
 - `poiId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`
@@ -290,7 +285,6 @@ authFetch path: `user/fleets/{fleetId}/services/{id}/pois/{poiId}` (base path `/
 - `poiId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`
@@ -308,7 +302,6 @@ authFetch path: `user/fleets/{fleetId}/services/{id}/stations/{stationId}` (base
 - `stationId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `object`
@@ -326,7 +319,6 @@ authFetch path: `user/fleets/{fleetId}/services/{id}/stations/{stationId}` (base
 - `stationId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `object`
@@ -344,7 +336,6 @@ authFetch path: `user/fleets/{fleetId}/services/{id}/vehicles/{vehicleId}` (base
 - `vehicleId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`
@@ -362,7 +353,6 @@ authFetch path: `user/fleets/{fleetId}/services/{id}/zones/{zoneId}` (base path 
 - `zoneId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `object`
@@ -380,7 +370,6 @@ authFetch path: `user/fleets/{fleetId}/services/{id}/zones/{zoneId}` (base path 
 - `zoneId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `object`
@@ -397,7 +386,6 @@ authFetch path: `user/fleets/{fleetId}/services/{serviceId}/energies` (base path
 - `serviceId`: string (required) — The serviceId
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `EnergyServiceAdditionalInfoRequestDTO[]`
@@ -417,7 +405,6 @@ authFetch path: `user/fleets/{fleetId}/services/{serviceId}/energies/{energyType
 - `energyType`: string (required) — The energy type
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `EnergyServiceAdditionalInfoUpdateDTO`
@@ -441,7 +428,6 @@ authFetch path: `user/fleets/{fleetId}/services/{serviceId}/energies/{energyType
 - `energyType`: string (required) — The energy type
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `204`
@@ -461,7 +447,6 @@ authFetch path: `user/fleets/{fleetId}/services/{serviceId}/products` (base path
 - `productIds`: string[] (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string[]`
@@ -479,7 +464,6 @@ authFetch path: `user/fleets/{fleetId}/services/{serviceId}/vehicles/{vehicleId}
 - `vehicleId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `object`
@@ -499,7 +483,6 @@ authFetch path: `user/fleets/{fleetId}/users/{userId}/services/scheduleatripserv
 - `cityId`: string (optional)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `ServiceFull[]`

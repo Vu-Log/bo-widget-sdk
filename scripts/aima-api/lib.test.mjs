@@ -939,6 +939,29 @@ describe('renderEndpoint', () => {
     );
   });
 
+  it('replaces a required x-user-id header with the need for a user token', () => {
+    const markdown = renderEndpoint(
+      makeEndpoint({
+        params: [
+          { name: 'X-User-Id', in: 'header', type: 'string', required: true, notes: '' },
+          { name: 'x-boapi-ctx', in: 'header', type: 'string', required: false, notes: 'ctx' },
+        ],
+      }),
+    );
+    expect(markdown).toContain('**Auth:** needs a user token.');
+    expect(markdown).not.toMatch(/x-user-id/i);
+    expect(markdown).toContain('**Header params:**\n- `x-boapi-ctx`: string (optional) — ctx');
+  });
+
+  it('drops an optional x-user-id header without asking for a user token', () => {
+    const markdown = renderEndpoint(
+      makeEndpoint({
+        params: [{ name: 'x-user-id', in: 'header', type: 'string', required: false, notes: '' }],
+      }),
+    );
+    expect(markdown).not.toMatch(/x-user-id|\*\*Auth|Header params/i);
+  });
+
   it('throws for an endpoint outside the admin gateway', () => {
     expect(() => renderEndpoint(find('POST', '/vehicles/{VehicleId}/journey'))).toThrow(
       'Not under /boapi/proxy',

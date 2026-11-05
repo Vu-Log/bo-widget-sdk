@@ -85,9 +85,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/disable` (base pa
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Request body:** `VehicleDisableListRequest`
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
@@ -105,9 +102,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/enable` (base pat
 
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `VehicleEnableListRequest`
 
@@ -181,9 +175,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/toIntegrate/{boxI
 - `fleetId`: string (required) — Unique id of the fleet
 - `boxId`: string (required) — unique id of the box
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Responses:** `200`, `403` → `Error`, `404` → `Error`, `500` → `Error`
 
 ### GET `/fleets/{fleetId}/vehicles/{vehicleId}`
@@ -209,12 +200,11 @@ update specific information on a given vehicle.
 
 authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}` (base path `/boapi/proxy/fleetmanager/public`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
-
-**Header params:**
-- `x-user-id`: string (required) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `UpdateRequest`
 | Field | Type | Required | Notes |
@@ -233,15 +223,14 @@ get BLE AdminToken
 
 authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/adminToken` (base path `/boapi/proxy/fleetmanager/public`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required) — The unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
 
 **Query params:**
 - `startDate`: string (optional) — Optional. Start date for the admin token in ISO-8601 format (e.g. 2019-12-01T10:40:27.29Z). If provided, the vehicle firmware version must be >= 7.7.0 and the…
-
-**Header params:**
-- `x-user-id`: string (required) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `BLETokenRequest`
 | Field | Type | Required | Notes |
@@ -263,9 +252,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/archi
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Responses:** `200`, `400` → `Error`, `404` → `Error`, `500` → `Error`
 
 ### POST `/fleets/{fleetId}/vehicles/{vehicleId}/battery/lock`
@@ -278,9 +264,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/batte
 **Path params:**
 - `fleetId`: string (required) — The unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `BatteryLockRequest`
 | Field | Type | Required | Notes |
@@ -299,9 +282,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/book`
 **Path params:**
 - `fleetId`: string (required) — The unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `BookingRequestFM`
 | Field | Type | Required | Notes |
@@ -333,9 +313,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/book`
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Responses:** `204`, `400` → `Error`, `404` → `Error`, `409` → `Error`, `500` → `Error`
 
 ### POST `/fleets/{fleetId}/vehicles/{vehicleId}/connectBoxless`
@@ -348,9 +325,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/conne
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automatically filled by the vulog api g…
 
 **Request body:** `ConnectBoxlessRequest`
 | Field | Type | Required | Notes |
@@ -369,9 +343,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/disab
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `VehicleStatusRequest`
 | Field | Type | Required | Notes |
@@ -392,9 +363,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/door`
 - `fleetId`: string (required) — The unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Request body:** `DoorsRequest`
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
@@ -412,9 +380,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/enabl
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `VehicleEnableRequest`
 | Field | Type | Required | Notes |
@@ -434,9 +399,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/exper
 - `fleetId`: string (required) — The unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Request body:** `ExpertRequest`
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
@@ -455,9 +417,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/ping`
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Responses:** `200` → `Result`, `410` → `Error`, `500` → `Error`
 
 ### PUT `/fleets/{fleetId}/vehicles/{vehicleId}/products/{productId}`
@@ -475,9 +434,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/produ
 **Query params:**
 - `force`: boolean (optional) — If false or omitted, the product is added only when it matches the trip service (validated via the backend). If true, the product id is attached without that v…
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Responses:** `200`, `403` → `Error`, `404` → `Error`, `500` → `Error`
 
 ### DELETE `/fleets/{fleetId}/vehicles/{vehicleId}/products/{productId}`
@@ -492,9 +448,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/produ
 - `vehicleId`: string (required) — unique id of the vehicle
 - `productId`: string (required) — unique id of the product which need to be removed to this vehicle.
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Responses:** `200`, `403` → `Error`, `404` → `Error`, `500` → `Error`
 
 ### POST `/fleets/{fleetId}/vehicles/{vehicleId}/release`
@@ -507,9 +460,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/relea
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `ReleaseRequest`
 | Field | Type | Required | Notes |
@@ -525,12 +475,11 @@ Send RFID card tag to a given vehicle. This command is only available on specifi
 
 authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/rfid/push` (base path `/boapi/proxy/fleetmanager/public`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
-
-**Header params:**
-- `x-user-id`: string (required) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Responses:** `200` → `FGResponse`, `404` → `Error`, `500` → `Error`
 
@@ -544,9 +493,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/trip/
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `TripStartEndRequest`
 | Field | Type | Required | Notes |
@@ -572,9 +518,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/trip/
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Request body:** `ForceEndTripRequest`
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
@@ -593,9 +536,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/trip/
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required)
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `AdjustTripRequest`
 | Field | Type | Required | Notes |
@@ -619,9 +559,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/trip/
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Request body:** `TripRequest`
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
@@ -641,9 +578,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/trip/
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `LTRRequest`
 | Field | Type | Required | Notes |
@@ -665,9 +599,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/trip/
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Request body:** `TripRequest`
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
@@ -687,9 +618,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/trip/
 **Path params:**
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `TripStartEndRequest`
 | Field | Type | Required | Notes |
@@ -715,9 +643,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/trip/
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required)
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Request body:** `TripRequest`
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
@@ -738,9 +663,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/wakeu
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
 
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
-
 **Responses:** `200` → `WakeupResponse`, `404` → `Error`, `500` → `Error`
 
 ### PUT `/fleets/{fleetId}/vehicles/{vehicleId}/zones/{zoneId}`
@@ -754,9 +676,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/zones
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
 - `zoneId`: string (required) — The unique id of the zone could be a zoneId, poiId or any externalId
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Request body:** `AssignZoneRequest`
 | Field | Type | Required | Notes |
@@ -777,9 +696,6 @@ authFetch path: `fleetmanager/public/fleets/{fleetId}/vehicles/{vehicleId}/zones
 - `fleetId`: string (required) — unique id of the fleet
 - `vehicleId`: string (required) — unique id of the vehicle
 - `zoneId`: string (required) — Unique id of the zone
-
-**Header params:**
-- `x-user-id`: string (optional) — vulog userid of user who perform this command. This is used to track the user who did the update. By default this id is automaticaly filled by the vulog api ga…
 
 **Responses:** `200`, `500` → `Error`
 

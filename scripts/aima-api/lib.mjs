@@ -741,7 +741,17 @@ function paramsList(params) {
 }
 
 /**
- * Renders one endpoint as a Markdown section.
+ * True for the `x-user-id` header: the gateway reads the user from the token, so the caller
+ * never sends it.
+ *
+ * @param {{name: string, in: string}} param - endpoint param
+ * @returns {boolean} whether the param is the `x-user-id` header
+ */
+const isUserIdHeader = (param) => param.in === 'header' && param.name.toLowerCase() === 'x-user-id';
+
+/**
+ * Renders one endpoint as a Markdown section. The `x-user-id` header is not listed: when the
+ * spec requires it, the section says that the endpoint needs a user token instead.
  *
  * @param {Endpoint} endpoint - endpoint under {@link GATEWAY_BASE_PATH}
  * @returns {string} Markdown, starting with `### METHOD \`path\``
@@ -757,8 +767,13 @@ export function renderEndpoint(endpoint) {
     '',
     `authFetch path: \`${authFetchPath(endpoint)}\` (base path \`/${endpoint.basePath}\`)`,
   );
+  if (endpoint.params.some((param) => isUserIdHeader(param) && param.required)) {
+    lines.push('', '**Auth:** needs a user token.');
+  }
   for (const location of PARAM_LOCATIONS) {
-    const params = endpoint.params.filter((param) => param.in === location);
+    const params = endpoint.params.filter(
+      (param) => param.in === location && !isUserIdHeader(param),
+    );
     if (params.length > 0) {
       const label = location.charAt(0).toUpperCase() + location.slice(1);
       lines.push('', `**${label} params:**`, paramsList(params));

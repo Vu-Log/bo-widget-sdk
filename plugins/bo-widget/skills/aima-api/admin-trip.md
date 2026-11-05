@@ -15,7 +15,6 @@ authFetch path: `user/billing/fleets/{fleetId}/trips/{tripId}/unlock` (base path
 - `tripId`: String (required) — The trip id
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`
@@ -24,6 +23,8 @@ authFetch path: `user/billing/fleets/{fleetId}/trips/{tripId}/unlock` (base path
 List all the events of a given user
 
 authFetch path: `user/by-service/fleets/{fleetId}/events/users/{userId}` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
@@ -36,7 +37,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/events/users/{userId}` (base p
 - `type`: any (optional) — One of the event type
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EventDTO[]`
@@ -47,6 +47,8 @@ List trip summaries of a fleet
 it's a paginated call
 
 authFetch path: `user/by-service/fleets/{fleetId}/trips` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
@@ -70,7 +72,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/trips` (base path `/boapi/prox
 - `adjusted`: any (optional) — return only the trips which have been adjusted/overridden
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip[]`
@@ -79,6 +80,8 @@ authFetch path: `user/by-service/fleets/{fleetId}/trips` (base path `/boapi/prox
 Get trips summaries for a given userId. It's a paginated end point.
 
 authFetch path: `user/by-service/fleets/{fleetId}/trips/users/{userId}` (base path `/boapi/proxy/user`)
+
+**Auth:** needs a user token.
 
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
@@ -91,7 +94,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/trips/users/{userId}` (base pa
 - `profileType`: any (optional) — The Filter by profileType
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip[]`
@@ -103,6 +105,8 @@ It's a paginated end point
 
 authFetch path: `user/by-service/fleets/{fleetId}/trips/vehicles/{vehicleId}` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `vehicleId`: any (required) — The vehicleId
@@ -113,7 +117,6 @@ authFetch path: `user/by-service/fleets/{fleetId}/trips/vehicles/{vehicleId}` (b
 - `endDate`: any (optional) — to this date
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip[]`
@@ -123,12 +126,13 @@ Get a trip summary by tripId
 
 authFetch path: `user/by-service/fleets/{fleetId}/trips/{tripId}` (base path `/boapi/proxy/user`)
 
+**Auth:** needs a user token.
+
 **Path params:**
 - `fleetId`: any (required) — The fleetId of your account
 - `tripId`: any (required) — The unique id of the trip
 
 **Header params:**
-- `x-user-id`: string (required)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip`
@@ -144,7 +148,6 @@ authFetch path: `user/fleets/{fleetId}/events` (base path `/boapi/proxy/user`)
 - `fleetId`: any (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `EventDTO`
@@ -190,7 +193,6 @@ authFetch path: `user/fleets/{fleetId}/events/alerts/{period}` (base path `/boap
 - `pageable`: CursorPageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `MappingJacksonValue`
@@ -205,7 +207,6 @@ authFetch path: `user/fleets/{fleetId}/events/statistics/boxActives/{period}` (b
 - `period`: any (required) — period to seek
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string[]`
@@ -220,7 +221,6 @@ authFetch path: `user/fleets/{fleetId}/events/statistics/licenses/{period}` (bas
 - `period`: any (required) — period to seek
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`
@@ -241,7 +241,6 @@ authFetch path: `user/fleets/{fleetId}/events/trips/{tripId}` (base path `/boapi
 - `type`: any (optional) — Event types separated by comma
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EventDTO[]`
@@ -256,7 +255,6 @@ authFetch path: `user/fleets/{fleetId}/events/trips/{tripId}` (base path `/boapi
 - `tripId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200`
@@ -273,7 +271,6 @@ authFetch path: `user/fleets/{fleetId}/events/types` (base path `/boapi/proxy/us
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string: `USER_ACCOUNT_UPDATE`, `USER_SUSPENDED`, `USER_REJECTED`, `USER_CREATED`, `USER_APPROVED`, `USER_INCOMPLETE`, `USER_ARCHIVED`, `USER_INACTIVE`, `USER_DELETED`, `USER_RESET_PASSWORD`, `USER_ROLE_ADD`, `USER_UNLOCK`, `USER_ROLE_DEL`, `USER_BOOKING_REQUEST`, `USER_UPDATE_BOOKING_REQUEST`, `USER_DELETE_BOOKING_REQUEST`, `USER_CANCEL_BOOKING_REQUEST`, `USER_GET_ADMIN_TK`, `USER_PROMOCODE_REDEEM`, `USER_SYSTEM_CREDIT_ADD`, `USER_SYSTEM_CREDIT_CONSUMED`, `USER_SYSTEM_CREDIT_REMOVED`, `USER_PRODUCT_CHARGED`, `USER_TRIP_INVOICE_CREATED`, `USER_TRIP_EXPENSE_CREATED`, `USER_TRIP_INVOICE_UPDATED`, `USER_PRODUCT_INVOICE_CREATED`, `USER_PRODUCT_EXPENSE_CREATED`, `USER_PRODUCT_INVOICE_UPDATED`, `VEHICLE_ADDED_TO_STATION`, `VEHICLE_REMOVED_FROM_STATION`, `VEHICLE_ALLOCATED`, `VEHICLE_TOWED`, `VEHICLE_INTEGRATE_DEL`, `VEHICLE_ARCHIVED`, `VEHICLE_DELETE`, `VEHICLE_UPDATED`, `VEHICLE_UPDATED_VUBOX`, `VEHICLE_REMOVE_VUBOX`, `VEHICLE_ASSIGN_VUBOX`, `VEHICLE_OUT_OF_SERVICE`, `VEHICLE_SCHEDULED_OUT_OF_SERVICE`, `VEHICLE_SCHEDULED_OUT_OF_SERVICE_CANCELED`, `VEHICLE_UNLOCK`, `VEHICLE_LOCK`, `VEHICLE_BATTERY_LOCK`, `VEHICLE_BATTERY_UNLOCK`, `VEHICLE_HELMET_LOCK`, `VEHICLE_HELMET_UNLOCK`, `VEHICLE_SPARE_LOCK`, `VEHICLE_SPARE_UNLOCK`, `VEHICLE_PILE_LOCK`, `VEHICLE_PILE_UNLOCK`, `VEHICLE_SPEED_LIMIT_CHANGED`, `VEHICLE_WAKE_UP`, `VEHICLE_WAKE_UP_ACCEL`, `VEHICLE_WAKE_UP_BLE`, `VEHICLE_CONNECTIVITY_ONLINE`, `VEHICLE_CONNECTIVITY_OFFLINE`, `VEHICLE_CONNECTIVITY_INTERRUPTED`, `VEHICLE_OUT_OF_COM`, `VEHICLE_BOOKING_STATUS_CHANGED`, `VEHICLE_GET_STATUS`, `VEHICLE_SCHEDULED_REBOOT`, `VEHICLE_WARNING`, `VEHICLE_CRUISING_RANGE_LOW`, `VEHICLE_CRUISING_RANGE_CRITICAL`, `VEHICLE_ACCEL_ALERT`, `VEHICLE_SPEED_ALERT`, `VEHICLE_CKH_UPDATE`, `VEHICLE_RECOVERY`, `VEHICLE_SYNC`, `VEHICLE_STANDBY`, `VEHICLE_AUTOCLOSE_ON`, `VEHICLE_AUTOCLOSE_OFF`, `VEHICLE_IGNITION_ON`, `VEHICLE_IGNITION_OFF`, `VEHICLE_REBOOT`, `VEHICLE_MOBILIZE`, `VEHICLE_IMMOBILIZE`, `VEHICLE_IMMOBILIZER_OOT`, `VEHICLE_ENABLE`, `VEHICLE_MAGIC_CARD`, `VEHICLE_CLEANLINESS_RESET`, `VEHICLE_ADD_ZONE`, `VEHICLE_REMOVE_ZONE`, `VEHICLE_RELEASE_TRIP`, `VEHICLE_START_TRIP`, `VEHICLE_END_TRIP`, `VEHICLE_EDIT_TRIP`, `VEHICLE_MANUAL_END_TRIP`, `VEHICLE_TRACKING_ON`, `VEHICLE_TRACKING_OFF`, `VEHICLE_TRIP_TERMINATION`, `VEHICLE_PAUSE_TRIP`, `VEHICLE_FORCED_PAUSE_TRIP`, `VEHICLE_RESUME_TRIP`, `VEHICLE_EXPERT`, `VEHICLE_PASSTHROUGH`, `VEHICLE_PING`, `VEHICLE_CANCEL_TRIP`, `VEHICLE_REMOVE_PRODUCT_TRIP`, `VEHICLE_BOOK`, `VEHICLE_ADD_PRODUCT_TRIP`, `VEHICLE_UPDATE_REASON`, `VEHICLE_RESET_CLEAN_DATE`, `VEHICLE_RESET_REDISTRIB_DATE`, `VEHICLE_RESET_MOVING_DATE`, `VEHICLE_RESET_BOOKING_CONTEXT`, `VEHICLE_ARCHIVED_FM`, `VEHICLE_ANTITHEFT_ON`, `VEHICLE_ANTITHEFT_OFF`, `VEHICLE_CHARGING_ACTIVE`, `VEHICLE_CHARGING_ENDED`, `VEHICLE_CHARGING_PLUGGED`, `VEHICLE_CHARGING_UNPLUGGED`, `VEHICLE_BATTERY_OK`, `VEHICLE_BATTERY_LOW`, `VEHICLE_BATTERY_CRITICAL`, `VEHICLE_DOORS_OPEN`, `VEHICLE_DOORS_CLOSED`, `VEHICLE_WINDOWS_OPEN`, `VEHICLE_WINDOWS_CLOSED`, `VEHICLE_ALERT`, `VEHICLE_FATAL`, `VEHICLE_PRICING_CHANGED`, `VEHICLE_GROUP_CHANGED`, `VEHICLE_UPDATE_ODOMETER`, `VEHICLE_UPDATE_STATUS`, `VEHICLE_UPDATE_GPS_MANUAL`, `VEHICLE_UPDATE_GPS_SIM`, `VEHICLE_RFID_SYNC`, `VEHICLE_PREAUTH_CONFIRMED`, `VEHICLE_PREAUTH_REJECTED`, `VEHICLE_PREAUTH_EXPIRED`, `VEHICLE_PREAUTH_CANCELLED`, `USER_PRODUCT_INVOICE_CANCELLED`, `USER_TRIP_INVOICE_CANCELLED`, `USER_PRODUCT_INVOICE_REFUSED`, `USER_TRIP_INVOICE_REFUSED`, `USER_TRIP_INVOICE_PAID`, `USER_PRODUCT_INVOICE_PAID`, `USER_TRIP_INVOICE_REFUNDED`, `USER_PRODUCT_INVOICE_REFUNDED`, `USER_PLAN_SUBSCRIBED`, `USER_PLAN_UNSUBSCRIBED`, `USER_PLAN_EXPIRED`, `USER_PLAN_RENEWED`, `USER_PLAN_RENEWAL`, `USER_PLAN_CANCELED`, `USER_PLAN_UPDATED`, `USER_PLAN_PERIODIC_TIME_WALLET_CHARGED`, `USER_PLAN_PERIODIC_TIME_WALLET_CONSUMED`, `USER_PLAN_RENEWAL_FAILED`, `USER_PLAN_CREDITS_FAILED`, `USER_UPDATE_TRIP`, `USER_REFERRAL_CREATED`, `USER_REFERRAL_CHECKED`, `USER_REPORT_CREATED`, `USER_REPORT_UPDATED`, `USER_DOC_UPDATED`, `USER_BILLING_GROUP_ADDED`, `USER_BILLING_GROUP_REMOVED`, `VEHICLE_ADDED_TO_SERVICE`, `VEHICLE_REMOVED_FROM_SERVICE`, `USER_RFIDPINCODE_REQUESTED`, `VEHICLE_REFILLED`, `VEHICLE_DIAG_GPS`, `VEHICLE_DIAG_CAN`, `VEHICLE_DIAG_MOBILIZER`, `VEHICLE_DIAG_IMMOBILIZER`, `VEHICLE_DIAG_LOCK`, `VEHICLE_DIAG_UNLOCK`, `VEHICLE_DIAG_ANALOG`, `VEHICLE_DIAG_CKH`, `VEHICLE_DIAG_RFID`, `VEHICLE_DIAG_SPEAK`, `VEHICLE_DIAG_HZ_LED`, `VEHICLE_BLE_AUTH`, `VEHICLE_BLE_START_FLOW`, `VEHICLE_BLE_START_ISSUE`, `VEHICLE_FIRMWARE_UPDATE`, `VEHICLE_FLEET_SWAP`, `USER_TRIP_EVENT_MAP_DISPLAY_GDPR`, `USER_AUTOMATICALLY_REFUNDED`, `USER_TRIP_CREDIT_REFUNDED`, `USER_PRODUCT_CREDIT_REFUNDED`, `USER_PRODUCT_TIME_WALLET_CHARGED`, `USER_PRODUCT_TIME_WALLET_CONSUMED`, `USER_CREDIT_REFUNDED`, `USER_ALL_CREDIT_REFUNDED`, `USER_PREPAYMENT_SUCCEEDED`, `USER_PREPAYMENT_FAILED`, `USER_CREATE_SUBSCRIPTION`, `USER_UPDATE_SUBSCRIPTION`, `GRACE_PERIOD_APPLIED`, `USER_LABEL_CREATED`, `USER_LABEL_DELETED`, `VEHICLE_UNAVAILABILITIES_ADD`, `VEHICLE_UNAVAILABILITIES_DELETE`, `VEHICLE_UNAVAILABILITIES_UPDATE`, `VEHICLE_ZONE_IN`, `VEHICLE_ZONE_OUT`, `USER_INSURANCE_CREATED`, `USER_INSURANCE_UPDATED`, `USER_DEPOSIT_CREATED`, `USER_DEPOSIT_CAPTURED`, `USER_DEPOSIT_CANCELLED`, `USER_INVOICE_PDF_GENERATION`[]`
@@ -293,7 +290,6 @@ authFetch path: `user/fleets/{fleetId}/events/types/{types}` (base path `/boapi/
 - `endDate`: any (optional) — end of the range
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EventDTO[]`
@@ -314,7 +310,6 @@ authFetch path: `user/fleets/{fleetId}/events/users/{userId}` (base path `/boapi
 - `type`: any (optional) — One of the event type
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EventDTO[]`
@@ -333,7 +328,6 @@ authFetch path: `user/fleets/{fleetId}/events/v2/trips` (base path `/boapi/proxy
 - `pageable`: CursorPageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `MappingJacksonValue`
@@ -353,7 +347,6 @@ authFetch path: `user/fleets/{fleetId}/events/v2/vehicles` (base path `/boapi/pr
 - `pageable`: CursorPageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `MappingJacksonValue`
@@ -374,7 +367,6 @@ authFetch path: `user/fleets/{fleetId}/events/vehicles/{vehicleId}` (base path `
 - `type`: any (optional) — One of the event type
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EventDTO[]`
@@ -390,7 +382,6 @@ authFetch path: `user/fleets/{fleetId}/maprequests` (base path `/boapi/proxy/use
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `EventDTO`
@@ -436,7 +427,6 @@ authFetch path: `user/fleets/{fleetId}/maprequests/trips/{tripId}` (base path `/
 - `endDate`: string (optional) — end of the range
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EventDTO[]`
@@ -456,7 +446,6 @@ authFetch path: `user/fleets/{fleetId}/maprequests/users/{userId}` (base path `/
 - `endDate`: string (optional) — end of the range
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `EventDTO[]`
@@ -475,7 +464,6 @@ authFetch path: `user/fleets/{fleetId}/reports/diagnostics/vehicles/{vehicleId}`
 - `pageable`: CursorPageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `CursorPaginationSliceEventV2OutDTO`
@@ -492,7 +480,6 @@ authFetch path: `user/fleets/{fleetId}/reports/diagnostics/vehicles/{vehicleId}`
 - `vehicleId`: any (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `EventDTO`
@@ -535,7 +522,6 @@ authFetch path: `user/trip/fleets/{fleetId}/customer_trips` (base path `/boapi/p
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip[]`
@@ -553,7 +539,6 @@ authFetch path: `user/trip/fleets/{fleetId}/sessions` (base path `/boapi/proxy/u
 - `pageable`: CursorPageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `CursorPaginationSliceTripSessionDTO`
@@ -568,7 +553,6 @@ authFetch path: `user/trip/fleets/{fleetId}/sessions/{sessionId}` (base path `/b
 - `sessionId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `TripSessionDTO`
@@ -603,7 +587,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips` (base path `/boapi/proxy/user
 - `adjusted`: Boolean (optional) — return only the trips which have been adjusted/overridden
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip[]`
@@ -622,7 +605,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/endDate` (base path `/boapi/pr
 - `endDateTo`: string (required) — to end date
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip[]`
@@ -636,7 +618,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/handle-event` (base path `/boa
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `PaymentEvent`
@@ -657,7 +638,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/ongoing` (base path `/boapi/pr
 - `fleetId`: string (required) — The fleetId of your account
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `string`
@@ -677,7 +657,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/services/{id}` (base path `/bo
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip[]`
@@ -700,7 +679,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/servicetypes/{serviceType}` (b
 - `userId`: string (optional)
 
 **Header params:**
-- `x-user-id`: string (optional)
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip[]`
@@ -721,7 +699,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/users/{userId}` (base path `/b
 - `profileType`: string (optional) — Filter by profileType
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip[]`
@@ -740,7 +717,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/users/{userId}/services/{id}` 
 - `pageable`: Pageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip[]`
@@ -762,7 +738,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/vehicles/{vehicleId}` (base pa
 - `endDate`: string (optional) — to this date
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip[]`
@@ -777,7 +752,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/{tripId}` (base path `/boapi/p
 - `tripId`: string (required) — unique id of the trip
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip`
@@ -792,7 +766,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/{tripId}` (base path `/boapi/p
 - `tripId`: string (required) — unique id of the trip
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `Trip`
@@ -834,7 +807,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/{tripId}/generate` (base path 
 - `tripId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `Trip`, `202` → `Trip`, `400` → `Trip`, `500` → `Trip`
@@ -849,7 +821,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/{tripId}/history` (base path `
 - `tripId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `TripHistory`
@@ -863,7 +834,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/{tripId}/notes` (base path `/b
 - `tripId`: string (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `TripNoteDTO`
@@ -883,7 +853,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/{tripId}/ongoing` (base path `
 - `tripId`: string (required) — id of the trip
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `OnGoingTripDTO`
@@ -898,7 +867,6 @@ authFetch path: `user/trip/fleets/{fleetId}/trips/{tripId}/pay` (base path `/boa
 - `tripId`: string (required) — id of the trip
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Request body:** `TripManualPaymentDTO`
@@ -927,7 +895,6 @@ authFetch path: `user/trip/fleets/{fleetId}/users/{userId}/vehicles/{vehicleId}/
 - `tripId`: string (required) — unique id of the trip
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`, `400` → `string`, `403` → `string`, `404` → `string`, `409` → `string`, `410` → `string`, `424` → `string`, `500` → `string`
@@ -943,7 +910,6 @@ authFetch path: `user/trip/fleets/{fleetId}/vehicles/{vehicleId}/trips/{tripId}/
 - `tripId`: string (required) — unique id of the trip
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `string`, `400` → `string`, `404` → `string`, `409` → `string`, `410` → `string`, `500` → `string`
@@ -961,7 +927,6 @@ authFetch path: `user/trip/v2/fleets/{fleetId}/trips` (base path `/boapi/proxy/u
 - `pageable`: CursorPageable (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `CursorPaginationSliceTripV2DTO`
@@ -978,7 +943,6 @@ authFetch path: `user/trip/v2/fleets/{fleetId}/trips/count` (base path `/boapi/p
 - `filter`: TripV2Filter (required)
 
 **Header params:**
-- `x-user-id`: string (optional) — the id of the authenticated user
 - `x-boapi-ctx`: string (optional) — the boapi context
 
 **Responses:** `200` → `JSONObject`
