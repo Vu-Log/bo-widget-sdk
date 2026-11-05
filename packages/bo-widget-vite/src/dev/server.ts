@@ -8,8 +8,14 @@ import type { Logger, ViteDevServer } from 'vite';
 import type { FakeBoConfig } from './host.js';
 import type { FakeBoMode, WidgetDevOptions } from './options.js';
 
+/**
+ * Default `basename` of the fake back office: the path of its page, so that a router with this
+ * basename matches the page URL, and its sub-routes are served on reload.
+ */
+export const FAKE_BO_BASENAME = '/__bo-widget';
+
 /** Path the fake back office is served on. */
-export const FAKE_BO_PATH = '/__bo-widget/';
+export const FAKE_BO_PATH = `${FAKE_BO_BASENAME}/`;
 
 /** URL of the module that starts the fake back office in the page. */
 export const FAKE_BO_MODULE_URL = `${FAKE_BO_PATH}fake-bo.js`;
@@ -144,11 +150,11 @@ export const fakeBoConfig = (
   const context: BoContext = {
     fleetId: DEV_FLEET,
     host: 'localhost',
-    locale: 'en',
+    locale: 'en_GB',
     timezone: 'Europe/Paris',
     currency: 'EUR',
     boVersion: manifest.protocol.minBoVersion ?? '1.86.0',
-    basename: `/widgets/${manifest.id}`,
+    basename: FAKE_BO_BASENAME,
     ...dev.context,
   };
   const user: BoCurrentUser = {
@@ -381,6 +387,24 @@ const proxyToApi = async (
   }
 };
 
+/**
+ * True for a request of the fake back office page: its path, or a page request (`GET` or `HEAD`
+ * accepting HTML) of a sub-route, which a widget router reloads. Its module and the local API are
+ * not pages.
+ */
+export const isFakeBoPage = (
+  req: Pick<IncomingMessage, 'method' | 'headers'>,
+  pathname: string,
+): boolean => {
+  if (pathname === FAKE_BO_PATH || pathname === FAKE_BO_BASENAME) return true;
+  if (!pathname.startsWith(FAKE_BO_PATH) || pathname === FAKE_BO_MODULE_URL) return false;
+  if (pathname.startsWith(FAKE_API_PATH)) return false;
+  const method = req.method ?? 'GET';
+  return (
+    (method === 'GET' || method === 'HEAD') && (req.headers.accept ?? '').includes('text/html')
+  );
+};
+
 /** What {@link installFakeBo} needs. */
 export interface FakeBoServerOptions {
   readonly runtime: WidgetManifest['runtime']['type'];
@@ -392,8 +416,8 @@ export interface FakeBoServerOptions {
 const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1'];
 
 /**
- * Serves the fake back office on {@link FAKE_BO_PATH} and the local Vulog API under
- * {@link FAKE_API_PATH}: mock responses, or the real API in token mode. As a Web Component, `/`
+ * Serves the fake back office on {@link FAKE_BO_PATH} and its sub-routes, and the local Vulog API
+ * under {@link FAKE_API_PATH}: mock responses, or the real API in token mode. As a Web Component, `/`
  * redirects to the fake back office; in an iframe, `/` stays the widget page it displays.
  */
 export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOptions): void => {
@@ -445,9 +469,9 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
       res.end();
       return;
     }
-    if (pathname === FAKE_BO_PATH || pathname === FAKE_BO_PATH.slice(0, -1)) {
+    if (isFakeBoPage(req, pathname)) {
       server
-        .transformIndexHtml(FAKE_BO_PATH, FAKE_BO_HTML)
+        .transformIndexHtml(pathname, FAKE_BO_HTML)
         .then((html) => {
           res.setHeader('Content-Type', 'text/html');
           res.end(html);

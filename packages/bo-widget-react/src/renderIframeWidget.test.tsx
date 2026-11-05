@@ -57,7 +57,7 @@ describe('renderIframeWidget', () => {
       unmount = renderIframeWidget(App, { connect: { widgetId: 'fleet-report' } });
     });
 
-    await waitFor(() => expect(root.textContent).toBe('Fleet FLEET en no-route'));
+    await waitFor(() => expect(root.textContent).toBe('Fleet FLEET en_GB no-route'));
     expect(backOffice.parent.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'hello', widgetId: 'fleet-report' }),
       '*',

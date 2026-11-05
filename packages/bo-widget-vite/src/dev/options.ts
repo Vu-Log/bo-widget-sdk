@@ -79,6 +79,9 @@ export const devOptionsIssues = (dev: unknown): string[] => {
         issues.push(`dev.context.${key}: must be a string`);
       }
     }
+    if (typeof context.basename === 'string' && !context.basename.startsWith('/')) {
+      issues.push('dev.context.basename: must start with "/" (the default is "/__bo-widget")');
+    }
     for (const key of CONTEXT_NULLABLE_STRING_KEYS) {
       const value = context[key];
       if (value !== undefined && value !== null && typeof value !== 'string') {

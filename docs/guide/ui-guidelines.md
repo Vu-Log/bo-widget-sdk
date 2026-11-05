@@ -20,9 +20,19 @@ render(locale);
 bo.on('localeChanged', ({ locale }) => render(locale));
 ```
 
-`locale`, `timezone` and `currency` can be `null`: have a fallback. Format dates and amounts with them, for instance with `Intl.DateTimeFormat` and `Intl.NumberFormat`.
+`locale` is `language_COUNTRY` with an underscore (`en_GB`, `fr_FR`), not a BCP 47 tag. `Intl` refuses it as is: replace the underscore first.
 
-Labels of the manifest (`menu.label`, `settings[].label`) are records per locale: give one per language your users use.
+```ts
+const tag = (locale ?? 'en_GB').replace('_', '-'); // 'en-GB'
+new Intl.DateTimeFormat(tag, { timeZone: timezone ?? undefined }).format(date);
+new Intl.NumberFormat(tag, { style: 'currency', currency: currency ?? 'EUR' }).format(amount);
+```
+
+To pick your own translations, try the exact locale, then its language (`locale.split('_')[0]`), then a default.
+
+`locale`, `timezone` and `currency` can be `null`: have a fallback.
+
+Labels of the manifest (`menu.label`, `settings[].label`) are records keyed by language (`en`, `fr`) or by exact BO locale (`fr_FR`). For the menu entry, the BO takes the exact locale, then its language, then `en`: give one per language your users use.
 
 ## Feedback
 
@@ -52,6 +62,28 @@ await bo.navigate({ path: 'details/1' }); // relative to the widget's view
 ```
 
 The widget needs the `navigate` permission. An external URL rejects with `INVALID_PAYLOAD`. For sub-routes of the widget, use `getContext().basename` as the base of your router and follow `routeChanged`. With React, `useBoRouter()` gives `basename`, `location` and `navigate`.
+
+### Sub-routes
+
+The BO shows the widget on its view and on every sub-route of it. A Web Component shares the BO page URL, so a widget with several screens can keep them in it: a deep link or a reload opens the same screen. Give `basename` to your router:
+
+```tsx
+import { useMemo } from 'react';
+import { useBoRouter } from '@vulog/bo-widget-react';
+import { createBrowserRouter, RouterProvider } from 'react-router';
+
+const Routes = () => {
+  const { basename } = useBoRouter();
+  const router = useMemo(() => createBrowserRouter(routes, { basename }), [basename]);
+  return <RouterProvider router={router} />;
+};
+```
+
+Move between the screens of the widget with the router itself (`Link`, `router.navigate`): the router does not see `navigate` of the BO, which changes the URL without telling it. Keep `navigate` for the routes of the BO (`/app/vehicles`). `navigate({ path: 'details/1' })` still resolves under `basename`, and the BO then pushes `routeChanged` with the full path.
+
+In an iframe, the widget page has its own URL, which stays the same: no request gives the BO route, and a reload opens the first screen. Route from `routeChanged` (`location` of `useBoRouter()`, `null` until the first one), with a memory router, not from the iframe URL.
+
+In dev, the fake BO uses `/__bo-widget` as `basename`, the path of its page, and serves its sub-routes on reload. Keep that default: with another `dev.context.basename`, the page URL is outside it and the router matches nothing (the dev server and the fake BO warn).
 
 ## Accessibility
 

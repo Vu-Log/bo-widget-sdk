@@ -8,7 +8,7 @@ export default defineWidgetConfig({
   menu: { label: { en: '{{title}}', fr: '{{title}}' } },
   // Data of the fake back office in `npm run dev` (mock mode).
   dev: {
-    context: { fleetId: 'FLEET-1', locale: 'en' },
+    context: { fleetId: 'FLEET-1', locale: 'en_GB' },
     user: { fullName: 'Jane Doe' },
   },
 });

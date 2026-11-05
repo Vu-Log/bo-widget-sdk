@@ -1,8 +1,12 @@
 // @vitest-environment happy-dom
 import { BoError, connect, type BoClient } from '@vulog/bo-widget-sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildManifest } from '../manifest.js';
+import { FAKE_BO_PATH, fakeBoConfig } from './server.js';
 import {
   createFakeBackOffice,
+  isInView,
+  resolveRoute,
   startFakeBo,
   WidgetHostError,
   type FakeBoConfig,
@@ -26,11 +30,11 @@ const fakeConfig = (overrides: Partial<FakeBoConfig> = {}): FakeBoConfig => ({
   context: {
     fleetId: 'DEV-FLEET',
     host: 'localhost',
-    locale: 'en',
+    locale: 'en_GB',
     timezone: 'Europe/Paris',
     currency: 'EUR',
     boVersion: '1.86.0',
-    basename: '/widgets/fleet-report',
+    basename: '/__bo-widget',
   },
   user: {
     id: 'dev-user',
@@ -103,6 +107,7 @@ const connectIframe = async (config: FakeBoConfig, ui = fakeUi()) => {
 beforeEach(() => {
   document.head.replaceChildren();
   document.body.replaceChildren();
+  history.replaceState(null, '', '/__bo-widget/');
 });
 
 afterEach(() => {
@@ -164,7 +169,7 @@ describe('startFakeBo as a Web Component', () => {
     const bo = await client();
 
     expect(await bo.navigate({ path: 'details/1' })).toEqual({
-      path: '/widgets/fleet-report/details/1',
+      path: '/__bo-widget/details/1',
     });
     expect(await bo.navigate({ path: '/app/vehicles' })).toEqual({ path: '/app/vehicles' });
     await bo.notify({ message: 'Saved', severity: 'success' });
@@ -183,15 +188,156 @@ describe('startFakeBo as a Web Component', () => {
     bo.on('themeChanged', (data) => themes.push(data.mode));
 
     const select = document.querySelector('select') as HTMLSelectElement;
-    select.value = 'fr';
+    select.value = 'fr_FR';
     select.dispatchEvent(new Event('change'));
     (document.querySelector('button') as HTMLButtonElement).click();
 
-    expect(locales).toEqual([{ locale: 'fr' }]);
+    expect(locales).toEqual([{ locale: 'fr_FR' }]);
     expect(themes).toEqual(['dark']);
-    expect((await bo.getContext()).locale).toBe('fr');
+    expect((await bo.getContext()).locale).toBe('fr_FR');
     expect((await bo.getTheme()).mode).toBe('dark');
     expect(document.querySelector('button')?.textContent).toBe('Theme: dark');
+  });
+
+  it('pushes a route of the widget view to the history, with routeChanged, so that a reload opens it', async () => {
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig(), load(Widget));
+    const bo = await client();
+    const routes: unknown[] = [];
+    bo.on('routeChanged', (data) => routes.push(data));
+
+    await bo.navigate({ path: 'stations/1?week=2#today' });
+
+    expect(`${location.pathname}${location.search}${location.hash}`).toBe(
+      '/__bo-widget/stations/1?week=2#today',
+    );
+    expect(routes).toEqual([
+      { pathname: '/__bo-widget/stations/1', search: '?week=2', hash: '#today' },
+    ]);
+    expect(document.querySelector('.bo-route')?.textContent).toBe(
+      '/__bo-widget/stations/1?week=2#today',
+    );
+  });
+
+  it('only shows a route outside the widget view, with a warning, as the back office would leave the widget', async () => {
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig(), load(Widget));
+    const bo = await client();
+    const routes: unknown[] = [];
+    bo.on('routeChanged', (data) => routes.push(data));
+
+    expect(await bo.navigate({ path: '../elsewhere' })).toEqual({ path: '/elsewhere' });
+
+    expect(location.pathname).toBe('/__bo-widget/');
+    expect(routes).toEqual([]);
+    expect(document.querySelector('.bo-log .warning')?.textContent).toContain(
+      "/elsewhere is outside the widget's view",
+    );
+  });
+
+  it('pushes routeChanged when the user goes back in the history', async () => {
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig(), load(Widget));
+    const bo = await client();
+    const routes: unknown[] = [];
+    bo.on('routeChanged', (data) => routes.push(data));
+
+    history.replaceState(null, '', '/__bo-widget/stations/2');
+    globalThis.dispatchEvent(new PopStateEvent('popstate'));
+
+    expect(routes).toEqual([{ pathname: '/__bo-widget/stations/2', search: '', hash: '' }]);
+    expect(document.querySelector('.bo-route')?.textContent).toBe('/__bo-widget/stations/2');
+  });
+
+  it('shows the route of a reloaded sub-route in the bar', async () => {
+    history.replaceState(null, '', '/__bo-widget/stations/3');
+    const { Widget } = widgetClass();
+
+    await startFakeBo(fakeConfig(), load(Widget));
+
+    expect(document.querySelector('.bo-route')?.textContent).toBe('/__bo-widget/stations/3');
+    expect(document.querySelector('.bo-log .warning')).toBeNull();
+  });
+
+  it('warns when the page is outside the basename, which a router would not match', async () => {
+    const { Widget } = widgetClass();
+
+    await startFakeBo(
+      fakeConfig({ context: { ...fakeConfig().context, basename: '/widgets/fleet-report' } }),
+      load(Widget),
+    );
+
+    expect(document.querySelector('.bo-log .warning')?.textContent).toContain(
+      'the page /__bo-widget/ is outside the basename /widgets/fleet-report',
+    );
+  });
+
+  it('offers the back office locales, in its language_COUNTRY format, and keeps another one first', async () => {
+    const options = () =>
+      [...document.querySelectorAll('select option')].map((option) => option.textContent);
+
+    await startFakeBo(fakeConfig(), load(widgetClass().Widget));
+    expect(options()).toEqual(['en_GB', 'fr_FR', 'es_ES', 'de_DE', 'it_IT']);
+    expect((document.querySelector('select') as HTMLSelectElement).value).toBe('en_GB');
+
+    document.body.replaceChildren();
+    await startFakeBo(
+      fakeConfig({ context: { ...fakeConfig().context, locale: 'pt_PT' } }),
+      load(widgetClass().Widget),
+    );
+    expect(options()[0]).toBe('pt_PT');
+    expect((document.querySelector('select') as HTMLSelectElement).value).toBe('pt_PT');
+  });
+
+  it('rejects a path that the browser would read as another host, backslashes included', async () => {
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig(), load(Widget));
+    const bo = await client();
+
+    for (const path of ['\\\\evil.example/x', '/\\evil.example/x', '//evil.example/x']) {
+      await expect(bo.navigate({ path })).rejects.toMatchObject({ code: 'INVALID_PAYLOAD' });
+    }
+    expect(location.pathname).toBe('/__bo-widget/');
+  });
+
+  it('pushes no routeChanged, with a warning, when the history goes back outside the widget view', async () => {
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig(), load(Widget));
+    const bo = await client();
+    const routes: unknown[] = [];
+    bo.on('routeChanged', (data) => routes.push(data));
+
+    history.replaceState(null, '', '/app/vehicles');
+    globalThis.dispatchEvent(new PopStateEvent('popstate'));
+
+    expect(routes).toEqual([]);
+    expect(document.querySelector('.bo-log .warning')?.textContent).toContain(
+      "/app/vehicles is outside the widget's view: no routeChanged",
+    );
+  });
+
+  it('warns about a locale that is not in the back office format', async () => {
+    await startFakeBo(
+      fakeConfig({ context: { ...fakeConfig().context, locale: 'en' } }),
+      load(widgetClass().Widget),
+    );
+
+    expect(document.querySelector('.bo-log .warning')?.textContent).toContain(
+      'the locale en is not in the format of the back office, language_COUNTRY',
+    );
+  });
+
+  it('matches its page with the default context of the dev server, without warning', async () => {
+    const manifest = buildManifest(
+      { name: 'Fleet report' },
+      { name: 'fleet-report', version: '1.0.0' },
+    );
+    history.replaceState(null, '', `${FAKE_BO_PATH}stations/1`);
+
+    await startFakeBo(fakeBoConfig(manifest, {}, { mode: 'mock' }), load(widgetClass().Widget));
+
+    expect(document.querySelector('.bo-log .warning')).toBeNull();
+    expect(document.querySelector('.bo-route')?.textContent).toBe(`${FAKE_BO_PATH}stations/1`);
   });
 
   it('rejects an external URL to navigate with INVALID_PAYLOAD', async () => {
@@ -327,7 +473,7 @@ describe('startFakeBo as an iframe', () => {
     hello({}, [second.port2]);
     await vi.waitFor(() => expect(secondReceived).toHaveLength(1));
     const select = document.querySelector('select') as HTMLSelectElement;
-    select.value = 'fr';
+    select.value = 'fr_FR';
     select.dispatchEvent(new Event('change'));
     await vi.waitFor(() => expect(secondReceived).toHaveLength(2));
 
@@ -335,7 +481,7 @@ describe('startFakeBo as an iframe', () => {
     expect(secondReceived[1]).toEqual({
       type: 'event',
       name: 'localeChanged',
-      data: { locale: 'fr' },
+      data: { locale: 'fr_FR' },
     });
     second.port1.close();
   });
@@ -535,7 +681,7 @@ describe('createFakeBackOffice on the iframe port', () => {
     port1.postMessage({ id: '1', type: 'getSecrets' });
     port1.postMessage({ id: '2', type: 'navigate', payload: { path: 'ok' } });
     port1.postMessage('not a request');
-    await vi.waitFor(() => expect(answers).toHaveLength(3));
+    await vi.waitFor(() => expect(answers).toHaveLength(4));
     await vi.waitFor(() =>
       expect(ui.log).toHaveBeenCalledWith(
         expect.stringMatching(/ignored a message without id/),
@@ -550,7 +696,12 @@ describe('createFakeBackOffice on the iframe port', () => {
         ok: false,
         error: { code: 'UNKNOWN_TYPE', message: 'Unknown request getSecrets' },
       },
-      { id: '2', ok: true, result: { path: '/widgets/fleet-report/ok' } },
+      {
+        type: 'event',
+        name: 'routeChanged',
+        data: { pathname: '/__bo-widget/ok', search: '', hash: '' },
+      },
+      { id: '2', ok: true, result: { path: '/__bo-widget/ok' } },
     ]);
     port1.close();
   });
@@ -652,5 +803,41 @@ describe('createFakeBackOffice host API', () => {
     ).createHostApi();
 
     expect(await api.getAccessToken()).toEqual({ accessToken: 'real', expiresAt });
+  });
+});
+
+describe('resolveRoute', () => {
+  it('keeps a back office route, and resolves a relative path under the widget view', () => {
+    expect(resolveRoute('/__bo-widget', '/app/vehicles')).toBe('/app/vehicles');
+    expect(resolveRoute('/__bo-widget/', 'details/1?tab=2#top')).toBe(
+      '/__bo-widget/details/1?tab=2#top',
+    );
+  });
+
+  it('keeps a query or a hash alone under the widget view', () => {
+    expect(resolveRoute('/__bo-widget', '?tab=2')).toBe('/__bo-widget/?tab=2');
+    expect(resolveRoute('/__bo-widget', '#top')).toBe('/__bo-widget/#top');
+    expect(isInView('/__bo-widget', '/__bo-widget/?tab=2')).toBe(true);
+  });
+
+  it('lets .. leave the widget view', () => {
+    expect(resolveRoute('/widgets/fleet-report', '../other')).toBe('/widgets/other');
+  });
+});
+
+describe('isInView', () => {
+  it('accepts the view and its sub-routes only', () => {
+    expect(isInView('/__bo-widget', '/__bo-widget')).toBe(true);
+    expect(isInView('/__bo-widget/', '/__bo-widget/a?b#c')).toBe(true);
+    expect(isInView('/__bo-widget', '/__bo-widget-other')).toBe(false);
+    expect(isInView('/__bo-widget', '/app/vehicles')).toBe(false);
+  });
+
+  it('compares a basename that needs encoding with the encoded route', () => {
+    expect(isInView('/w x', resolveRoute('/w x', 'a'))).toBe(true);
+  });
+
+  it('accepts every route for the root basename', () => {
+    expect(isInView('/', '/anything')).toBe(true);
   });
 });
