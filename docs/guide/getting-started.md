@@ -71,7 +71,7 @@ The widget shows the fleet and the connected user. They come from the `dev` sect
 
 ```ts
 dev: {
-  context: { fleetId: 'FLEET-1', locale: 'en' },
+  context: { fleetId: 'FLEET-1', locale: 'en_GB' },
   user: { fullName: 'Jane Doe' },
 },
 ```

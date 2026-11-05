@@ -39,11 +39,13 @@ Objects are strict: **an unknown field is an error**, at any level, so that a ty
 
 These are defaults for the menu entry the BO creates when the widget is installed.
 
-Every `label` is a record per locale, never a plain string:
+Every `label` is a record, never a plain string, keyed by language (`en`) or by exact BO locale (`fr_FR`, the `language_COUNTRY` format of [`getContext().locale`](./protocol#requests)):
 
 ```json
 { "en": "Fleet report", "fr": "Rapport de flotte" }
 ```
+
+The BO shows the label of its exact locale, then of its language, then `en`.
 
 ### `settings`
 

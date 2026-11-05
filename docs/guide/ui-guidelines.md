@@ -20,9 +20,19 @@ render(locale);
 bo.on('localeChanged', ({ locale }) => render(locale));
 ```
 
-`locale`, `timezone` and `currency` can be `null`: have a fallback. Format dates and amounts with them, for instance with `Intl.DateTimeFormat` and `Intl.NumberFormat`.
+`locale` is `language_COUNTRY` with an underscore (`en_GB`, `fr_FR`), not a BCP 47 tag. `Intl` refuses it as is: replace the underscore first.
 
-Labels of the manifest (`menu.label`, `settings[].label`) are records per locale: give one per language your users use.
+```ts
+const tag = (locale ?? 'en_GB').replace('_', '-'); // 'en-GB'
+new Intl.DateTimeFormat(tag, { timeZone: timezone ?? undefined }).format(date);
+new Intl.NumberFormat(tag, { style: 'currency', currency: currency ?? 'EUR' }).format(amount);
+```
+
+To pick your own translations, try the exact locale, then its language (`locale.split('_')[0]`), then a default.
+
+`locale`, `timezone` and `currency` can be `null`: have a fallback.
+
+Labels of the manifest (`menu.label`, `settings[].label`) are records keyed by language (`en`, `fr`) or by exact BO locale (`fr_FR`). The BO takes the exact locale, then its language, then `en`: give one per language your users use.
 
 ## Feedback
 

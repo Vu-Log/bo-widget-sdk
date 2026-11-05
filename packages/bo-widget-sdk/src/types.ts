@@ -11,6 +11,11 @@ export type BoPermission = 'accessToken' | 'apiInfo' | 'navigate' | 'notify';
 export interface BoContext {
   fleetId: string | null;
   host: string | null;
+  /**
+   * Language of the back office, as `language_COUNTRY` with an underscore: `en_GB` (the default),
+   * `fr_FR`, `de_DE`… Not a BCP 47 tag: `Intl` refuses `en_GB`, so replace the underscore first
+   * (`locale.replace('_', '-')`).
+   */
   locale: string | null;
   timezone: string | null;
   currency: string | null;
@@ -94,6 +99,7 @@ export interface BoResizePayload {
 
 /** Data of each event the back office pushes to the widget. */
 export interface BoEventMap {
+  /** The new language, in the format of {@link BoContext.locale} (`en_GB`). */
   localeChanged: { locale: string | null };
   fleetChanged: { fleetId: string | null };
   userChanged: BoCurrentUser;
