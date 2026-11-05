@@ -1,6 +1,6 @@
 {
   "name": "@vulog/create-bo-widget",
-  "version": "0.1.0-next.1",
+  "version": "0.1.0-next.2",
   "description": "Creates the project of a Vulog back office widget: npm create @vulog/bo-widget, with React + MUI, Svelte, Vue, Lit or plain Web Component templates.",
   "license": "MIT",
   "author": "Vulog",

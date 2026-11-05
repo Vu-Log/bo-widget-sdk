@@ -1,5 +1,11 @@
 # @vulog/bo-widget-sdk
 
+## 0.1.0-next.4
+
+### Patch Changes
+
+- 2fe97a0: Document the format of `BoContext.locale` and `localeChanged`: the BO language as `language_COUNTRY` with an underscore (`en_GB`, `fr_FR`), not a BCP 47 tag, so `Intl` needs the underscore replaced first.
+
 ## 0.1.0-next.3
 
 ### Patch Changes

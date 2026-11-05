@@ -1,5 +1,11 @@
 # @vulog/create-bo-widget
 
+## 0.1.0-next.2
+
+### Patch Changes
+
+- 2fe97a0: Use the BO locale format, `en_GB`, in the `dev.context` and the tests of the templates.
+
 ## 0.1.0-next.1
 
 ### Patch Changes
