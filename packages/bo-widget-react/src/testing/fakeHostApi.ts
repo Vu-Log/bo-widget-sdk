@@ -6,7 +6,7 @@ type Listener = (data: unknown) => void;
 export const context: BoContext = {
   fleetId: 'FLEET',
   host: 'bo.example.com',
-  locale: 'en',
+  locale: 'en_GB',
   timezone: 'Europe/Paris',
   currency: 'EUR',
   boVersion: '1.86.0',

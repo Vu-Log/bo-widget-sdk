@@ -63,6 +63,26 @@ await bo.navigate({ path: 'details/1' }); // relative to the widget's view
 
 The widget needs the `navigate` permission. An external URL rejects with `INVALID_PAYLOAD`. For sub-routes of the widget, use `getContext().basename` as the base of your router and follow `routeChanged`. With React, `useBoRouter()` gives `basename`, `location` and `navigate`.
 
+### Sub-routes
+
+The BO shows the widget on its view and on every sub-route of it, so a widget with several screens can keep them in the URL: a deep link or a reload opens the same screen. Give `basename` to your router:
+
+```tsx
+import { useMemo } from 'react';
+import { useBoRouter } from '@vulog/bo-widget-react';
+import { createBrowserRouter, RouterProvider } from 'react-router';
+
+const Routes = () => {
+  const { basename } = useBoRouter();
+  const router = useMemo(() => createBrowserRouter(routes, { basename }), [basename]);
+  return <RouterProvider router={router} />;
+};
+```
+
+`navigate({ path: 'details/1' })` resolves under `basename`, and the BO then pushes `routeChanged` with the full path. In an iframe, the widget page has its own URL: route from `routeChanged` (`location` of `useBoRouter()`), not from the iframe URL.
+
+In dev, the fake BO uses `/__bo-widget` as `basename`, the path of its page, and serves its sub-routes on reload. Keep that default: with another `dev.context.basename`, the page URL is outside it and the router matches nothing (the fake BO warns in its log).
+
 ## Accessibility
 
 - Use semantic elements (`header`, `main`, `button`, `label`) and the components of your UI library, which handle focus and keyboard.

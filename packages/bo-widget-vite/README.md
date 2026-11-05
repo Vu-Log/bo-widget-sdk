@@ -85,7 +85,9 @@ The plugin sets `base: './'` (and warns if you set another one) and, for a Web C
 
 ## Fake back office
 
-The fake BO displays the widget as the BO does: a Web Component registered under a `widget-{hash}` tag with its API injected as `vulogBo`, or an iframe with the `postMessage` handshake. It answers every request of the protocol, and its bar pushes `localeChanged` and `themeChanged`. A log at the bottom shows each request and its answer, and `notify` shows a snackbar.
+The fake BO displays the widget as the BO does: a Web Component registered under a `widget-{hash}` tag with its API injected as `vulogBo`, or an iframe with the `postMessage` handshake. It answers every request of the protocol, and its bar pushes `localeChanged` and `themeChanged`, with the locales in the BO format (`en_GB`, `fr_FR`…). A log at the bottom shows each request and its answer, and `notify` shows a snackbar.
+
+Its context defaults to the fleet `DEV-FLEET`, the locale `en_GB` and the `basename` `/__bo-widget`, the path of its page, so that a widget router matches it. As in the BO, the page is served on every sub-route (`/__bo-widget/stations/1`): a reload or a deep link opens the same screen. `navigate` to a route of the widget's view pushes it to the history and pushes `routeChanged`, as do back and forward; a route outside the view is only shown in the bar, with a warning, since the BO would leave the widget.
 
 As in the BO, permissions are enforced in an iframe only (`FORBIDDEN`); for a Web Component, a request the manifest does not allow is served, with a warning in the log. In an iframe, `authFetch` needs `accessToken` as well as `apiInfo`, since the SDK adds the token itself.
 
@@ -101,7 +103,7 @@ A fake token, and static answers for the Vulog API calls: a `200` with the JSON 
 defineWidgetConfig({
   name: 'Fleet report',
   dev: {
-    context: { fleetId: 'FLEET-1', locale: 'fr' }, // getContext
+    context: { fleetId: 'FLEET-1', locale: 'fr_FR' }, // getContext
     user: { roles: ['fleetagent'] }, // getCurrentUser
     settings: { currency: 'CAD' }, // getSettings, over the setting defaults
     responses: {

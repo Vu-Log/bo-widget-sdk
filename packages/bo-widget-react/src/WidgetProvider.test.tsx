@@ -36,7 +36,7 @@ describe('WidgetProvider', () => {
 
     await act(async () => context.resolve({ ...baseContext }));
 
-    expect(screen.getByText('Jane Doe FLEET en')).toBeDefined();
+    expect(screen.getByText('Jane Doe FLEET en_GB')).toBeDefined();
   });
 
   it('applies the events received while loading', async () => {
@@ -224,7 +224,7 @@ describe('WidgetProvider', () => {
         <Probe />
       </WidgetProvider>,
     );
-    await waitFor(() => expect(screen.getByText('Jane Doe FLEET en')).toBeDefined());
+    await waitFor(() => expect(screen.getByText('Jane Doe FLEET en_GB')).toBeDefined());
 
     unmount();
 

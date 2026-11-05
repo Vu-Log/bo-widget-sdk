@@ -10,7 +10,7 @@ const fakeBo = (overrides: Record<string, unknown> = {}) => {
   const listeners = new Map<string, Set<Listener>>();
   const api = {
     protocolVersion: 2,
-    getContext: async () => ({ fleetId: 'FLEET-1', locale: 'en', basename: '/' }),
+    getContext: async () => ({ fleetId: 'FLEET-1', locale: 'en_GB', basename: '/' }),
     getCurrentUser: async () => ({ fullName: 'Jane Doe', roles: [] }),
     getTheme: async () => ({ palette: {}, typography: {}, mode: 'light' }),
     on: (name: string, listener: Listener) => {

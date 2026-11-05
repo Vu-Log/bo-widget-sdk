@@ -17,9 +17,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { boWidget } from '../plugin.js';
 import {
   FAKE_API_PATH,
+  FAKE_BO_BASENAME,
   FAKE_BO_MODULE_URL,
   FAKE_BO_PATH,
   fakeBoConfig,
+  isFakeBoPage,
   fakeBoModule,
   forwardedHeaders,
   isCrossSite,
@@ -266,7 +268,7 @@ describe('fakeBoConfig', () => {
         permissions: ['apiInfo'],
       },
       tag: widgetTag('dev', 'fleet-report', '1.2.3'),
-      context: { fleetId: 'DEV-FLEET', locale: 'en', basename: '/widgets/fleet-report' },
+      context: { fleetId: 'DEV-FLEET', locale: 'en_GB', basename: FAKE_BO_BASENAME },
       user: { currentFleetId: 'DEV-FLEET', fleets: [{ fleetId: 'DEV-FLEET', profile: 'manager' }] },
       settings: { currency: 'CAD' },
       apiPath: FAKE_API_PATH,
@@ -476,6 +478,28 @@ describe('fake back office dev server', () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toContain('createFakeBackOffice');
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('serves the fake back office page on a sub-route, which a widget router reloads', async () => {
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const response = await fetch(`${origin}${FAKE_BO_PATH}stations/1?week=2`, {
+      headers: { accept: 'text/html,application/xhtml+xml' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toMatch(/text\/html/);
+    expect(await response.text()).toContain(`src="${FAKE_BO_MODULE_URL}"`);
+  });
+
+  it('leaves a sub-route that is not a page request to Vite', async () => {
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const response = await fetch(`${origin}${FAKE_BO_PATH}stations/1`, {
+      headers: { accept: 'application/json' },
+    });
+
+    expect(response.status).toBe(404);
   });
 
   it('redirects / to the fake back office for a Web Component', async () => {
@@ -875,5 +899,28 @@ describe('fake back office dev server', () => {
         'Fake back office (mock mode): http://192.168.1.10:5173/__bo-widget/',
       ),
     );
+  });
+});
+
+describe('isFakeBoPage', () => {
+  const page = { method: 'GET', headers: { accept: 'text/html' } };
+
+  it('accepts the page path, with or without its slash, whatever the request', () => {
+    expect(isFakeBoPage({ method: 'POST', headers: {} }, FAKE_BO_PATH)).toBe(true);
+    expect(isFakeBoPage({ method: 'GET', headers: {} }, FAKE_BO_BASENAME)).toBe(true);
+  });
+
+  it('accepts a page request of a sub-route', () => {
+    expect(isFakeBoPage(page, `${FAKE_BO_PATH}stations/1`)).toBe(true);
+    expect(isFakeBoPage({ ...page, method: 'HEAD' }, `${FAKE_BO_PATH}stations/1`)).toBe(true);
+  });
+
+  it('refuses the module, the local API, another method or a request without HTML', () => {
+    expect(isFakeBoPage(page, FAKE_BO_MODULE_URL)).toBe(false);
+    expect(isFakeBoPage(page, `${FAKE_API_PATH}fleets`)).toBe(false);
+    expect(isFakeBoPage({ ...page, method: 'POST' }, `${FAKE_BO_PATH}stations/1`)).toBe(false);
+    expect(isFakeBoPage({ method: 'GET', headers: {} }, `${FAKE_BO_PATH}stations/1`)).toBe(false);
+    expect(isFakeBoPage(page, '/__bo-widget-other/x')).toBe(false);
+    expect(isFakeBoPage(page, '/src/main.ts')).toBe(false);
   });
 });

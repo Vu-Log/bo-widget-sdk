@@ -51,7 +51,11 @@ export interface FakeBoConfig {
 export interface FakeBoUi {
   log(message: string, level?: 'info' | 'warning' | 'error'): void;
   notify(message: string, severity: BoNotifySeverity): void;
-  navigate(path: string): void;
+  /**
+   * Shows the route `navigate` resolved. A route of the widget's view is also pushed to the
+   * history, so that a reload opens it again.
+   */
+  navigate(route: string, inView: boolean): void;
   resize(height: number | null): void;
 }
 
@@ -123,9 +127,31 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const invalidPayload = (message: string): WidgetHostError =>
   new WidgetHostError('invalid-payload', message);
 
-/** Resolves a `navigate` path the way the back office does: `/…` under the fleet, otherwise under the widget's view. */
-const resolveRoute = (basename: string, path: string): string =>
-  path.startsWith('/') ? path : `${basename.replace(/\/+$/, '')}/${path}`;
+/** Origin to resolve the routes against: only their path, query and hash are kept. */
+const ROUTE_ORIGIN = 'http://fake-bo.invalid';
+
+/**
+ * Resolves a `navigate` path the way the back office does: `/…` is a route of the back office,
+ * otherwise a path resolved like a relative URL under the widget's view (`..` may leave it).
+ * Query and hash are kept.
+ */
+export const resolveRoute = (basename: string, path: string): string => {
+  const url = new URL(path, `${ROUTE_ORIGIN}${basename.replace(/\/+$/, '')}/`);
+  return `${url.pathname}${url.search}${url.hash}`;
+};
+
+/** True when a route is the widget's view or one of its sub-routes. */
+export const isInView = (basename: string, route: string): boolean => {
+  const base = basename.replace(/\/+$/, '');
+  const { pathname } = new URL(route, ROUTE_ORIGIN);
+  return base === '' || pathname === base || pathname.startsWith(`${base}/`);
+};
+
+/** A route as `routeChanged` pushes it. */
+const routeEvent = (route: string): BoEventMap['routeChanged'] => {
+  const { pathname, search, hash } = new URL(route, ROUTE_ORIGIN);
+  return { pathname, search, hash };
+};
 
 /** JSON of a result for the log, with the access token masked: the log is on screen. */
 const forLog = (value: unknown): string => {
@@ -182,7 +208,9 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
         throw invalidPayload(`navigate: ${path} is not a back office route`);
       }
       const route = resolveRoute(context.basename, path);
-      ui.navigate(route);
+      const inView = isInView(context.basename, route);
+      ui.navigate(route, inView);
+      if (inView) emit('routeChanged', routeEvent(route));
       return { path: route };
     },
     notify: (payload) => {
@@ -352,6 +380,11 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
       context.locale = locale;
       emit('localeChanged', { locale });
     },
+    /** Pushes the route of the page (back or forward in the history). */
+    routeChanged() {
+      const { pathname, search, hash } = globalThis.location;
+      emit('routeChanged', { pathname, search, hash });
+    },
     toggleTheme() {
       themeMode = themeMode === 'light' ? 'dark' : 'light';
       emit('themeChanged', structuredClone(THEMES[themeMode]));
@@ -377,6 +410,9 @@ const STYLES = `
   .bo-toast.success { background: #2e7d32; } .bo-toast.warning { background: #ed6c02; } .bo-toast.error { background: #d32f2f; }
 `;
 
+/** Locales of the bar, in the format of the back office (`language_COUNTRY`). */
+const BO_LOCALES = ['en_GB', 'fr_FR', 'es_ES', 'de_DE', 'it_IT'];
+
 const element = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
   props: Partial<HTMLElementTagNameMap[K]> = {},
@@ -387,12 +423,17 @@ const createPage = (config: FakeBoConfig) => {
   document.title = `${config.widget.name} · fake back office`;
   document.head.append(element('style', { textContent: STYLES }));
 
-  const route = element('span', { className: 'bo-route', textContent: config.context.basename });
+  const route = element('span', {
+    className: 'bo-route',
+    textContent: `${location.pathname}${location.search}${location.hash}`,
+  });
   const locale = element('select', { title: 'Locale (localeChanged)' });
-  for (const value of ['en', 'fr', 'es', 'de', 'it']) {
+  const initialLocale = config.context.locale ?? 'en_GB';
+  const locales = BO_LOCALES.includes(initialLocale) ? BO_LOCALES : [initialLocale, ...BO_LOCALES];
+  for (const value of locales) {
     locale.append(element('option', { value, textContent: value }));
   }
-  locale.value = config.context.locale ?? 'en';
+  locale.value = initialLocale;
   const theme = element('button', { type: 'button', textContent: 'Theme: light' });
   const bar = element('header', { className: 'bo-bar' });
   bar.append(
@@ -420,8 +461,16 @@ const createPage = (config: FakeBoConfig) => {
       toasts.append(toast);
       setTimeout(() => toast.remove(), 4000);
     },
-    navigate(path) {
+    navigate(path, inView) {
       route.textContent = path;
+      if (inView) {
+        history.pushState(null, '', path);
+        return;
+      }
+      ui.log(
+        `${path} is outside the widget's view: the back office would leave the widget`,
+        'warning',
+      );
     },
     resize(height) {
       const frame = content.querySelector('iframe');
@@ -433,7 +482,11 @@ const createPage = (config: FakeBoConfig) => {
     content.append(element('div', { className: 'bo-error', textContent: message }));
     ui.log(message, 'error');
   };
-  return { ui, fail, content, locale, theme };
+  /** Shows the route of the page, after a move in the history. */
+  const showRoute = (): void => {
+    route.textContent = `${location.pathname}${location.search}${location.hash}`;
+  };
+  return { ui, fail, content, locale, theme, showRoute };
 };
 
 const isElementClass = (value: unknown): value is CustomElementConstructor =>
@@ -579,6 +632,17 @@ export const startFakeBo = async (config: FakeBoConfig, load?: WidgetLoader): Pr
   page.theme.addEventListener('click', () => {
     page.theme.textContent = `Theme: ${backOffice.toggleTheme()}`;
   });
+  globalThis.addEventListener('popstate', () => {
+    page.showRoute();
+    backOffice.routeChanged();
+  });
+  const { basename } = config.context;
+  if (!isInView(basename, location.pathname)) {
+    page.ui.log(
+      `the page ${location.pathname} is outside the basename ${basename}: a router with this basename matches nothing. Keep the default basename, /__bo-widget.`,
+      'warning',
+    );
+  }
   globalThis.addEventListener('error', (event: ErrorEvent) =>
     page.ui.log(`uncaught error: ${String(event.error ?? event.message)}`, 'error'),
   );

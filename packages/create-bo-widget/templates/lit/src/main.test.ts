@@ -10,7 +10,7 @@ const fakeBo = (overrides: Record<string, unknown> = {}) => {
   const listeners = new Map<string, Set<Listener>>();
   const api = {
     protocolVersion: 2,
-    getContext: async () => ({ fleetId: 'FLEET-1', locale: 'en' }),
+    getContext: async () => ({ fleetId: 'FLEET-1', locale: 'en_GB' }),
     getCurrentUser: async () => ({ fullName: 'Jane Doe' }),
     on: (name: string, listener: Listener) => {
       listeners.set(name, (listeners.get(name) ?? new Set()).add(listener));
