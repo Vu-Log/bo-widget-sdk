@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { boConfUrl, fetchBoApi, fetchFailure, parseBoHost } from './boConf.js';
+import { boConfUrl, fetchBoApi, fetchFailure, fetchFailureCode, parseBoHost } from './boConf.js';
 
 const HOST = 'bo.example.com';
 const SECRET_KEY = 'secret-api-key-123';
@@ -33,6 +33,8 @@ describe('parseBoHost', () => {
     ['bo.example.com', 'bo.example.com'],
     ['BO.Example.com', 'bo.example.com'],
     ['localhost:8443', 'localhost:8443'],
+    ['bo.example.com:443', 'bo.example.com'],
+    ['bücher.example', 'xn--bcher-kva.example'],
   ])('accepts the host %s', (value, host) => {
     expect(parseBoHost(value)).toBe(host);
   });
@@ -72,6 +74,29 @@ describe('fetchFailure', () => {
     ['a thrown value', 'boom', 'boom'],
   ])('gives %s', (_label, error, reason) => {
     expect(fetchFailure(error)).toBe(reason);
+  });
+});
+
+describe('fetchFailureCode', () => {
+  it.each([
+    [
+      'the code of the cause',
+      new TypeError('fetch failed to https://api.bo.example.com', { cause: { code: 'ENOTFOUND' } }),
+      'ENOTFOUND',
+    ],
+    [
+      'the name of the error, never its message',
+      new TypeError('fetch failed to https://api.bo.example.com', { cause: new Error('x') }),
+      'TypeError',
+    ],
+    [
+      'the name of a timeout',
+      new DOMException('aborted due to timeout', 'TimeoutError'),
+      'TimeoutError',
+    ],
+    ['a fixed text for a thrown value', 'https://api.bo.example.com', 'unknown error'],
+  ])('gives %s', (_label, error, code) => {
+    expect(fetchFailureCode(error)).toBe(code);
   });
 });
 
@@ -149,6 +174,29 @@ describe('fetchBoApi', () => {
         Promise.reject(new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } })),
       ),
       'cannot be reached (ENOTFOUND)',
+    ],
+    [
+      'does not answer in time',
+      vi.fn<typeof fetch>(() =>
+        Promise.reject(
+          new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+        ),
+      ),
+      'did not answer within 10 s',
+    ],
+    [
+      'breaks off while sending its body',
+      vi.fn<typeof fetch>(() =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              start: (controller) =>
+                controller.error(new TypeError('terminated', { cause: { code: 'ECONNRESET' } })),
+            }),
+          ),
+        ),
+      ),
+      'cannot be reached (ECONNRESET)',
     ],
   ])('fails when the conf %s', async (_label, fetchImpl, problem) => {
     const error = await failure(fetchImpl);

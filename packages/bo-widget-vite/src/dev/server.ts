@@ -5,7 +5,7 @@ import { pipeline } from 'node:stream/promises';
 import type { BoContext, BoCurrentUser, BoSettings } from '@vulog/bo-widget-sdk';
 import type { WidgetManifest } from '@vulog/bo-widget-sdk/manifest';
 import type { Logger, ViteDevServer } from 'vite';
-import { fetchBoApi, fetchFailure, parseBoHost } from './boConf.js';
+import { fetchBoApi, fetchFailure, fetchFailureCode, parseBoHost } from './boConf.js';
 import type { FakeBoConfig } from './host.js';
 import type { FakeBoMode, WidgetDevOptions } from './options.js';
 
@@ -43,15 +43,18 @@ export interface TokenModeEnv {
 
 /** Mode of the fake back office, with the environment of the token mode. */
 export type ResolvedDevMode =
-  /** `host`: `BO_WIDGET_HOST`, if set, for `getContext().host`. */
-  | { readonly mode: 'mock'; readonly host?: string }
+  | {
+      readonly mode: 'mock';
+      /** `BO_WIDGET_HOST`, if set, for `getContext().host`. */
+      readonly host?: string;
+    }
   | { readonly mode: 'token'; readonly env: TokenModeEnv };
 
 /** Dependencies of {@link resolveDevMode}. */
 export interface ResolveDevModeOptions {
   /** `fetch`, replaced in tests. */
   readonly fetch?: typeof fetch;
-  /** Logs a warning in the terminal. */
+  /** Logs a warning in the terminal; warnings are dropped when it is omitted. */
   readonly warn?: (message: string) => void;
 }
 
@@ -137,7 +140,7 @@ const hostTokenEnv = async (
  * @throws {Error} For an unknown `dev.mode` or an invalid `BO_WIDGET_HOST`; in token mode when
  * `BO_WIDGET_TOKEN` is missing; with `BO_WIDGET_HOST`, when the conf cannot be read or lacks a
  * field; without it, when `BO_WIDGET_API_URL` or `BO_WIDGET_API_KEY` is missing, or
- * `BO_WIDGET_API_URL` is not an http(s) URL without query nor hash.
+ * `BO_WIDGET_API_URL` is not an http(s) URL without credentials, query nor hash.
  */
 export const resolveDevMode = async (
   requested: FakeBoMode | undefined,
@@ -387,7 +390,8 @@ const proxyToApi = async (
       res.destroy();
       return;
     }
-    const reason = fetchFailure(error);
+    // With BO_WIDGET_HOST, only the code: the message of a failure may name the API origin.
+    const reason = env.host ? fetchFailureCode(error) : fetchFailure(error);
     const where = env.host ? `the API of ${env.host}` : target.origin;
     logger.error(
       `[bo-widget] ${method} ${target.pathname}: cannot reach ${where} (${reason}). Check ${env.host ? 'BO_WIDGET_HOST' : 'BO_WIDGET_API_URL'} and your network.`,
@@ -427,7 +431,7 @@ const proxyToApi = async (
       (error as { code?: unknown }).code !== 'ERR_STREAM_PREMATURE_CLOSE'
     ) {
       logger.error(
-        `[bo-widget] ${method} ${target.pathname}: the API response broke off (${fetchFailure(error)}).`,
+        `[bo-widget] ${method} ${target.pathname}: the API response broke off (${env.host ? fetchFailureCode(error) : fetchFailure(error)}).`,
       );
     }
     res.destroy();

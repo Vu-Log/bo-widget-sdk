@@ -183,7 +183,7 @@ To call the API of a Vulog environment instead, use the token mode:
 
    `--token -` reads the token from the standard input, so that it does not stay in your shell history. Arguments after `--` go to Vite: `npx bo-widget dev --token - -- --port 4000`.
 
-The fake BO forwards each Vulog API call to the API of that BO, with the token, as the BO service worker does. `getContext().host` returns `BO_WIDGET_HOST`; the rest of the context and the user stay the `dev` fixtures. The token is short-lived: once it expires, the API answers `401`. Paste a new one and restart.
+The fake BO forwards each Vulog API call to the API of that BO, with the token, as the BO service worker does. `getContext().host` returns `BO_WIDGET_HOST` (unless `dev.context.host` is set); the rest of the context and the user stay the `dev` fixtures. The token is short-lived: once it expires, the API answers `401`. Paste a new one and restart.
 
 Keep the dev server on `localhost` in token mode: anyone who can reach it can call the API with your token.
 

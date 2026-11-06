@@ -19,9 +19,9 @@ export type MockResponseKey = `${MockMethod} ${string}`;
 /** Options of the fake back office that `vite` serves in dev on `/__bo-widget/`. */
 export interface WidgetDevOptions {
   /**
-   * Defaults to `token` when `BO_WIDGET_TOKEN` is set, `mock` otherwise. Forcing `token` without
-   * `BO_WIDGET_TOKEN` and either `BO_WIDGET_HOST` or both `BO_WIDGET_API_URL` and
-   * `BO_WIDGET_API_KEY` makes `vite` fail at startup.
+   * Defaults to `token` when `BO_WIDGET_TOKEN` is set, `mock` otherwise. Forcing `token` makes
+   * `vite` fail at startup unless `BO_WIDGET_TOKEN` is set, along with either `BO_WIDGET_HOST` or
+   * both `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY`. Always `mock` in the `test` mode (Vitest).
    */
   mode?: FakeBoMode;
   /** Overrides the context of the fake back office (`getContext`). */

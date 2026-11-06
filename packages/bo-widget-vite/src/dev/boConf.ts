@@ -20,36 +20,56 @@ export const fetchFailure = (error: unknown): string => {
   return error instanceof Error ? error.message : String(error);
 };
 
+/**
+ * The code of a `fetch` failure only (`ENOTFOUND`, `TimeoutError`…), without its message, which
+ * may name the target: for a target that must not be logged, such as an API from a conf.
+ */
+export const fetchFailureCode = (error: unknown): string => {
+  const cause = (error as { cause?: { code?: unknown } } | null)?.cause;
+  if (typeof cause?.code === 'string') return cause.code;
+  return error instanceof Error ? error.name : 'unknown error';
+};
+
+const isTimeout = (error: unknown): boolean =>
+  error instanceof Error && error.name === 'TimeoutError';
+
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
- * Checks `BO_WIDGET_HOST`: the host name of a back office, with an optional port, without scheme
- * nor path (`bo.example.com`).
+ * Checks `BO_WIDGET_HOST`: the host name of a back office served over `https:`, with an optional
+ * port, without scheme nor path (`bo.example.com`).
  *
- * @param value - The variable, trimmed.
- * @returns The host, lower-cased.
+ * @param value - The variable, already trimmed by the caller.
+ * @returns The host as `URL` normalizes it: lower-cased, without the default port `443`, an
+ * internationalized name in punycode.
  * @throws {Error} When it is not a bare host.
  */
 export const parseBoHost = (value: string): string => {
   let url: URL | undefined;
-  try {
-    url = new URL(`https://${value}`);
-  } catch {
-    // Reported below.
+  if (value !== '' && !/[/?#@\\\s]/.test(value)) {
+    try {
+      url = new URL(`https://${value}`);
+    } catch {
+      // Reported below.
+    }
   }
-  const host = value.toLowerCase();
-  if (!url || url.host !== host || /[/?#@\\]/.test(value)) {
+  if (!url) {
     throw new Error(
       `Fake back office: BO_WIDGET_HOST must be the host of a back office, without scheme nor path (e.g. bo.example.com), not "${value}"`,
     );
   }
-  return host;
+  return url.host;
 };
 
 /** URL of the anonymous conf the back office of `host` (checked by {@link parseBoHost}) reads at startup. */
 export const boConfUrl = (host: string): string =>
   `https://${host}/fe-api/anonymous/bo/${host}/conf`;
+
+const unreachable = (error: unknown): string =>
+  isTimeout(error)
+    ? `did not answer within ${CONF_TIMEOUT_MS / 1000} s`
+    : `cannot be reached (${fetchFailure(error)})`;
 
 const confError = (host: string, problem: string): Error =>
   new Error(
@@ -65,7 +85,8 @@ const confError = (host: string, problem: string): Error =>
  * @param host - A host checked by {@link parseBoHost}.
  * @param fetchImpl - `fetch`, replaced in tests.
  * @returns The API base URL and the API key.
- * @throws {Error} When the conf cannot be fetched (network, timeout, non-2xx status), is not a
+ * @throws {Error} When the conf cannot be fetched (network, timeout, non-2xx status, body broken
+ * off), is not a
  * JSON object, has no `https:` URL in `url.baseUrl`, or no non-empty string in `X-API-Key`.
  */
 export const fetchBoApi = async (host: string, fetchImpl: typeof fetch = fetch): Promise<BoApi> => {
@@ -76,12 +97,19 @@ export const fetchBoApi = async (host: string, fetchImpl: typeof fetch = fetch):
       signal: AbortSignal.timeout(CONF_TIMEOUT_MS),
     });
   } catch (error) {
-    throw confError(host, `cannot be reached (${fetchFailure(error)})`);
+    throw confError(host, unreachable(error));
   }
   if (!response.ok) throw confError(host, `answered ${response.status}`);
+  let text: string;
+  try {
+    text = await response.text();
+  } catch (error) {
+    // The body broke off or stalled: a network problem, not a malformed conf.
+    throw confError(host, unreachable(error));
+  }
   let conf: unknown;
   try {
-    conf = await response.json();
+    conf = JSON.parse(text);
   } catch {
     throw confError(host, 'is not valid JSON');
   }

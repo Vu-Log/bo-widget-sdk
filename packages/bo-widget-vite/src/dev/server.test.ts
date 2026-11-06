@@ -231,6 +231,32 @@ describe('resolveDevMode', () => {
       );
     });
 
+    it('does not warn about blank BO_WIDGET_API_URL and BO_WIDGET_API_KEY', async () => {
+      const warn = vi.fn();
+
+      await resolveDevMode(
+        undefined,
+        {
+          BO_WIDGET_TOKEN: 't',
+          BO_WIDGET_API_URL: '  ',
+          BO_WIDGET_API_KEY: '',
+          BO_WIDGET_HOST: HOST,
+        },
+        { fetch: confFetch(), warn },
+      );
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('stays mock when asked, with the host and without reading the conf', async () => {
+      const fetchConf = confFetch();
+
+      await expect(
+        resolveDevMode('mock', { ...TOKEN_ENV, BO_WIDGET_HOST: HOST }, { fetch: fetchConf }),
+      ).resolves.toEqual({ mode: 'mock', host: HOST });
+      expect(fetchConf).not.toHaveBeenCalled();
+    });
+
     it('still needs a token in token mode, without reading the conf', async () => {
       const fetchConf = confFetch();
 
@@ -513,7 +539,7 @@ describe('fake back office dev server', () => {
     return root;
   };
 
-  const serve = async (config: WidgetConfig, files?: Record<string, string>) => {
+  const serve = async (config: WidgetConfig, files?: Record<string, string>, mode?: string) => {
     const root = await project(files);
     const customLogger = createLogger('silent');
     const warn = vi.spyOn(customLogger, 'warn');
@@ -521,6 +547,7 @@ describe('fake back office dev server', () => {
     const server: ViteDevServer = await createServer({
       root,
       configFile: false,
+      ...(mode ? { mode } : {}),
       logLevel: 'silent',
       customLogger,
       server: { port: 0, strictPort: false, ws: false },
@@ -856,6 +883,46 @@ describe('fake back office dev server', () => {
         ),
       );
       expect(logged(error)).not.toContain('api.bo.example.com');
+    });
+
+    it('gives only the error code when the API fails, never a message that may name its origin', async () => {
+      stubNetwork(undefined, () =>
+        Promise.reject(new TypeError(`fetch failed: ${API}`, { cause: new Error(`bad ${API}`) })),
+      );
+      const { origin, error } = await serve({ name: 'Fleet report' });
+
+      const response = await fetch(`${origin}${FAKE_API_PATH}x`);
+
+      expect(await response.json()).toEqual({
+        error: 'proxy-failed',
+        message: `Cannot reach the API of ${HOST}: TypeError`,
+      });
+      expect(logged(error)).not.toContain('api.bo.example.com');
+    });
+
+    it('names the host, not the API URL, for a path outside the API', async () => {
+      const calls = stubNetwork();
+      const { origin, warn } = await serve({ name: 'Fleet report' });
+
+      const response = await fetch(`${origin}${FAKE_API_PATH}/admin`);
+
+      expect(response.status).toBe(400);
+      expect(calls).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(`/admin is outside the API of ${HOST}: not forwarded`),
+      );
+      expect(logged(warn)).not.toContain('api.bo.example.com');
+    });
+
+    it('stays in mock mode in the test mode of Vitest, without reading the conf', async () => {
+      stubNetwork(() => Promise.reject(new Error('the conf must not be read')));
+
+      const { origin } = await serve({ name: 'Fleet report' }, undefined, 'test');
+
+      const module = await (await fetch(`${origin}${FAKE_BO_MODULE_URL}`)).text();
+      expect(module).toContain('"mode":"mock"');
+      const urls = vi.mocked(globalThis.fetch).mock.calls.map(([input]) => String(input));
+      expect(urls.filter((url) => url.includes(HOST))).toEqual([]);
     });
 
     it.each([
