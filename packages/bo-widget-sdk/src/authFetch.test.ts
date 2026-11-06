@@ -107,6 +107,17 @@ describe('authFetch as a Web Component', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('rejects a third-party URL when the API info is invalid, without sending the token', async () => {
+    const src = source('iframe', [token('t1')]);
+    src.getApiInfo.mockResolvedValue({ baseUrl: 'file:///etc/boapi/', apiKey: 'k' });
+    await expect(createAuthFetch(src)('https://third.example/x')).rejects.toMatchObject({
+      code: 'INTERNAL',
+      reason: 'invalid-api-info',
+    });
+    expect(src.getAccessToken).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('asks for the API info once', async () => {
     const src = source('webcomponent');
     const authFetch = createAuthFetch(src);
@@ -351,6 +362,7 @@ describe('authFetch: answers of the back office', () => {
     ['a file: baseUrl', { baseUrl: 'file:///etc/boapi/', apiKey: 'k' }],
     ['a javascript: baseUrl', { baseUrl: 'javascript:alert(1)', apiKey: 'k' }],
     ['a data: baseUrl', { baseUrl: 'data:text/plain,boapi', apiKey: 'k' }],
+    ['a blob: baseUrl', { baseUrl: 'blob:https://api.example.com/1234', apiKey: 'k' }],
     ['nothing', undefined],
   ])('rejects API info with %s as invalid-api-info', async (_label, info) => {
     const src = source('webcomponent');
@@ -359,6 +371,7 @@ describe('authFetch: answers of the back office', () => {
       code: 'INTERNAL',
       reason: 'invalid-api-info',
     });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it.each([

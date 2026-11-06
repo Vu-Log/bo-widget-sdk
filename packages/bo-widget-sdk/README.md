@@ -129,12 +129,12 @@ try {
 
 ### Options of `connect` (iframe)
 
-| Option                      | Default |                                                                                                                                                                                                 |
-| --------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `targetOrigin`              | `'*'`   | Origin of the BO the handshake is posted to. Set it when you know it, so that no other page framing the widget can answer; serve the widget with `Content-Security-Policy: frame-ancestors` too |
-| `handshakeTimeout`          | `10000` | ms to wait for the BO                                                                                                                                                                           |
-| `requestTimeout`            | `30000` | ms to wait for each answer                                                                                                                                                                      |
-| `widgetId`, `widgetVersion` |         | Sent in the handshake, for diagnostics                                                                                                                                                          |
+| Option                      | Default |                                                                                                                           |
+| --------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `targetOrigin`              | `'*'`   | Origin of the BO the handshake is posted to. Set it when you know it, so that no other page framing the widget can answer |
+| `handshakeTimeout`          | `10000` | ms to wait for the BO                                                                                                     |
+| `requestTimeout`            | `30000` | ms to wait for each answer                                                                                                |
+| `widgetId`, `widgetVersion` |         | Sent in the handshake, for diagnostics                                                                                    |
 
 ## Manifest validation
 

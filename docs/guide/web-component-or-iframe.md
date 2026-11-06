@@ -76,10 +76,9 @@ In an iframe, `authFetch` adds the token itself, so a Vulog API call needs `acce
 
 ### Who can frame the widget
 
-`connect()` posts its handshake to the parent window. Without `targetOrigin`, it goes to any origin (`'*'`): a page of another site that frames your `index.html` can answer it and play the BO. It gets no Vulog token, since it answers `getAccessToken` itself, but it controls the context, the settings and the theme, and receives what the widget sends to the URLs it chose.
+`connect()` posts its handshake to the parent window. Without `targetOrigin`, it goes to any origin (`'*'`): a page of another site that frames your `index.html` can answer it and play the BO. It gets no Vulog token, since it answers `getAccessToken` itself, but it controls everything the BO answers (context, user, settings, theme, permissions, events), `getApiInfo` included: the widget's Vulog API calls and their bodies go to a server it chose, and it receives the payloads of `navigate`, `notify` and `resize`.
 
-- Pass `targetOrigin` when the widget is displayed by a single BO, for example from a constant of your build: `connect(null, { targetOrigin: 'https://bo.example.com' })`.
-- Serve `index.html` with a `Content-Security-Policy: frame-ancestors` header that lists the BOs allowed to display it. It works whatever the number of BOs, and the browser refuses to render the widget anywhere else.
+Pass `targetOrigin` when the widget is displayed by a single BO, for example from a constant of your build: `connect(null, { targetOrigin: 'https://bo.example.com' })`. The browser then delivers the handshake to that origin only.
 
 ## In the fake back office
 
