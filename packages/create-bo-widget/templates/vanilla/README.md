@@ -31,6 +31,12 @@ BO_WIDGET_HOST=bo.example.com
 pbpaste | npx bo-widget dev --token -
 ```
 
+Or log in to that back office once, in a Chrome that the dev server opens, and let it follow your session, without pasting a new token when it expires (Chrome and Node.js 22 or later):
+
+```bash
+npx bo-widget dev --login
+```
+
 ## How it works
 
 The back office loads `index.js`, registers its default export (the element class) under a tag of its own, sets its API on the element (`vulogBo`) and inserts it in its content zone. The widget never calls `customElements.define`.

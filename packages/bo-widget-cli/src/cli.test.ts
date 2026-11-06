@@ -300,6 +300,29 @@ describe('runCli', () => {
       });
     });
 
+    it('runs vite in login mode with --login, without reading the standard input', async () => {
+      io.readStdinLine = vi.fn(async () => 'jwt');
+
+      expect(await runCli(['dev', '--login', '--', '--open'], io)).toBe(0);
+      expect(io.runVite).toHaveBeenCalledWith(root, ['--open'], {
+        PATH: '/bin',
+        BO_WIDGET_LOGIN: '1',
+      });
+      expect(io.readStdinLine).not.toHaveBeenCalled();
+    });
+
+    it.each([[['dev', '--login', '--token', 'jwt']], [['dev', '--token', '-', '--login']]])(
+      'refuses --login with --token (%j)',
+      async (argv) => {
+        io.readStdinLine = vi.fn(async () => 'jwt');
+
+        expect(await runCli(argv, io)).toBe(2);
+        expect(err[0]).toBe('bo-widget dev: --login and --token cannot be used together');
+        expect(io.readStdinLine).not.toHaveBeenCalled();
+        expect(io.runVite).not.toHaveBeenCalled();
+      },
+    );
+
     it('runs vite in mock mode without token', async () => {
       expect(await runCli(['dev'], io)).toBe(0);
       expect(io.runVite).toHaveBeenCalledWith(root, [], { PATH: '/bin' });

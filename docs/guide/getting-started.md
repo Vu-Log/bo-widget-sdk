@@ -187,6 +187,18 @@ The fake BO forwards each Vulog API call to the API of that BO, with the token, 
 
 Keep the dev server on `localhost` in token mode: anyone who can reach it can call the API with your token. Never set `server.allowedHosts: true` either: it lets a page that rebinds its domain to your machine (DNS rebinding) reach the dev server, and the plugin warns.
 
+### Log in instead of pasting a token
+
+To avoid pasting a new token every few minutes, log in to the BO once and let the dev server follow your session:
+
+```bash
+npx bo-widget dev --login
+```
+
+The dev server opens the BO of `BO_WIDGET_HOST` in a dedicated Chrome (its own profile, kept between two runs). Log in there as usual; the fake BO then opens in a tab of the same Chrome, and its calls carry the token of your session, renewed as long as the session lasts. Keep the BO tab open. If you log out, the terminal says so within about 30 seconds and the calls get `401`: log in again in the same Chrome, without restarting. If you close Chrome, restart `npx bo-widget dev --login`.
+
+This login mode needs Google Chrome and Node.js 22 or later. A coding agent can also drive the fake BO in that Chrome, through the Chrome DevTools MCP server: see the rules to follow in the [README of `@vulog/bo-widget-vite`](https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-vite#let-an-agent-drive-the-fake-back-office).
+
 The details of both modes are in the [README of `@vulog/bo-widget-vite`](https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-vite#fake-back-office).
 
 ## Next steps

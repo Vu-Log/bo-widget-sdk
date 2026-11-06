@@ -8,11 +8,15 @@ import {
   searchForWorkspaceRoot,
   type Plugin,
   type ResolvedConfig,
+  type ViteDevServer,
 } from 'vite';
 import { defineWarning, findCustomElementsDefine } from './defineCheck.js';
+import { startLogin } from './dev/login/index.js';
 import {
+  assertLoginServerHost,
   FAKE_BO_BASENAME,
   FAKE_BO_MODULE_URL,
+  FAKE_BO_PATH,
   fakeBoConfig,
   fakeBoModule,
   installFakeBo,
@@ -26,6 +30,23 @@ export const MANIFEST_FILE = 'widget.json';
 
 const DEFAULT_ENTRY = 'src/main.ts';
 const FAKE_BO_MODULE_ID = '\0bo-widget:fake-bo';
+
+/**
+ * URL of the fake back office on `localhost`, once the dev server listens; `null` without an HTTP
+ * server (middleware mode).
+ */
+const fakeBoUrl = (server: ViteDevServer): Promise<string | null> => {
+  const { httpServer } = server;
+  if (!httpServer) return Promise.resolve(null);
+  const url = (): string | null => {
+    const address = httpServer.address();
+    if (!address || typeof address === 'string') return null;
+    const protocol = server.config.server.https ? 'https' : 'http';
+    return `${protocol}://localhost:${address.port}${FAKE_BO_PATH}`;
+  };
+  if (httpServer.listening) return Promise.resolve(url());
+  return new Promise((resolveUrl) => httpServer.once('listening', () => resolveUrl(url())));
+};
 
 /** The fake back office module, compiled next to this file (`.ts` when run from the sources). */
 const hostModule = (): string => {
@@ -106,17 +127,21 @@ const readPackageJson = (root: string): Record<string, unknown> => {
  *   the widget bundles its dependencies (React reads it).
  * - In dev, serves a fake back office on `/__bo-widget/` that displays the widget, in mock mode
  *   or, with `BO_WIDGET_TOKEN`, against a real Vulog API: with `BO_WIDGET_HOST`, its URL and key
- *   come from the anonymous conf of that back office, read at startup. Always in mock mode in the
- *   `test` mode (Vitest).
+ *   come from the anonymous conf of that back office, read at startup. With `BO_WIDGET_LOGIN`
+ *   (`bo-widget dev --login`), opens that back office in a dedicated Chrome, where the user logs
+ *   in, and follows the token of that session. Always in mock mode in the `test` mode (Vitest).
  *
  * @param config - The widget configuration, usually imported from `widget.config.ts`.
  * @returns The plugin, to add to `plugins` in `vite.config.ts`.
  * @throws {BoWidgetConfigError} When Vite resolves its configuration, for an invalid widget
  * configuration or a missing or invalid `package.json`.
  * @throws {Error} When the dev server starts in token mode without its `BO_WIDGET_*` variables,
+ * in login mode without `BO_WIDGET_HOST`, with `server.host` set, an invalid
+ * `BO_WIDGET_DEBUG_PORT`, without Chrome or a Chrome that does not answer on that port, or on
+ * Node.js before 22 (see `startLogin`),
  * with an invalid `BO_WIDGET_HOST` (in mock mode too), or with a `BO_WIDGET_HOST` whose conf
  * cannot be read or lacks the API URL or key (in the `test` mode of Vitest, the fake back office
- * stays in mock mode, with a warning when token mode was asked for);
+ * stays in mock mode, with a warning when token or login mode was asked for);
  * the build fails when the entry has no default export, the iframe build has no `index.html`, or
  * the icon is not in the bundle.
  *
@@ -207,7 +232,23 @@ export const boWidget = (config: WidgetConfig): Plugin => {
           `[bo-widget] dev.context.basename ${basename} is outside ${FAKE_BO_BASENAME}, the path of the fake back office: a widget router matches nothing, and its sub-routes are not served on reload. Keep the default.`,
         );
       }
-      installFakeBo(server, { runtime, responses: config.dev?.responses ?? {}, resolved: devMode });
+      const base = { runtime, responses: config.dev?.responses ?? {} };
+      if (devMode.mode !== 'login') {
+        installFakeBo(server, { ...base, resolved: devMode });
+        return;
+      }
+      assertLoginServerHost(server.config.server.host);
+      const session = await startLogin({
+        host: devMode.env.host,
+        root: resolvedConfig.root,
+        env,
+        logger: server.config.logger,
+        fakeBoUrl: () => fakeBoUrl(server),
+      });
+      // Without an HTTP server (middleware mode), the host app owns the lifecycle: the CDP
+      // connection then closes with the process.
+      server.httpServer?.once('close', () => session.close());
+      installFakeBo(server, { ...base, resolved: devMode, session });
     },
 
     resolveId(id) {

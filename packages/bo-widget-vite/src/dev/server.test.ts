@@ -20,12 +20,15 @@ import {
   FAKE_BO_BASENAME,
   FAKE_BO_MODULE_URL,
   FAKE_BO_PATH,
+  FAKE_TOKEN_PATH,
+  assertLoginServerHost,
   fakeBoConfig,
+  installFakeBo,
+  isLocalRequest,
   isFakeBoPage,
   fakeBoModule,
   forwardedHeaders,
   isCrossSite,
-  jwtExpiresAt,
   resolveDevMode,
   tokenWarnings,
   widgetTag,
@@ -56,21 +59,6 @@ describe('widgetTag', () => {
 
   it('differs between versions', () => {
     expect(widgetTag('acme', 'a', '1.0.0')).not.toBe(widgetTag('acme', 'a', '1.0.1'));
-  });
-});
-
-describe('jwtExpiresAt', () => {
-  it('reads exp in milliseconds', () => {
-    expect(jwtExpiresAt(jwt({ exp: 1_700_000_000 }))).toBe(1_700_000_000_000);
-  });
-
-  it.each([
-    ['a token that is not a JWT', 'opaque'],
-    ['a JWT without exp', jwt({ sub: 'x' })],
-    ['a non-numeric exp', jwt({ exp: 'soon' })],
-    ['an unreadable payload', 'a.%%%.c'],
-  ])('is null for %s', (_label, token) => {
-    expect(jwtExpiresAt(token)).toBeNull();
   });
 });
 
@@ -320,6 +308,138 @@ describe('resolveDevMode', () => {
         ),
       ).rejects.toThrow(`the conf of the back office ${HOST} has no url.baseUrl`);
     });
+
+    describe('in login mode', () => {
+      it('reads the API URL and key from the conf, without any token', async () => {
+        const fetchConf = confFetch();
+        const warn = vi.fn();
+
+        await expect(
+          resolveDevMode(
+            undefined,
+            { BO_WIDGET_LOGIN: '1', BO_WIDGET_HOST: HOST },
+            { fetch: fetchConf, warn },
+          ),
+        ).resolves.toEqual({
+          mode: 'login',
+          env: {
+            apiUrl: 'https://api.bo.example.com/boapi/proxy/',
+            apiKey: 'conf-key',
+            host: HOST,
+          },
+        });
+        expect(warn).not.toHaveBeenCalled();
+      });
+
+      it('wins over dev.mode, BO_WIDGET_TOKEN and the API variables, with warnings', async () => {
+        const warn = vi.fn();
+
+        const resolved = await resolveDevMode(
+          'mock',
+          { ...TOKEN_ENV, BO_WIDGET_LOGIN: ' TRUE ', BO_WIDGET_HOST: HOST },
+          { fetch: confFetch(), warn },
+        );
+
+        expect(resolved.mode).toBe('login');
+        const warnings = warn.mock.calls.map((call) => String(call[0])).join('\n');
+        expect(warnings).toContain('dev.mode "mock" ignored: bo-widget dev --login is used');
+        expect(warnings).toContain('BO_WIDGET_TOKEN ignored: in login mode');
+        expect(warnings).toContain('BO_WIDGET_API_URL and BO_WIDGET_API_KEY ignored');
+        expect(warnings).not.toContain('real-token');
+      });
+
+      it.each([[''], ['0'], ['no']])('is not asked for by BO_WIDGET_LOGIN=%j', async (value) => {
+        await expect(resolveDevMode(undefined, { BO_WIDGET_LOGIN: value })).resolves.toEqual({
+          mode: 'mock',
+        });
+      });
+
+      it('needs BO_WIDGET_HOST', async () => {
+        await expect(resolveDevMode(undefined, { BO_WIDGET_LOGIN: '1' })).rejects.toThrow(
+          /login mode: set BO_WIDGET_HOST/,
+        );
+      });
+
+      it('fails with the error of the conf', async () => {
+        await expect(
+          resolveDevMode(
+            undefined,
+            { BO_WIDGET_LOGIN: '1', BO_WIDGET_HOST: HOST },
+            { fetch: confFetch({ url: {} }) },
+          ),
+        ).rejects.toThrow(`the conf of the back office ${HOST} has no url.baseUrl`);
+      });
+
+      it('stays mock offline, with a warning, without reading the conf', async () => {
+        const fetchConf = confFetch();
+        const warn = vi.fn();
+
+        await expect(
+          resolveDevMode(
+            undefined,
+            { BO_WIDGET_LOGIN: '1', BO_WIDGET_HOST: HOST },
+            { fetch: fetchConf, warn, offline: true },
+          ),
+        ).resolves.toEqual({ mode: 'mock', host: HOST });
+        expect(fetchConf).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('without login mode'));
+      });
+    });
+  });
+});
+
+describe('assertLoginServerHost', () => {
+  it.each([[undefined], [false], ['localhost'], ['127.0.0.1'], ['::1']])(
+    'accepts the local host %j',
+    (host) => {
+      expect(() => assertLoginServerHost(host)).not.toThrow();
+    },
+  );
+
+  it.each([[true], ['0.0.0.0'], ['192.168.1.2']])('refuses the exposed host %j', (host) => {
+    expect(() => assertLoginServerHost(host)).toThrow(/login mode: remove server.host/);
+  });
+});
+
+describe('installFakeBo', () => {
+  it('refuses login mode without a session, as an untyped caller could ask', () => {
+    const server = { config: { logger: createLogger('silent'), server: {} } } as ViteDevServer;
+    const options = {
+      runtime: 'webcomponent',
+      responses: {},
+      resolved: {
+        mode: 'login',
+        env: { apiUrl: 'https://api.example.com/', apiKey: 'k', host: 'bo.example.com' },
+      },
+    } as unknown as Parameters<typeof installFakeBo>[1];
+
+    expect(() => installFakeBo(server, options)).toThrow('login mode: no session to follow');
+  });
+});
+
+describe('isLocalRequest', () => {
+  it.each([['localhost:5173'], ['127.0.0.1:5173'], ['[::1]:5173'], ['localhost']])(
+    'accepts the Host %s',
+    (host) => {
+      expect(isLocalRequest({ headers: { host } })).toBe(true);
+    },
+  );
+
+  it('reads :authority over HTTP/2', () => {
+    expect(isLocalRequest({ headers: { ':authority': 'localhost:5173' } })).toBe(true);
+  });
+
+  it.each([
+    ['a rebound domain', 'attacker.example:5173'],
+    ['a LAN address', '192.168.1.2:5173'],
+    ['a look-alike', 'localhost.attacker.example'],
+    ['a malformed host', 'local host'],
+  ])('refuses %s', (_label, host) => {
+    expect(isLocalRequest({ headers: { host } })).toBe(false);
+  });
+
+  it('refuses a request without Host', () => {
+    expect(isLocalRequest({ headers: {} })).toBe(false);
   });
 });
 
@@ -388,6 +508,10 @@ describe('forwardedHeaders', () => {
       'Bearer mine',
     );
   });
+
+  it('adds no Authorization without a token (login mode without a session)', () => {
+    expect(forwardedHeaders({ accept: '*/*' }, null).has('authorization')).toBe(false);
+  });
 });
 
 describe('tokenWarnings', () => {
@@ -438,8 +562,7 @@ describe('fakeBoConfig', () => {
       settings: { currency: 'CAD' },
       apiPath: FAKE_API_PATH,
       apiKey: 'mock-api-key',
-      accessToken: 'mock-access-token',
-      expiresAt: null,
+      auth: { kind: 'static', accessToken: 'mock-access-token', expiresAt: null },
     });
   });
 
@@ -503,9 +626,26 @@ describe('fakeBoConfig', () => {
 
     expect(config).toMatchObject({
       mode: 'token',
-      accessToken: token,
       apiKey: 'real-key',
-      expiresAt: 2_000_000_000_000,
+      auth: { kind: 'static', accessToken: token, expiresAt: 2_000_000_000_000 },
+    });
+  });
+
+  it('passes no token in login mode, only the path to read the latest one from', () => {
+    const config = fakeBoConfig(
+      manifest,
+      {},
+      {
+        mode: 'login',
+        env: { apiUrl: 'https://api.example.com/', apiKey: 'conf-key', host: 'bo.example.com' },
+      },
+    );
+
+    expect(config).toMatchObject({
+      mode: 'login',
+      auth: { kind: 'session', tokenPath: FAKE_TOKEN_PATH },
+      apiKey: 'conf-key',
+      context: { host: 'bo.example.com' },
     });
   });
 });

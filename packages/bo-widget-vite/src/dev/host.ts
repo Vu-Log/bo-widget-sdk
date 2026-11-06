@@ -24,11 +24,25 @@ import type {
   BoTheme,
 } from '@vulog/bo-widget-sdk';
 import type { WidgetManifest, WidgetPermission } from '@vulog/bo-widget-sdk/manifest';
-import type { FakeBoMode } from './options.js';
+import type { ResolvedDevMode } from './server.js';
+
+/**
+ * Where the fake back office gets its access token from: fixed (mock and token modes), or the
+ * latest token of the session, read from the dev server at each `getAccessToken` (login mode).
+ */
+export type FakeBoAuth =
+  | {
+      readonly kind: 'static';
+      readonly accessToken: string;
+      /** Expiry of `accessToken` in ms since the epoch, `null` when unknown. */
+      readonly expiresAt: number | null;
+    }
+  | { readonly kind: 'session'; readonly tokenPath: string };
 
 /** What the dev server passes to the fake back office (JSON). */
 export interface FakeBoConfig {
-  mode: FakeBoMode;
+  /** `login`: the token of the session the user opened in the Chrome of `bo-widget dev --login`. */
+  mode: ResolvedDevMode['mode'];
   runtime: WidgetManifest['runtime']['type'];
   protocolVersion: number;
   widget: { id: string; name: string; version: string; permissions: readonly WidgetPermission[] };
@@ -42,9 +56,7 @@ export interface FakeBoConfig {
   /** Path of the local API proxy, `baseUrl` of `getApiInfo` once resolved against the page. */
   apiPath: string;
   apiKey: string;
-  accessToken: string;
-  /** Expiry of `accessToken` in ms since the epoch, `null` when unknown. */
-  expiresAt: number | null;
+  auth: FakeBoAuth;
 }
 
 /** What the fake back office shows: requests log, snackbars, route and iframe height. */
@@ -157,14 +169,58 @@ const routeEvent = (route: string): BoEventMap['routeChanged'] => {
   return { pathname, search, hash };
 };
 
+/**
+ * Longer than the dev server may wait for Chrome before answering: four CDP commands, one of
+ * 20 s and three of 5 s.
+ */
+const SESSION_TOKEN_TIMEOUT_MS = 45_000;
+
+/**
+ * Login mode: the latest token of the session, from the dev server.
+ *
+ * @throws {WidgetHostError} `no-token`, with the reason the dev server gives (no session, Chrome
+ * closed…), or when it does not answer, answers late or answers something else than a token.
+ */
+const sessionToken = async (path: string): Promise<BoAccessToken> => {
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(SESSION_TOKEN_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw new WidgetHostError(
+      'no-token',
+      (error as Error).name === 'TimeoutError'
+        ? 'The dev server is still waiting for the tab of the back office in Chrome: see the terminal.'
+        : 'The dev server does not answer: is vite still running? See the terminal.',
+    );
+  }
+  const body = (await response.json().catch(() => null)) as
+    (Partial<BoAccessToken> & { message?: unknown }) | null;
+  if (!response.ok) {
+    const reason =
+      typeof body?.message === 'string'
+        ? body.message
+        : `The dev server answered ${response.status}`;
+    throw new WidgetHostError('no-token', `${reason} (see the terminal)`, response.status);
+  }
+  if (typeof body?.accessToken !== 'string' || !body.accessToken) {
+    throw new WidgetHostError('no-token', 'The dev server answered no token: see the terminal');
+  }
+  return {
+    accessToken: body.accessToken,
+    expiresAt: typeof body.expiresAt === 'number' ? body.expiresAt : null,
+  };
+};
+
 /** JSON of a result for the log, with the access token and the API key masked: the log is on screen. */
 const forLog = (value: unknown): string => {
   try {
     return (
       JSON.stringify(value, (key, item: unknown) => {
         if (typeof item !== 'string') return item;
-        if (key === 'accessToken') return `${item.slice(0, 6)}…`;
-        return key === 'apiKey' ? '…' : item;
+        return key === 'accessToken' || key === 'apiKey' ? '…' : item;
       }) ?? String(value)
     );
   } catch {
@@ -195,14 +251,16 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
       baseUrl: new URL(config.apiPath, globalThis.location.href).href,
       apiKey: config.apiKey,
     }),
-    getAccessToken: (): BoAccessToken => {
-      if (config.expiresAt !== null && config.expiresAt <= Date.now()) {
+    getAccessToken: (): BoAccessToken | Promise<BoAccessToken> => {
+      const { auth } = config;
+      if (auth.kind === 'session') return sessionToken(auth.tokenPath);
+      if (auth.expiresAt !== null && auth.expiresAt <= Date.now()) {
         throw new WidgetHostError(
           'no-token',
           'The dev token expired: paste a new one in BO_WIDGET_TOKEN and restart vite',
         );
       }
-      return { accessToken: config.accessToken, expiresAt: config.expiresAt };
+      return { accessToken: auth.accessToken, expiresAt: auth.expiresAt };
     },
     getTheme: () => structuredClone(THEMES[themeMode]),
     navigate: (payload) => {

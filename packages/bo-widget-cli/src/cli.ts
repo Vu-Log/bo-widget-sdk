@@ -37,6 +37,9 @@ Commands:
                        after checking it with the same rules.
       --out-dir <dir>  Folder of the zip (default: the current folder).
   dev [-- vite args]   Runs the vite dev server with the fake back office.
+      --login          Opens the back office of BO_WIDGET_HOST in a dedicated Chrome: log in
+                       there, the fake back office then calls its API with your session,
+                       renewed as long as it lasts (login mode).
       --token <jwt>    Token pasted from the back office of a Vulog environment ("-" reads
                        it from the standard input), to call its API (token mode).
       --api-url <url>  Base URL of its API (.../boapi/proxy/), unless BO_WIDGET_HOST is set.
@@ -154,6 +157,7 @@ const devCommand = async (args: string[], io: CliIo): Promise<number> => {
     parseArgs({
       args,
       options: {
+        login: { type: 'boolean' },
         token: { type: 'string' },
         'api-url': { type: 'string' },
         'api-key': { type: 'string' },
@@ -162,13 +166,21 @@ const devCommand = async (args: string[], io: CliIo): Promise<number> => {
       strict: true,
     }),
   );
+  if (values.login && values.token !== undefined) {
+    throw new UsageError('--login and --token cannot be used together');
+  }
   let token = values.token;
   if (token === '-') token = await io.readStdinLine();
   if (token !== undefined) {
     token = token.trim();
     if (token === '') throw new UsageError('--token is empty');
   }
-  const env = devEnv(io.env, { token, apiUrl: values['api-url'], apiKey: values['api-key'] });
+  const env = devEnv(io.env, {
+    login: values.login,
+    token,
+    apiUrl: values['api-url'],
+    apiKey: values['api-key'],
+  });
   return io.runVite(io.cwd, positionals, env);
 };
 
