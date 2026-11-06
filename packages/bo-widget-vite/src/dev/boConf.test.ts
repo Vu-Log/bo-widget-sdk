@@ -86,13 +86,27 @@ describe('fetchFailureCode', () => {
     ],
     [
       'the name of the error, never its message',
-      new TypeError('fetch failed to https://api.bo.example.com', { cause: new Error('x') }),
+      new TypeError('fetch failed to https://api.bo.example.com', {
+        cause: { message: 'to https://api.bo.example.com' },
+      }),
       'TypeError',
     ],
     [
       'the name of a timeout',
       new DOMException('aborted due to timeout', 'TimeoutError'),
       'TimeoutError',
+    ],
+    [
+      'the code of a stream error',
+      Object.assign(new Error('write EPIPE https://api.bo.example.com'), { code: 'EPIPE' }),
+      'EPIPE',
+    ],
+    [
+      'the name of the cause without code',
+      new TypeError('fetch failed', {
+        cause: Object.assign(new Error('to https://api.bo.example.com'), { name: 'SocketError' }),
+      }),
+      'SocketError',
     ],
     ['a fixed text for a thrown value', 'https://api.bo.example.com', 'unknown error'],
   ])('gives %s', (_label, error, code) => {
@@ -196,7 +210,7 @@ describe('fetchBoApi', () => {
           ),
         ),
       ),
-      'cannot be reached (ECONNRESET)',
+      'answered, but its body broke off (ECONNRESET)',
     ],
   ])('fails when the conf %s', async (_label, fetchImpl, problem) => {
     const error = await failure(fetchImpl);

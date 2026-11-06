@@ -56,6 +56,11 @@ export interface ResolveDevModeOptions {
   readonly fetch?: typeof fetch;
   /** Logs a warning in the terminal; warnings are dropped when it is omitted. */
   readonly warn?: (message: string) => void;
+  /**
+   * Never calls the network (tests): the mode and `BO_WIDGET_HOST` are still checked and the host
+   * kept, but token mode falls back to mock mode, with a warning.
+   */
+  readonly offline?: boolean;
 }
 
 /**
@@ -136,7 +141,7 @@ const hostTokenEnv = async (
  * @param env - Variables prefixed with `BO_WIDGET_`.
  * @param options - `fetch` and the warning logger.
  * @returns `mock` (with the host, if any), or `token` with the token (without `Bearer ` prefix),
- * the canonical API base URL, the API key and the host, if any.
+ * the canonical API base URL, the API key and the host, if any. Always `mock` with `offline`.
  * @throws {Error} For an unknown `dev.mode` or an invalid `BO_WIDGET_HOST`; in token mode when
  * `BO_WIDGET_TOKEN` is missing; with `BO_WIDGET_HOST`, when the conf cannot be read or lacks a
  * field; without it, when `BO_WIDGET_API_URL` or `BO_WIDGET_API_KEY` is missing, or
@@ -153,7 +158,12 @@ export const resolveDevMode = async (
   }
   const rawHost = (env.BO_WIDGET_HOST ?? '').trim();
   const host = rawHost ? parseBoHost(rawHost) : undefined;
-  if (mode === 'mock') return host ? { mode, host } : { mode };
+  if (mode === 'token' && options.offline) {
+    options.warn?.(
+      '[bo-widget] Test mode: the fake back office stays in mock mode, without token mode nor any call to a back office conf.',
+    );
+  }
+  if (mode === 'mock' || options.offline) return host ? { mode: 'mock', host } : { mode: 'mock' };
   const token = (env.BO_WIDGET_TOKEN ?? '').trim().replace(/^Bearer(?:\s+|$)/i, '');
   if (host) return { mode, env: await hostTokenEnv(host, token, env, options) };
   const apiKey = (env.BO_WIDGET_API_KEY ?? '').trim();

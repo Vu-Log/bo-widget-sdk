@@ -115,7 +115,8 @@ const readPackageJson = (root: string): Record<string, unknown> => {
  * configuration or a missing or invalid `package.json`.
  * @throws {Error} When the dev server starts in token mode without its `BO_WIDGET_*` variables,
  * with an invalid `BO_WIDGET_HOST` (in mock mode too), or with a `BO_WIDGET_HOST` whose conf
- * cannot be read or lacks the API URL or key (except in the `test` mode of Vitest, always mock);
+ * cannot be read or lacks the API URL or key (in the `test` mode of Vitest, the fake back office
+ * stays in mock mode, with a warning when token mode was asked for);
  * the build fails when the entry has no default export, the iframe build has no `index.html`, or
  * the icon is not in the bundle.
  *
@@ -181,14 +182,12 @@ export const boWidget = (config: WidgetConfig): Plugin => {
         resolvedConfig.envDir === false ? resolvedConfig.root : resolvedConfig.envDir,
         'BO_WIDGET_',
       );
-      // Vitest serves the tests in the `test` mode, where nobody opens the fake back office: no
-      // token mode, so that a test run never depends on the conf of a back office.
-      devMode =
-        resolvedConfig.mode === 'test'
-          ? { mode: 'mock' }
-          : await resolveDevMode(config.dev?.mode, env, {
-              warn: (message) => server.config.logger.warn(message),
-            });
+      // Vitest serves the tests in the `test` mode: no token mode there, so that a test run never
+      // depends on the conf of a back office nor on a token.
+      devMode = await resolveDevMode(config.dev?.mode, env, {
+        warn: (message) => server.config.logger.warn(message),
+        offline: resolvedConfig.mode === 'test',
+      });
       const settingKeys = new Set(manifest.settings.map((setting) => setting.key));
       const unknownSettings = Object.keys(config.dev?.settings ?? {}).filter(
         (key) => !settingKeys.has(key),

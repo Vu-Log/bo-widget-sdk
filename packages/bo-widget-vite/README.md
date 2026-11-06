@@ -133,7 +133,7 @@ BO_WIDGET_API_URL=https://…/boapi/proxy/
 BO_WIDGET_API_KEY=…
 ```
 
-`BO_WIDGET_HOST` takes precedence over these two variables: `vite` warns when they are set too, and ignores them. In the `test` mode of Vitest, the fake BO always stays in mock mode, so that a test run never reads the conf of a BO.
+`BO_WIDGET_HOST` takes precedence over these two variables: `vite` warns when they are set too, and ignores them. In the `test` mode of Vitest, the fake BO always stays in mock mode, so that a test run never reads the conf of a BO: the mode and `BO_WIDGET_HOST` are still checked, the host kept, and `vite` warns when token mode was asked for.
 
 The mode switches to `token` when `BO_WIDGET_TOKEN` is set; `dev.mode: 'token'` forces it, and `vite` then fails to start without the token and either `BO_WIDGET_HOST` or both `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY`. `dev.responses` are ignored in this mode. The dev server forwards each call to the API and adds `Authorization: Bearer` when the widget did not; the API key reaches the API through `getApiInfo`, as `authFetch` sends it. The user stays the `dev` fixture, and so does the context, apart from its host.
 

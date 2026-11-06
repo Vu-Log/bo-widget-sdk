@@ -21,12 +21,19 @@ export const fetchFailure = (error: unknown): string => {
 };
 
 /**
- * The code of a `fetch` failure only (`ENOTFOUND`, `TimeoutError`…), without its message, which
- * may name the target: for a target that must not be logged, such as an API from a conf.
+ * The code of a `fetch` or stream failure only (`ENOTFOUND`, `ECONNRESET`, `TimeoutError`…),
+ * never its message, which may name the target: for a target that must not be logged, such as an
+ * API from a conf. Node puts the code on the error itself (stream errors) or on its `cause`
+ * (`fetch` errors); the names come last.
  */
 export const fetchFailureCode = (error: unknown): string => {
-  const cause = (error as { cause?: { code?: unknown } } | null)?.cause;
+  const { code, cause } = (error ?? {}) as {
+    code?: unknown;
+    cause?: { code?: unknown; name?: unknown };
+  };
+  if (typeof code === 'string') return code;
   if (typeof cause?.code === 'string') return cause.code;
+  if (typeof cause?.name === 'string') return cause.name;
   return error instanceof Error ? error.name : 'unknown error';
 };
 
@@ -86,8 +93,8 @@ const confError = (host: string, problem: string): Error =>
  * @param fetchImpl - `fetch`, replaced in tests.
  * @returns The API base URL and the API key.
  * @throws {Error} When the conf cannot be fetched (network, timeout, non-2xx status, body broken
- * off), is not a
- * JSON object, has no `https:` URL in `url.baseUrl`, or no non-empty string in `X-API-Key`.
+ * off), is not a JSON object, has no `https:` URL in `url.baseUrl`, or no non-empty string in
+ * `X-API-Key`.
  */
 export const fetchBoApi = async (host: string, fetchImpl: typeof fetch = fetch): Promise<BoApi> => {
   let response: Response;
@@ -105,7 +112,12 @@ export const fetchBoApi = async (host: string, fetchImpl: typeof fetch = fetch):
     text = await response.text();
   } catch (error) {
     // The body broke off or stalled: a network problem, not a malformed conf.
-    throw confError(host, unreachable(error));
+    throw confError(
+      host,
+      isTimeout(error)
+        ? unreachable(error)
+        : `answered, but its body broke off (${fetchFailure(error)})`,
+    );
   }
   let conf: unknown;
   try {

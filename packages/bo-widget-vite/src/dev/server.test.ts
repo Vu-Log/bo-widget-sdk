@@ -257,6 +257,36 @@ describe('resolveDevMode', () => {
       expect(fetchConf).not.toHaveBeenCalled();
     });
 
+    it('stays mock offline, keeping the host, with a warning when token mode was asked for', async () => {
+      const fetchConf = confFetch();
+      const warn = vi.fn();
+
+      await expect(
+        resolveDevMode(
+          undefined,
+          { BO_WIDGET_TOKEN: 't', BO_WIDGET_HOST: HOST },
+          { fetch: fetchConf, warn, offline: true },
+        ),
+      ).resolves.toEqual({ mode: 'mock', host: HOST });
+      expect(fetchConf).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Test mode: .* stays in mock mode/));
+    });
+
+    it('still checks the mode and the host offline, without a warning in mock mode', async () => {
+      const warn = vi.fn();
+
+      await expect(resolveDevMode('proxy' as 'token', {}, { offline: true })).rejects.toThrow(
+        /unknown dev\.mode "proxy"/,
+      );
+      await expect(
+        resolveDevMode(undefined, { BO_WIDGET_HOST: 'bo.example.com/x' }, { offline: true }),
+      ).rejects.toThrow(/BO_WIDGET_HOST must be the host/);
+      await expect(resolveDevMode(undefined, {}, { warn, offline: true })).resolves.toEqual({
+        mode: 'mock',
+      });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
     it('still needs a token in token mode, without reading the conf', async () => {
       const fetchConf = confFetch();
 
@@ -887,7 +917,7 @@ describe('fake back office dev server', () => {
 
     it('gives only the error code when the API fails, never a message that may name its origin', async () => {
       stubNetwork(undefined, () =>
-        Promise.reject(new TypeError(`fetch failed: ${API}`, { cause: new Error(`bad ${API}`) })),
+        Promise.reject(new TypeError(`fetch failed: ${API}`, { cause: { message: `bad ${API}` } })),
       );
       const { origin, error } = await serve({ name: 'Fleet report' });
 
@@ -917,10 +947,12 @@ describe('fake back office dev server', () => {
     it('stays in mock mode in the test mode of Vitest, without reading the conf', async () => {
       stubNetwork(() => Promise.reject(new Error('the conf must not be read')));
 
-      const { origin } = await serve({ name: 'Fleet report' }, undefined, 'test');
+      const { origin, warn } = await serve({ name: 'Fleet report' }, undefined, 'test');
 
       const module = await (await fetch(`${origin}${FAKE_BO_MODULE_URL}`)).text();
       expect(module).toContain('"mode":"mock"');
+      expect(module).toContain(`"host":"${HOST}"`);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('stays in mock mode'));
       const urls = vi.mocked(globalThis.fetch).mock.calls.map(([input]) => String(input));
       expect(urls.filter((url) => url.includes(HOST))).toEqual([]);
     });
