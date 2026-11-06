@@ -27,14 +27,19 @@ const toBase = (baseUrl: string): string => {
   return href.endsWith('/') ? href : `${href}/`;
 };
 
+/** True for an absolute `http:` or `https:` URL: the only schemes a Vulog API can be served on. */
+const isHttpUrl = (value: string): boolean => {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'https:' || protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
+
 const checkApiInfo = (info: unknown): BoApiInfo => {
   const { baseUrl, apiKey } = (info ?? {}) as Partial<BoApiInfo>;
-  if (
-    typeof baseUrl === 'string' &&
-    isAbsoluteUrl(baseUrl) &&
-    typeof apiKey === 'string' &&
-    apiKey
-  ) {
+  if (typeof baseUrl === 'string' && isHttpUrl(baseUrl) && typeof apiKey === 'string' && apiKey) {
     return { baseUrl, apiKey };
   }
   throw new BoError(

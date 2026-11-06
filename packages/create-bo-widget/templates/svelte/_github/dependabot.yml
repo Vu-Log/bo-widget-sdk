@@ -1,0 +1,7 @@
+# Keeps the actions of .github/workflows up to date: they are pinned by commit SHA, so that a moved tag cannot change what the CI runs.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

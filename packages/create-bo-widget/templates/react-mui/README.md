@@ -16,7 +16,7 @@ A widget of the Vulog back office, built with React and [MUI](https://mui.com) (
 2. `npm run build`.
 3. In the back office: **Configuration > Widgets > Publish a version**, then drop the zip.
 
-`npx bo-widget validate` checks a zip with the rules the back office applies, and the CI (`.github/workflows/build.yml` or `.gitlab-ci.yml`) keeps the zip of each build as an artifact. Commit `package-lock.json`: the CI installs with `npm ci`.
+`npx bo-widget validate` checks a zip with the rules the back office applies, and the CI (`.github/workflows/build.yml` or `.gitlab-ci.yml`) keeps the zip of each build as an artifact. The GitHub workflow pins its actions by commit SHA, and `.github/dependabot.yml` keeps them up to date. Commit `package-lock.json`: the CI installs with `npm ci`.
 
 ## Develop against a real API
 

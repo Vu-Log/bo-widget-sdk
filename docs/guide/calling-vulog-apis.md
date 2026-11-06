@@ -123,6 +123,10 @@ The SDK caches the token while its expiry is known, renews it once it expires wi
 
 To tell a Vulog URL from a third-party one, the SDK asks for the API info once. Without the `apiInfo` permission, every absolute URL is a third-party API.
 
+::: warning The token goes to every third-party URL
+`authFetch` adds the user's Vulog token to **any** absolute URL outside `baseUrl`: whoever answers that URL can call the Vulog API as the user until the token expires. Only pass URLs of backends you own, written in your code. Never build the origin of an `authFetch` URL from a setting, a query parameter, an API answer or a user input; for a URL that must not receive the token, use `fetch`.
+:::
+
 The call leaves the browser from the widget's page, so your backend must accept it cross-origin: see [the FAQ](../faq#my-third-party-api-call-fails-with-a-cors-error).
 
 `getAccessToken()` returns `{ accessToken, expiresAt }` when you need the token itself, for a client that does not take a `fetch` function. Never decode it to read the user: use `getCurrentUser()`.

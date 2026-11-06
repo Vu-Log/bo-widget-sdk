@@ -261,6 +261,14 @@ describe('authFetch: URL resolution', () => {
     });
   });
 
+  it('accepts an http: baseUrl, as the dev server answers', async () => {
+    await withBase('http://localhost:5173/__bo-widget/api/boapi/proxy/')('fleets/F1');
+    expect(lastCall()).toMatchObject({
+      url: 'http://localhost:5173/__bo-widget/api/boapi/proxy/fleets/F1',
+      apiKey: 'api-key',
+    });
+  });
+
   it('keeps a protocol-relative path under baseUrl', async () => {
     await withBase(BASE_URL)('//evil.example/x');
     expect(lastCall()).toMatchObject({ url: `${BASE_URL}evil.example/x`, apiKey: 'api-key' });
@@ -340,6 +348,9 @@ describe('authFetch: answers of the back office', () => {
   it.each([
     ['no apiKey', { baseUrl: BASE_URL, apiKey: '' }],
     ['a relative baseUrl', { baseUrl: '/boapi/proxy/', apiKey: 'k' }],
+    ['a file: baseUrl', { baseUrl: 'file:///etc/boapi/', apiKey: 'k' }],
+    ['a javascript: baseUrl', { baseUrl: 'javascript:alert(1)', apiKey: 'k' }],
+    ['a data: baseUrl', { baseUrl: 'data:text/plain,boapi', apiKey: 'k' }],
     ['nothing', undefined],
   ])('rejects API info with %s as invalid-api-info', async (_label, info) => {
     const src = source('webcomponent');
