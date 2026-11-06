@@ -105,13 +105,15 @@ const readPackageJson = (root: string): Record<string, unknown> => {
  * - Web Component build: defines `process.env.NODE_ENV`, which library mode leaves as is, since
  *   the widget bundles its dependencies (React reads it).
  * - In dev, serves a fake back office on `/__bo-widget/` that displays the widget, in mock mode
- *   or, with `BO_WIDGET_TOKEN`, against a real Vulog API.
+ *   or, with `BO_WIDGET_TOKEN`, against a real Vulog API: with `BO_WIDGET_HOST`, its URL and key
+ *   come from the anonymous conf of that back office, read at startup.
  *
  * @param config - The widget configuration, usually imported from `widget.config.ts`.
  * @returns The plugin, to add to `plugins` in `vite.config.ts`.
  * @throws {BoWidgetConfigError} When Vite resolves its configuration, for an invalid widget
  * configuration or a missing or invalid `package.json`.
- * @throws {Error} When the dev server starts in token mode without its `BO_WIDGET_*` variables;
+ * @throws {Error} When the dev server starts in token mode without its `BO_WIDGET_*` variables,
+ * or with a `BO_WIDGET_HOST` whose conf cannot be read or lacks the API URL or key;
  * the build fails when the entry has no default export, the iframe build has no `index.html`, or
  * the icon is not in the bundle.
  *
@@ -171,13 +173,15 @@ export const boWidget = (config: WidgetConfig): Plugin => {
       }
     },
 
-    configureServer(server) {
+    async configureServer(server) {
       const env = loadEnv(
         resolvedConfig.mode,
         resolvedConfig.envDir === false ? resolvedConfig.root : resolvedConfig.envDir,
         'BO_WIDGET_',
       );
-      devMode = resolveDevMode(config.dev?.mode, env);
+      devMode = await resolveDevMode(config.dev?.mode, env, {
+        warn: (message) => server.config.logger.warn(message),
+      });
       const settingKeys = new Set(manifest.settings.map((setting) => setting.key));
       const unknownSettings = Object.keys(config.dev?.settings ?? {}).filter(
         (key) => !settingKeys.has(key),

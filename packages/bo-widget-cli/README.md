@@ -55,12 +55,12 @@ What only the BO knows is checked at publication only: that the widget id belong
 
 ### `bo-widget dev [--token <jwt>] [--api-url <url>] [--api-key <key>] [-- <vite args>]`
 
-Runs the `vite` of the project with the `BO_WIDGET_TOKEN`, `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY` variables given, which switch the fake BO of `@vulog/bo-widget-vite` to token mode (see its README). An option left out keeps the value of the environment or of `.env.local`. Without `--token`, the fake BO stays in mock mode, unless `BO_WIDGET_TOKEN` is set elsewhere or `dev.mode` is `'token'`.
+Runs the `vite` of the project with the `BO_WIDGET_TOKEN`, `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY` variables given, which switch the fake BO of `@vulog/bo-widget-vite` to token mode (see its README). An option left out keeps the value of the environment or of `.env.local`. Without `--token`, the fake BO stays in mock mode, unless `BO_WIDGET_TOKEN` is set elsewhere or `dev.mode` is `'token'`. With `BO_WIDGET_HOST` set (in `.env.local` or the shell), the fake BO reads the API URL and key from the conf of that BO, and ignores `--api-url` and `--api-key`.
 
 `--token -` reads the token from the standard input, so that it does not stay in your shell history:
 
 ```bash
-# API URL and key in .env.local, token copied from the BO of the dev environment
+# BO_WIDGET_HOST in .env.local, token copied from the BO of the dev environment
 pbpaste | npx bo-widget dev --token -
 npx bo-widget dev --token - -- --port 4000   # arguments after -- go to vite
 ```

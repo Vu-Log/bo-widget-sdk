@@ -20,12 +20,11 @@ A widget of the Vulog back office, built with a [Lit](https://lit.dev) element. 
 
 ## Develop against a real API
 
-In mock mode, the fake back office answers the Vulog API calls with the `dev.responses` of `widget.config.ts`. To call the API of a Vulog environment instead, copy its API URL and API key from its back office into `.env.local` (never commit it), then paste a token:
+In mock mode, the fake back office answers the Vulog API calls with the `dev.responses` of `widget.config.ts`. To call the API of a Vulog environment instead, put the host of its back office in `.env.local` (never commit it), then paste a token of your session in that back office:
 
 ```bash
 # .env.local
-BO_WIDGET_API_URL=https://…/boapi/proxy/
-BO_WIDGET_API_KEY=…
+BO_WIDGET_HOST=bo.example.com
 ```
 
 ```bash

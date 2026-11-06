@@ -39,8 +39,8 @@ Commands:
   dev [-- vite args]   Runs the vite dev server with the fake back office.
       --token <jwt>    Token pasted from the back office of a Vulog environment ("-" reads
                        it from the standard input), to call its API (token mode).
-      --api-url <url>  Base URL of its API (.../boapi/proxy/).
-      --api-key <key>  Its API key.
+      --api-url <url>  Base URL of its API (.../boapi/proxy/), unless BO_WIDGET_HOST is set.
+      --api-key <key>  Its API key, unless BO_WIDGET_HOST is set.
 
 Instead of a command:
   -h, --help           Shows this help.

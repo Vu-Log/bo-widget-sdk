@@ -157,13 +157,15 @@ const routeEvent = (route: string): BoEventMap['routeChanged'] => {
   return { pathname, search, hash };
 };
 
-/** JSON of a result for the log, with the access token masked: the log is on screen. */
+/** JSON of a result for the log, with the access token and the API key masked: the log is on screen. */
 const forLog = (value: unknown): string => {
   try {
     return (
-      JSON.stringify(value, (key, item: unknown) =>
-        key === 'accessToken' && typeof item === 'string' ? `${item.slice(0, 6)}…` : item,
-      ) ?? String(value)
+      JSON.stringify(value, (key, item: unknown) => {
+        if (typeof item !== 'string') return item;
+        if (key === 'accessToken') return `${item.slice(0, 6)}…`;
+        return key === 'apiKey' ? '…' : item;
+      }) ?? String(value)
     );
   } catch {
     // Circular, or a BigInt: both can be posted on a port.
