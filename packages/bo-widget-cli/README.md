@@ -4,7 +4,7 @@ Command line of the widgets of the Vulog back office (BO): `bo-widget`.
 
 - **`bo-widget validate`** checks a widget zip with the rules the BO applies when you publish it, so you find the problems before the upload.
 - **`bo-widget pack`** zips your build into `{id}-{version}.zip`, the archive to publish, after the same checks.
-- **`bo-widget dev --token`** runs the Vite dev server with the fake BO against a real Vulog API, with a token pasted from its BO.
+- **`bo-widget dev --login`** runs the Vite dev server with the fake BO against a real Vulog API, with the session you open in that BO; **`bo-widget dev --token`** does the same with a token pasted from it.
 
 There is no publish command: you publish the zip in the BO, Configuration > Widgets.
 
@@ -53,9 +53,9 @@ Structural errors (`archive-too-large`, `invalid-archive`, `too-many-files`, `zi
 
 What only the BO knows is checked at publication only: that the widget id belongs to your namespace, and that the version is greater than the versions already published.
 
-### `bo-widget dev [--token <jwt>] [--api-url <url>] [--api-key <key>] [-- <vite args>]`
+### `bo-widget dev [--login | --token <jwt>] [--api-url <url>] [--api-key <key>] [-- <vite args>]`
 
-Runs the `vite` of the project with the `BO_WIDGET_TOKEN`, `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY` variables given, which switch the fake BO of `@vulog/bo-widget-vite` to token mode (see its README). An option left out keeps the value of the environment or of `.env.local`. Without `--token`, the fake BO stays in mock mode, unless `BO_WIDGET_TOKEN` is set elsewhere or `dev.mode` is `'token'`. With `BO_WIDGET_HOST` set (in `.env.local` or the shell), the fake BO reads the API URL and key from the conf of that BO, and ignores `--api-url` and `--api-key`.
+Runs the `vite` of the project with the `BO_WIDGET_TOKEN`, `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY` variables given, which switch the fake BO of `@vulog/bo-widget-vite` to token mode (see its README). An option left out keeps the value of the environment or of `.env.local`. Without `--token` nor `--login`, the fake BO stays in mock mode, unless `BO_WIDGET_TOKEN` or `BO_WIDGET_LOGIN` is set elsewhere, or `dev.mode` is `'token'`. With `BO_WIDGET_HOST` set (in `.env.local` or the shell), the fake BO reads the API URL and key from the conf of that BO, and ignores `--api-url` and `--api-key`.
 
 `--token -` reads the token from the standard input, so that it does not stay in your shell history:
 
@@ -63,6 +63,12 @@ Runs the `vite` of the project with the `BO_WIDGET_TOKEN`, `BO_WIDGET_API_URL` a
 # BO_WIDGET_HOST in .env.local, token copied from the BO of the dev environment
 pbpaste | npx bo-widget dev --token -
 npx bo-widget dev --token - -- --port 4000   # arguments after -- go to vite
+```
+
+`--login` switches the fake BO of `@vulog/bo-widget-vite` to login mode (`BO_WIDGET_LOGIN=1`, see its README): the dev server opens the BO of `BO_WIDGET_HOST` in a dedicated Chrome, you log in there, and the fake BO calls the API with your session, renewed as long as it lasts, without restarting `vite`. It cannot be combined with `--token`.
+
+```bash
+BO_WIDGET_HOST=bo.example.com npx bo-widget dev --login
 ```
 
 The exit code is the one of `vite` (128 + the signal number when a signal stopped it). `SIGINT`, `SIGTERM` and `SIGHUP` are passed on to `vite`.

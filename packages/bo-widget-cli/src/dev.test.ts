@@ -55,6 +55,12 @@ describe('devEnv', () => {
     });
   });
 
+  it('sets BO_WIDGET_LOGIN with login, and only then', () => {
+    expect(devEnv({}, { login: true })).toEqual({ BO_WIDGET_LOGIN: '1' });
+    expect(devEnv({ BO_WIDGET_LOGIN: '1' }, { login: false })).toEqual({ BO_WIDGET_LOGIN: '1' });
+    expect(devEnv({}, { login: undefined })).toEqual({});
+  });
+
   it('keeps the variables of the environment for the options not given, without mutating it', () => {
     const base = { BO_WIDGET_API_URL: 'from-shell', BO_WIDGET_API_KEY: 'from-shell' };
 

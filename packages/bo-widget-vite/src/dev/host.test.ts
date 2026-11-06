@@ -52,8 +52,7 @@ const fakeConfig = (overrides: Partial<FakeBoConfig> = {}): FakeBoConfig => ({
   settings: { currency: 'CAD' },
   apiPath: '/__bo-widget/api/boapi/proxy/',
   apiKey: 'mock-api-key',
-  accessToken: 'mock-access-token',
-  expiresAt: null,
+  auth: { kind: 'static', accessToken: 'mock-access-token', expiresAt: null },
   ...overrides,
 });
 
@@ -417,14 +416,18 @@ describe('startFakeBo as a Web Component', () => {
 
   it('masks the access token in the log', async () => {
     const { Widget, client } = widgetClass();
-    await startFakeBo(fakeConfig({ accessToken: 'secret-token-value' }), load(Widget));
+    await startFakeBo(
+      fakeConfig({ auth: { kind: 'static', accessToken: 'secret-token-value', expiresAt: null } }),
+      load(Widget),
+    );
     const bo = await client();
 
     expect((await bo.getAccessToken()).accessToken).toBe('secret-token-value');
 
     const log = document.querySelector('.bo-log')?.textContent ?? '';
     expect(log).toContain('getAccessToken');
-    expect(log).not.toContain('secret-token-value');
+    expect(log).toContain('"accessToken":"…"');
+    expect(log).not.toContain('secret');
   });
 
   it('masks the API key in the log', async () => {
@@ -662,7 +665,11 @@ describe('createFakeBackOffice on the iframe port', () => {
 
   it('answers an expired dev token with INTERNAL, reason no-token', async () => {
     const { client } = await connectIframe(
-      fakeConfig({ runtime: 'iframe', mode: 'token', expiresAt: Date.now() - 1000 }),
+      fakeConfig({
+        runtime: 'iframe',
+        mode: 'token',
+        auth: { kind: 'static', accessToken: 'old', expiresAt: Date.now() - 1000 },
+      }),
     );
 
     await expect(client.getAccessToken()).rejects.toMatchObject({
@@ -798,7 +805,10 @@ describe('createFakeBackOffice host API', () => {
 
   it('throws a WidgetHostError no-token once the dev token expired', async () => {
     const api = createFakeBackOffice(
-      fakeConfig({ mode: 'token', expiresAt: Date.now() - 1 }),
+      fakeConfig({
+        mode: 'token',
+        auth: { kind: 'static', accessToken: 'old', expiresAt: Date.now() - 1 },
+      }),
       fakeUi(),
     ).createHostApi();
 
@@ -811,11 +821,128 @@ describe('createFakeBackOffice host API', () => {
   it('serves a dev token that has not expired', async () => {
     const expiresAt = Date.now() + 60_000;
     const api = createFakeBackOffice(
-      fakeConfig({ mode: 'token', accessToken: 'real', expiresAt }),
+      fakeConfig({ mode: 'token', auth: { kind: 'static', accessToken: 'real', expiresAt } }),
       fakeUi(),
     ).createHostApi();
 
     expect(await api.getAccessToken()).toEqual({ accessToken: 'real', expiresAt });
+  });
+});
+
+describe('createFakeBackOffice host API in login mode', () => {
+  const loginApi = () =>
+    createFakeBackOffice(
+      fakeConfig({ mode: 'login', auth: { kind: 'session', tokenPath: '/__bo-widget/token' } }),
+      fakeUi(),
+    ).createHostApi();
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('reads the latest token of the session from the dev server at each call', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ accessToken: 'first', expiresAt: 1000 }))
+      .mockResolvedValueOnce(Response.json({ accessToken: 'renewed', expiresAt: 2000 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const api = loginApi();
+
+    expect(await api.getAccessToken()).toEqual({ accessToken: 'first', expiresAt: 1000 });
+    expect(await api.getAccessToken()).toEqual({ accessToken: 'renewed', expiresAt: 2000 });
+    expect(fetchMock).toHaveBeenCalledWith('/__bo-widget/token', {
+      cache: 'no-store',
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it('keeps an unknown expiry as null', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ accessToken: 'opaque' })));
+
+    expect(await loginApi().getAccessToken()).toEqual({ accessToken: 'opaque', expiresAt: null });
+  });
+
+  it('rejects with no-token, the status and the reason of the dev server', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            { error: 'no-token', message: 'No token: the Chrome of bo-widget was closed' },
+            { status: 401 },
+          ),
+        ),
+    );
+    const error = await loginApi()
+      .getAccessToken()
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(WidgetHostError);
+    expect(error).toMatchObject({ code: 'no-token', status: 401 });
+    expect((error as Error).message).toBe(
+      'No token: the Chrome of bo-widget was closed (see the terminal)',
+    );
+  });
+
+  it('gives the status when the dev server answers an error without a message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('oops', { status: 500 })));
+    const error = await loginApi()
+      .getAccessToken()
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ code: 'no-token', status: 500 });
+    expect((error as Error).message).toContain('The dev server answered 500');
+  });
+
+  it('tells the dev server is waiting for Chrome when it answers late', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new DOMException('signal timed out', 'TimeoutError')),
+    );
+    const error = await loginApi()
+      .getAccessToken()
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ code: 'no-token' });
+    expect((error as Error).message).toContain('still waiting for the tab of the back office');
+  });
+
+  it('gives up when the dev server answers late', async () => {
+    const fetchMock = vi.fn((_path: string, init?: RequestInit) => {
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      return Promise.reject(new DOMException('timed out', 'TimeoutError'));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const error = await loginApi()
+      .getAccessToken()
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ code: 'no-token', status: null });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects with no-token when the dev server does not answer', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    const error = await loginApi()
+      .getAccessToken()
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ code: 'no-token', status: null });
+    expect((error as Error).message).toContain('vite');
+  });
+
+  it.each([
+    ['not JSON', new Response('oops')],
+    ['an empty token', Response.json({ accessToken: '' })],
+    ['no token', Response.json({})],
+  ])('rejects with no-token for %s', async (_, response) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+    const error = await loginApi()
+      .getAccessToken()
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ code: 'no-token' });
   });
 });
 

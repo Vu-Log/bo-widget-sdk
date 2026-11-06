@@ -7,6 +7,11 @@ import { BoWidgetCliError } from './errors.js';
 
 /** Options of `bo-widget dev`, as given on the command line; `undefined` means not given. */
 export interface DevOptions {
+  /**
+   * Login mode: the dev server opens the back office of `BO_WIDGET_HOST` in a dedicated Chrome and
+   * follows the token of the session the user opens there.
+   */
+  login?: boolean | undefined;
   /** Token pasted from the back office of a Vulog environment: the fake back office uses it. */
   token?: string | undefined;
   /** Base URL of the Vulog API of that environment (`…/boapi/proxy/`). */
@@ -17,7 +22,8 @@ export interface DevOptions {
 
 /**
  * Environment of the `vite` dev server: the `BO_WIDGET_*` variables that switch the fake back
- * office of `@vulog/bo-widget-vite` to token mode. A variable not given is left as is, so it can
+ * office of `@vulog/bo-widget-vite` to token mode, or to
+ * login mode (`BO_WIDGET_LOGIN=1`). A variable not given is left as is, so it can
  * also come from the shell or from `.env.local`, which Vite reads.
  *
  * @param base - The current environment.
@@ -26,6 +32,7 @@ export interface DevOptions {
  */
 export const devEnv = (base: NodeJS.ProcessEnv, options: DevOptions): NodeJS.ProcessEnv => {
   const env = { ...base };
+  if (options.login) env.BO_WIDGET_LOGIN = '1';
   if (options.token !== undefined) env.BO_WIDGET_TOKEN = options.token;
   if (options.apiUrl !== undefined) env.BO_WIDGET_API_URL = options.apiUrl;
   if (options.apiKey !== undefined) env.BO_WIDGET_API_KEY = options.apiKey;

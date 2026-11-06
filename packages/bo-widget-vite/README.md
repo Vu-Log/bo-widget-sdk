@@ -93,7 +93,7 @@ As in the BO, permissions are enforced in an iframe only (`FORBIDDEN`); for a We
 
 Errors the widget throws (loading the entry, constructor, `connectedCallback`, rejected promises) show in the log too, and in the browser console.
 
-`getApiInfo` returns a `baseUrl` on the dev server (`http://localhost:5173/__bo-widget/api/boapi/proxy/`), so `authFetch` calls it: in mock mode it answers the static responses, in token mode it forwards to the real API, as the BO service worker does. It only answers the pages it serves: a call from another origin gets `403`.
+`getApiInfo` returns a `baseUrl` on the dev server (`http://localhost:5173/__bo-widget/api/boapi/proxy/`), so `authFetch` calls it: in mock mode it answers the static responses, in token and login modes it forwards to the real API, as the BO service worker does. It only answers the pages it serves: a call from another origin gets `403`.
 
 ### Mock mode (default)
 
@@ -140,6 +140,60 @@ The mode switches to `token` when `BO_WIDGET_TOKEN` is set; `dev.mode: 'token'` 
 `vite` warns at startup when the token is not a JWT or already expired. Once it expires, the API answers `401` (logged with a hint) and `getAccessToken` rejects (`INTERNAL`, reason `no-token`): paste a new one and restart `vite`. The access token and the API key are masked in the log of the fake BO.
 
 Keep the dev server on `localhost` in token mode: with `server.host`, anyone on your network could call the API with your token through it (the plugin warns). Keep Vite's default `server.allowedHosts` too: with `true`, a page that rebinds its domain to your machine (DNS rebinding) could call the dev server, and so the API with your token (the plugin warns as well).
+
+### Login mode
+
+A token lasts a few minutes: in token mode, you paste a new one and restart `vite` each time it expires. In login mode, you log in to the real BO yourself, and the dev server follows the token of that session for as long as it lasts. Set `BO_WIDGET_HOST` (in `.env.local` or the shell) and run [`@vulog/bo-widget-cli`](../bo-widget-cli/):
+
+```bash
+BO_WIDGET_HOST=bo.example.com npx bo-widget dev --login
+```
+
+1. The dev server opens `https://{host}/` in a dedicated Chrome: a profile of its own, kept between two runs in `node_modules/.cache/bo-widget/chrome-profile`, with its DevTools port on `127.0.0.1:9333` only. If a Chrome already listens on that port (when `vite` restarts itself after a config change, for instance), it is reused. `Ctrl+C` in the terminal closes it with `vite`.
+2. Log in there as usual: your password, 2FA and SSO stay between you and the BO.
+3. Once you are logged in, the fake BO opens in a tab of the same Chrome. The calls of the widget carry the token of your session.
+
+The token stays in the auth service worker of the BO. Through the Chrome DevTools Protocol, the dev server asks that worker for it, in the tab of the BO: the worker answers the valid token, and renews it first when it has expired. It asks again when the token expires within a minute, after a `401` of the API, and every 30 seconds in the background, which keeps the session alive even when you never touch the BO tab. The token is kept in memory only: it is never written to the terminal, the log of the fake BO, nor any file outside the Chrome profile. `getAccessToken` reads the latest one from the dev server (`/__bo-widget/token`, which only answers the pages of the dev server, on `localhost`).
+
+Keep the tab of the BO open. A logout or a closed BO tab is seen within about 30 seconds (a logout is confirmed by a second check), a closed Chrome at once. The terminal then says why, once, the calls get `401` (`no-token`, with the same reason) without reaching the API, and `getAccessToken` rejects with the reason `no-token`. After a logout or a closed tab, log in again in the same Chrome (reopen `https://{host}/`): the calls go through again, without restarting `vite`. After closing Chrome, restart `bo-widget dev --login`.
+
+When the worker or Chrome does not answer for a while (a BO tab paused in the debugger, or showing a dialog), the token still valid is kept until it expires, and the terminal says so once.
+
+Login mode needs Google Chrome and Node.js 22 or later (Chromium is found on macOS and Linux; elsewhere, set `BO_WIDGET_CHROME`). Variables:
+
+| Variable               | Default                                        | Use                                                                          |
+| ---------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------- |
+| `BO_WIDGET_HOST`       | (required)                                     | The BO to log in to; its conf gives the API URL and key.                     |
+| `BO_WIDGET_CHROME`     | the usual install paths                        | Path of the Chrome executable.                                               |
+| `BO_WIDGET_DEBUG_PORT` | `9333`                                         | DevTools port of that Chrome, on `127.0.0.1`.                                |
+| `BO_WIDGET_LOGIN`      | unset (`bo-widget dev --login` sets it to `1`) | `1` or `true` switches to login mode, over `dev.mode` and `BO_WIDGET_TOKEN`. |
+
+`vite` refuses to start in login mode with `server.host` (or `--host`): the token of your session would be served to your network. The token and the local API also answer `403` to a request for another host than `localhost`, `127.0.0.1` or `[::1]`, even with `server.allowedHosts`, so that a page whose domain points to your machine cannot read them. In the `test` mode of Vitest, the fake BO stays in mock mode, with a warning.
+
+### Let an agent drive the fake back office
+
+In login mode, a coding agent can see and drive the fake BO while you change the code of the widget (HMR): connect the [Chrome DevTools MCP server](https://github.com/ChromeDevTools/chrome-devtools-mcp) to the Chrome of login mode instead of a Chrome of its own:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["chrome-devtools-mcp@latest", "--browserUrl", "http://127.0.0.1:9333"]
+    }
+  }
+}
+```
+
+Change `9333` when you set `BO_WIDGET_DEBUG_PORT`, and `5173` below when Vite serves on another port.
+
+The agent then takes snapshots and screenshots of the fake BO, reads its log at the bottom of the page and the console, and clicks through the widget. That Chrome holds your session in the real BO, so give the agent these rules, for instance in the `CLAUDE.md` or `AGENTS.md` of the widget:
+
+- Act only on the tab of the fake BO (`http://localhost:5173/__bo-widget/`): never select, read nor drive the tab of the real BO.
+- Never read the authenticated network requests (no `get_network_request`): their headers carry your token. Never read `/__bo-widget/token`, nor call `getAccessToken` yourself.
+- Report the status codes and messages of the API, never headers nor tokens.
+
+The token never goes through the agent as long as it follows these rules: the agent only sees the pages, the dev server adds the token to the calls of a Web Component, and an iframe widget reads it through `getAccessToken`, which the log of the fake BO masks.
 
 ## License
 

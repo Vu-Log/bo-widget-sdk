@@ -6,7 +6,9 @@ import type { BoContext, BoCurrentUser, BoSettings } from '@vulog/bo-widget-sdk'
 import type { WidgetManifest } from '@vulog/bo-widget-sdk/manifest';
 import type { Logger, ViteDevServer } from 'vite';
 import { fetchBoApi, fetchFailure, fetchFailureCode, parseBoHost } from './boConf.js';
-import type { FakeBoConfig } from './host.js';
+import { jwtExpiresAt } from './jwt.js';
+import type { FakeBoAuth, FakeBoConfig } from './host.js';
+import type { TokenSource } from './login/session.js';
 import type { FakeBoMode, WidgetDevOptions } from './options.js';
 
 /**
@@ -23,6 +25,9 @@ export const FAKE_BO_MODULE_URL = `${FAKE_BO_PATH}fake-bo.js`;
 
 /** Path of the local Vulog API: `baseUrl` of `getApiInfo` in the fake back office. */
 export const FAKE_API_PATH = `${FAKE_BO_PATH}api/boapi/proxy/`;
+
+/** Path the fake back office reads the latest token of the session from, in login mode. */
+export const FAKE_TOKEN_PATH = `${FAKE_BO_PATH}token`;
 
 /** Publisher segment of the fake back office in the tag hash (the back office uses the publisher's namespace). */
 const DEV_CLIENT = 'dev';
@@ -41,14 +46,27 @@ export interface TokenModeEnv {
   readonly host?: string;
 }
 
-/** Mode of the fake back office, with the environment of the token mode. */
+/**
+ * Settings of the login mode: the API URL and key from the conf of `BO_WIDGET_HOST`; the token
+ * comes from the session the user opens in the Chrome of login mode.
+ */
+export interface LoginModeEnv {
+  /** Canonical `URL.href` of the API base URL, ending with `/`. */
+  readonly apiUrl: string;
+  readonly apiKey: string;
+  /** `BO_WIDGET_HOST`, the back office the user logs in to. */
+  readonly host: string;
+}
+
+/** Mode of the fake back office, with the environment of the token or login mode. */
 export type ResolvedDevMode =
   | {
       readonly mode: 'mock';
       /** `BO_WIDGET_HOST`, if set, for `getContext().host`. */
       readonly host?: string;
     }
-  | { readonly mode: 'token'; readonly env: TokenModeEnv };
+  | { readonly mode: 'token'; readonly env: TokenModeEnv }
+  | { readonly mode: 'login'; readonly env: LoginModeEnv };
 
 /** Dependencies of {@link resolveDevMode}. */
 export interface ResolveDevModeOptions {
@@ -69,20 +87,6 @@ export interface ResolveDevModeOptions {
  */
 export const widgetTag = (client: string, id: string, version: string): string =>
   `widget-${createHash('sha256').update(`${client}/${id}@${version}`).digest('hex').slice(0, 12)}`;
-
-/** Expiry of a JWT (`exp` × 1000), `null` when the token is not a readable JWT or has no `exp`. */
-export const jwtExpiresAt = (token: string): number | null => {
-  const payload = token.split('.')[1];
-  if (!payload) return null;
-  try {
-    const { exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
-      exp?: unknown;
-    };
-    return typeof exp === 'number' && Number.isFinite(exp) ? exp * 1000 : null;
-  } catch {
-    return null;
-  }
-};
 
 /** Parses `BO_WIDGET_API_URL` into its canonical form, the prefix every proxied URL must start with. */
 const canonicalApiUrl = (value: string): string => {
@@ -116,18 +120,51 @@ const hostTokenEnv = async (
 ): Promise<TokenModeEnv> => {
   if (!token) {
     throw new Error(
-      'Fake back office in token mode: set BO_WIDGET_TOKEN (in .env.local, the shell or with bo-widget dev --token -). Copy it from the back office of BO_WIDGET_HOST.',
+      'Fake back office in token mode: set BO_WIDGET_TOKEN (in .env.local, the shell or with bo-widget dev --token -), or log in with bo-widget dev --login. Copy it from the back office of BO_WIDGET_HOST.',
     );
   }
+  const { apiUrl, apiKey } = await hostApi(host, env, options);
+  return { token, apiUrl, apiKey, host };
+};
+
+/** API URL and key from the conf of `host`, with a warning when the API variables are set too. */
+const hostApi = async (
+  host: string,
+  env: Record<string, string | undefined>,
+  options: ResolveDevModeOptions,
+): Promise<{ apiUrl: string; apiKey: string }> => {
   const overridden = ['BO_WIDGET_API_URL', 'BO_WIDGET_API_KEY'].filter((name) => env[name]?.trim());
   if (overridden.length > 0) {
     options.warn?.(
       `[bo-widget] ${overridden.join(' and ')} ignored: BO_WIDGET_HOST is set, the API URL and key come from the conf of ${host}.`,
     );
   }
-  const { apiUrl, apiKey } = await fetchBoApi(host, options.fetch);
-  return { token, apiUrl, apiKey, host };
+  return fetchBoApi(host, options.fetch);
 };
+
+/** Login-mode environment: `BO_WIDGET_HOST` is required, `BO_WIDGET_TOKEN` ignored. */
+const loginEnv = async (
+  host: string | undefined,
+  env: Record<string, string | undefined>,
+  options: ResolveDevModeOptions,
+): Promise<LoginModeEnv> => {
+  if (!host) {
+    throw new Error(
+      'Fake back office in login mode: set BO_WIDGET_HOST (in .env.local or the shell) to the host of the back office to log in to, e.g. BO_WIDGET_HOST=bo.example.com.',
+    );
+  }
+  if (env.BO_WIDGET_TOKEN?.trim()) {
+    options.warn?.(
+      '[bo-widget] BO_WIDGET_TOKEN ignored: in login mode, the token comes from your session in the Chrome of bo-widget.',
+    );
+  }
+  const { apiUrl, apiKey } = await hostApi(host, env, options);
+  return { apiUrl, apiKey, host };
+};
+
+/** Whether `BO_WIDGET_LOGIN` asks for login mode (`bo-widget dev --login` sets it to `1`). */
+export const isLoginRequested = (env: Record<string, string | undefined>): boolean =>
+  ['1', 'true'].includes((env.BO_WIDGET_LOGIN ?? '').trim().toLowerCase());
 
 /**
  * Picks the mode of the fake back office and, in token mode, checks its environment.
@@ -135,15 +172,18 @@ const hostTokenEnv = async (
  * In token mode with `BO_WIDGET_HOST`, the API base URL and key come from the anonymous conf of
  * that back office (see {@link fetchBoApi}), over `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY`
  * (a warning tells when they are set too). In mock mode, `BO_WIDGET_HOST` only sets the host of
- * the context, without any call.
+ * the context, without any call. `BO_WIDGET_LOGIN` (`bo-widget dev --login`) asks for login mode,
+ * over `dev.mode` and `BO_WIDGET_TOKEN`: the API URL and key come from the conf of
+ * `BO_WIDGET_HOST`, and the token from the session the user opens in Chrome.
  *
  * @param requested - `dev.mode` of the widget configuration, if any.
  * @param env - Variables prefixed with `BO_WIDGET_`.
  * @param options - `fetch` and the warning logger.
- * @returns `mock` (with the host, if any), or `token` with the token (without `Bearer ` prefix),
- * the canonical API base URL, the API key and the host, if any. Always `mock` with `offline`.
+ * @returns `mock` (with the host, if any), `token` with the token (without `Bearer ` prefix),
+ * the canonical API base URL, the API key and the host, if any, or `login` with the API base URL,
+ * the API key and the host. Always `mock` with `offline`.
  * @throws {Error} For an unknown `dev.mode` or an invalid `BO_WIDGET_HOST`; in token mode when
- * `BO_WIDGET_TOKEN` is missing; with `BO_WIDGET_HOST`, when the conf cannot be read or lacks a
+ * `BO_WIDGET_TOKEN` is missing; in login mode when `BO_WIDGET_HOST` is missing; with `BO_WIDGET_HOST`, when the conf cannot be read or lacks a
  * field; without it, when `BO_WIDGET_API_URL` or `BO_WIDGET_API_KEY` is missing, or
  * `BO_WIDGET_API_URL` is not an http(s) URL without credentials, query nor hash.
  */
@@ -152,18 +192,23 @@ export const resolveDevMode = async (
   env: Record<string, string | undefined>,
   options: ResolveDevModeOptions = {},
 ): Promise<ResolvedDevMode> => {
-  const mode = requested ?? (env.BO_WIDGET_TOKEN ? 'token' : 'mock');
-  if (mode !== 'mock' && mode !== 'token') {
-    throw new Error(`Fake back office: unknown dev.mode "${String(mode)}"`);
+  if (requested !== undefined && requested !== 'mock' && requested !== 'token') {
+    throw new Error(`Fake back office: unknown dev.mode "${String(requested)}"`);
   }
+  const login = isLoginRequested(env);
+  if (login && requested !== undefined) {
+    options.warn?.(`[bo-widget] dev.mode "${requested}" ignored: bo-widget dev --login is used.`);
+  }
+  const mode = login ? 'login' : (requested ?? (env.BO_WIDGET_TOKEN ? 'token' : 'mock'));
   const rawHost = (env.BO_WIDGET_HOST ?? '').trim();
   const host = rawHost ? parseBoHost(rawHost) : undefined;
-  if (mode === 'token' && options.offline) {
+  if (mode !== 'mock' && options.offline) {
     options.warn?.(
-      '[bo-widget] Test mode: the fake back office stays in mock mode, without token mode nor any call to a back office conf.',
+      `[bo-widget] Test mode: the fake back office stays in mock mode, without ${mode} mode nor any call to a back office conf.`,
     );
   }
   if (mode === 'mock' || options.offline) return host ? { mode: 'mock', host } : { mode: 'mock' };
+  if (mode === 'login') return { mode, env: await loginEnv(host, env, options) };
   const token = (env.BO_WIDGET_TOKEN ?? '').trim().replace(/^Bearer(?:\s+|$)/i, '');
   if (host) return { mode, env: await hostTokenEnv(host, token, env, options) };
   const apiKey = (env.BO_WIDGET_API_KEY ?? '').trim();
@@ -211,7 +256,7 @@ export const fakeBoConfig = (
   dev: WidgetDevOptions,
   resolved: ResolvedDevMode,
 ): FakeBoConfig => {
-  const host = resolved.mode === 'token' ? resolved.env.host : resolved.host;
+  const host = resolved.mode === 'mock' ? resolved.host : resolved.env.host;
   const context: BoContext = {
     fleetId: DEV_FLEET,
     host: host ?? 'localhost',
@@ -241,7 +286,6 @@ export const fakeBoConfig = (
       .filter((setting) => setting.default !== undefined)
       .map((setting) => [setting.key, setting.default]),
   );
-  const token = resolved.mode === 'token' ? resolved.env.token : 'mock-access-token';
   return {
     mode: resolved.mode,
     runtime: manifest.runtime.type,
@@ -258,10 +302,26 @@ export const fakeBoConfig = (
     user,
     settings: { ...defaults, ...dev.settings },
     apiPath: FAKE_API_PATH,
-    apiKey: resolved.mode === 'token' ? resolved.env.apiKey : 'mock-api-key',
-    accessToken: token,
-    expiresAt: resolved.mode === 'token' ? jwtExpiresAt(token) : null,
+    apiKey: resolved.mode === 'mock' ? 'mock-api-key' : resolved.env.apiKey,
+    auth: pageAuth(resolved),
   };
+};
+
+/** Where the page of the fake back office gets its token from. */
+const pageAuth = (resolved: ResolvedDevMode): FakeBoAuth => {
+  switch (resolved.mode) {
+    case 'mock':
+      return { kind: 'static', accessToken: 'mock-access-token', expiresAt: null };
+    case 'token':
+      return {
+        kind: 'static',
+        accessToken: resolved.env.token,
+        expiresAt: jwtExpiresAt(resolved.env.token),
+      };
+    case 'login':
+      // The page reads the latest token of the session at each `getAccessToken`.
+      return { kind: 'session', tokenPath: FAKE_TOKEN_PATH };
+  }
 };
 
 /**
@@ -348,15 +408,18 @@ export const isCrossSite = (req: Pick<IncomingMessage, 'headers'>): boolean => {
 
 /**
  * Headers of a call forwarded to the API: the browser's, without hop-by-hop ones, cookies, origin
- * nor HTTP/2 pseudo-headers (`:method`, `:path`…), with `Authorization: Bearer` when absent.
+ * nor HTTP/2 pseudo-headers (`:method`, `:path`…), with `Authorization: Bearer` when absent and
+ * a token is given.
  */
-export const forwardedHeaders = (incoming: IncomingHttpHeaders, token: string): Headers => {
+export const forwardedHeaders = (incoming: IncomingHttpHeaders, token: string | null): Headers => {
   const headers = new Headers();
   for (const [name, value] of Object.entries(incoming)) {
     if (value === undefined || name.startsWith(':') || SKIPPED_REQUEST_HEADERS.has(name)) continue;
     headers.set(name, Array.isArray(value) ? value.join(', ') : value);
   }
-  if (!headers.has('authorization')) headers.set('authorization', `Bearer ${token}`);
+  if (token !== null && !headers.has('authorization')) {
+    headers.set('authorization', `Bearer ${token}`);
+  }
   return headers;
 };
 
@@ -365,16 +428,19 @@ export const forwardedHeaders = (incoming: IncomingHttpHeaders, token: string): 
  * widget did not, as the back office service worker does for a Web Component. Answers itself
  * `400 outside-api` for a path that leaves the API base URL, and `502 proxy-failed` when the API
  * cannot be reached; a response that breaks while streaming closes the connection, with a log.
+ * In login mode, a call without `Authorization` while there is no session gets `401 no-token`
+ * without reaching the API, and a `401` of the API makes the session forget its token.
  */
 const proxyToApi = async (
   req: IncomingMessage,
   res: ServerResponse,
   path: string,
   search: string,
-  env: TokenModeEnv,
+  auth: ProxyAuth,
   logger: Logger,
   warnOnce: (key: string, message: string) => void,
 ): Promise<void> => {
+  const { env } = auth;
   const target = new URL(`${path}${search}`, env.apiUrl);
   // With BO_WIDGET_HOST, the API origin comes from the conf of the back office: name the host.
   const api = env.host ? `the API of ${env.host}` : 'BO_WIDGET_API_URL';
@@ -383,8 +449,20 @@ const proxyToApi = async (
     sendJson(res, 400, { error: 'outside-api', message: `${path} is outside the API base URL` });
     return;
   }
-  const headers = forwardedHeaders(req.headers, env.token);
   const method = req.method ?? 'GET';
+  const fromWidget = req.headers.authorization;
+  let token: string | null = null;
+  if (fromWidget === undefined) {
+    token = auth.kind === 'static' ? auth.env.token : await auth.session.token();
+  }
+  if (auth.kind === 'session' && token === null && fromWidget === undefined) {
+    sendJson(res, 401, {
+      error: 'no-token',
+      message: `No token: ${auth.session.noTokenReason()}.`,
+    });
+    return;
+  }
+  const headers = forwardedHeaders(req.headers, token);
   const hasBody = method !== 'GET' && method !== 'HEAD';
   let response: Response;
   try {
@@ -412,7 +490,22 @@ const proxyToApi = async (
     });
     return;
   }
-  if (response.status === 401) {
+  if (response.status === 401 && auth.kind === 'session') {
+    const refused = token ?? bearerToken(fromWidget);
+    if (refused === null) {
+      warnOnce(
+        '401 not bearer',
+        `[bo-widget] ${method} ${target.pathname}: the API refused the Authorization header the widget sent (401), which is not a Bearer token.`,
+      );
+    } else {
+      auth.session.invalidate(refused);
+      // Once per refused token: the key is a digest, never logged.
+      warnOnce(
+        `401 ${createHash('sha256').update(refused).digest('hex')}`,
+        `[bo-widget] ${method} ${target.pathname}: the API refused the token of your session (401). If it keeps failing, log out and in again in the Chrome of bo-widget.`,
+      );
+    }
+  } else if (response.status === 401) {
     warnOnce(
       '401',
       `[bo-widget] ${method} ${target.pathname}: 401 from the API. Has BO_WIDGET_TOKEN expired? Paste a new one and restart vite.`,
@@ -466,31 +559,127 @@ export const isFakeBoPage = (
   );
 };
 
-/** What {@link installFakeBo} needs. */
-export interface FakeBoServerOptions {
+/**
+ * Login mode: answers the latest token of the session to the pages of this dev server, never
+ * cached: `{ accessToken, expiresAt }`, or `401 no-token` with the reason. A method other than
+ * `GET` gets `405`; a `GET` from another origin, or for another host than `localhost` (DNS
+ * rebinding), `403`.
+ */
+const answerToken = async (
+  req: IncomingMessage,
+  res: ServerResponse,
+  session: TokenSource,
+): Promise<void> => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', 'GET');
+    sendJson(res, 405, { error: 'method-not-allowed', message: 'Only GET' });
+    return;
+  }
+  if (isCrossSite(req) || !isLocalRequest(req)) {
+    sendJson(res, 403, {
+      error: 'cross-site',
+      message: 'The token is only given to the pages of this dev server, on localhost.',
+    });
+    return;
+  }
+  const token = await session.token();
+  if (token === null) {
+    sendJson(res, 401, { error: 'no-token', message: `No token: ${session.noTokenReason()}.` });
+    return;
+  }
+  sendJson(res, 200, { accessToken: token, expiresAt: jwtExpiresAt(token) });
+};
+
+/** How the proxy authenticates the calls it forwards. */
+type ProxyAuth =
+  | { readonly kind: 'static'; readonly env: TokenModeEnv }
+  | { readonly kind: 'session'; readonly env: LoginModeEnv; readonly session: TokenSource };
+
+/** What {@link installFakeBo} needs: the session comes with login mode, and only with it. */
+export type FakeBoServerOptions = {
   readonly runtime: WidgetManifest['runtime']['type'];
   /** `dev.responses`, answered in mock mode only. */
   readonly responses: Readonly<Record<string, unknown>>;
-  readonly resolved: ResolvedDevMode;
-}
+} & (
+  | {
+      readonly resolved: Extract<ResolvedDevMode, { mode: 'login' }>;
+      /** The session the token comes from. */
+      readonly session: TokenSource;
+    }
+  | { readonly resolved: Exclude<ResolvedDevMode, { mode: 'login' }>; readonly session?: never }
+);
 
 const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1'];
 
 /**
+ * Whether the request names this machine in its `Host` (or `:authority`): a page whose domain
+ * was rebound to 127.0.0.1 names its own, and Vite only checks it with `server.allowedHosts`.
+ */
+export const isLocalRequest = (req: Pick<IncomingMessage, 'headers'>): boolean => {
+  const host = req.headers.host ?? req.headers[':authority'];
+  if (typeof host !== 'string') return false;
+  try {
+    const { hostname } = new URL(`http://${host}`);
+    return LOOPBACK_HOSTS.includes(hostname.replace(/^\[|\]$/g, ''));
+  } catch {
+    return false;
+  }
+};
+
+/** The token of a `Bearer` `Authorization` header, `null` for another scheme. */
+const bearerToken = (header: string | undefined): string | null =>
+  /^Bearer\s+(\S+)$/i.exec(header ?? '')?.[1] ?? null;
+
+/** Whether `server.host` exposes the dev server beyond this machine. */
+const isExposed = (host: string | boolean | undefined): boolean =>
+  host === true || (typeof host === 'string' && !LOOPBACK_HOSTS.includes(host));
+
+/**
+ * Login mode serves the token of the session: the dev server must stay on this machine.
+ *
+ * @param host - `server.host` of Vite.
+ * @throws {Error} When `host` exposes the dev server to the network.
+ */
+export const assertLoginServerHost = (host: string | boolean | undefined): void => {
+  if (!isExposed(host)) return;
+  throw new Error(
+    'Fake back office in login mode: remove server.host (or --host), the token of your session would be served to your whole network.',
+  );
+};
+
+/**
  * Serves the fake back office on {@link FAKE_BO_PATH} and its sub-routes, and the local Vulog API
- * under {@link FAKE_API_PATH}: mock responses, or the real API in token mode. As a Web Component, `/`
- * redirects to the fake back office; in an iframe, `/` stays the widget page it displays.
+ * under {@link FAKE_API_PATH}: mock responses, or the real API in token and login modes. In login
+ * mode, also serves the latest token of the session on {@link FAKE_TOKEN_PATH}, to the pages of
+ * this server only. As a Web Component, `/` redirects to the fake back office; in an iframe, `/`
+ * stays the widget page it displays.
+ *
+ * @throws {Error} In login mode with a `server.host` that exposes the dev server to the network:
+ * anyone there could read the token of the session.
  */
 export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOptions): void => {
   const { logger } = server.config;
   const { resolved } = options;
   const host = server.config.server.host;
+  let auth: ProxyAuth | null = null;
+  if (options.resolved.mode === 'login') {
+    // The type pairs the session with login mode; a caller without types may still omit it.
+    if (!options.session) throw new Error('Fake back office in login mode: no session to follow');
+    // Already checked before Chrome is launched; checked again for any other caller.
+    assertLoginServerHost(host);
+    if (Object.keys(options.responses).length > 0) {
+      logger.warn('[bo-widget] Login mode: dev.responses are ignored, the calls go to the API.');
+    }
+    auth = { kind: 'session', env: options.resolved.env, session: options.session };
+  }
   if (resolved.mode === 'token') {
+    auth = { kind: 'static', env: resolved.env };
     for (const warning of tokenWarnings(resolved.env.token)) logger.warn(`[bo-widget] ${warning}`);
     if (Object.keys(options.responses).length > 0) {
       logger.warn('[bo-widget] Token mode: dev.responses are ignored, the calls go to the API.');
     }
-    if (host === true || (typeof host === 'string' && !LOOPBACK_HOSTS.includes(host))) {
+    if (isExposed(host)) {
       logger.warn(
         '[bo-widget] Fake back office in token mode with server.host set: anyone on the network can call the Vulog API with your token through this server.',
       );
@@ -535,6 +724,10 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
       res.end();
       return;
     }
+    if (pathname === FAKE_TOKEN_PATH && auth?.kind === 'session') {
+      answerToken(req, res, auth.session).catch(next);
+      return;
+    }
     if (isFakeBoPage(req, pathname)) {
       server
         .transformIndexHtml(pathname, FAKE_BO_HTML)
@@ -561,9 +754,20 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
       });
       return;
     }
+    if (auth?.kind === 'session' && !isLocalRequest(req)) {
+      warnOnce(
+        `not local ${String(req.headers.host)}`,
+        '[bo-widget] Login mode: refused a call of the local Vulog API for another host than localhost.',
+      );
+      sendJson(res, 403, {
+        error: 'not-local',
+        message: 'In login mode, the local Vulog API only answers on localhost.',
+      });
+      return;
+    }
     const rawPath = pathname.slice(FAKE_API_PATH.length);
-    if (resolved.mode === 'token') {
-      proxyToApi(req, res, rawPath, url.search, resolved.env, logger, warnOnce).catch(next);
+    if (auth) {
+      proxyToApi(req, res, rawPath, url.search, auth, logger, warnOnce).catch(next);
       return;
     }
     let path: string;
@@ -583,7 +787,7 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
     const base = server.resolvedUrls?.local[0] ?? server.resolvedUrls?.network[0];
     const where = base ? new URL(FAKE_BO_PATH, base).href : FAKE_BO_PATH;
     const api =
-      resolved.mode === 'token' && resolved.env.host ? `, API of ${resolved.env.host}` : '';
+      resolved.mode !== 'mock' && resolved.env.host ? `, API of ${resolved.env.host}` : '';
     logger.info(`  ➜  Fake back office (${resolved.mode} mode${api}): ${where}`);
   };
 };
