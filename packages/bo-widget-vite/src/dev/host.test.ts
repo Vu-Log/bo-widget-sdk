@@ -427,6 +427,19 @@ describe('startFakeBo as a Web Component', () => {
     expect(log).not.toContain('secret-token-value');
   });
 
+  it('masks the API key in the log', async () => {
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig({ apiKey: 'secret-api-key' }), load(Widget));
+    const bo = await client();
+
+    expect((await bo.getApiInfo()).apiKey).toBe('secret-api-key');
+
+    const log = document.querySelector('.bo-log')?.textContent ?? '';
+    expect(log).toContain('getApiInfo');
+    expect(log).toContain('"apiKey":"…"');
+    expect(log).not.toContain('secret-api-key');
+  });
+
   it('shows the errors the widget throws later in the log', async () => {
     await startFakeBo(fakeConfig(), load(widgetClass().Widget));
 

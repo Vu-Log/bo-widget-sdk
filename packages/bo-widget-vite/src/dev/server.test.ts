@@ -34,6 +34,12 @@ import {
 const jwt = (payload: object): string =>
   ['e30', Buffer.from(JSON.stringify(payload)).toString('base64url'), 'sig'].join('.');
 
+/** Anonymous conf of a back office, as `fe-api` serves it. */
+const BO_CONF = {
+  'X-API-Key': 'conf-key',
+  url: { baseUrl: 'https://api.bo.example.com/boapi/proxy/' },
+};
+
 const TOKEN_ENV = {
   BO_WIDGET_TOKEN: 'real-token',
   BO_WIDGET_API_URL: 'https://api.example.com/boapi/proxy',
@@ -69,12 +75,12 @@ describe('jwtExpiresAt', () => {
 });
 
 describe('resolveDevMode', () => {
-  it('is mock by default', () => {
-    expect(resolveDevMode(undefined, {})).toEqual({ mode: 'mock' });
+  it('is mock by default', async () => {
+    await expect(resolveDevMode(undefined, {})).resolves.toEqual({ mode: 'mock' });
   });
 
-  it('is token when BO_WIDGET_TOKEN is set, with a trailing slash on the API URL', () => {
-    expect(resolveDevMode(undefined, TOKEN_ENV)).toEqual({
+  it('is token when BO_WIDGET_TOKEN is set, with a trailing slash on the API URL', async () => {
+    await expect(resolveDevMode(undefined, TOKEN_ENV)).resolves.toEqual({
       mode: 'token',
       env: {
         token: 'real-token',
@@ -84,12 +90,12 @@ describe('resolveDevMode', () => {
     });
   });
 
-  it('stays mock when asked, even with a token', () => {
-    expect(resolveDevMode('mock', TOKEN_ENV)).toEqual({ mode: 'mock' });
+  it('stays mock when asked, even with a token', async () => {
+    await expect(resolveDevMode('mock', TOKEN_ENV)).resolves.toEqual({ mode: 'mock' });
   });
 
-  it('lists the missing variables in token mode', () => {
-    expect(() => resolveDevMode('token', { BO_WIDGET_TOKEN: 't' })).toThrow(
+  it('lists the missing variables in token mode', async () => {
+    await expect(resolveDevMode('token', { BO_WIDGET_TOKEN: 't' })).rejects.toThrow(
       /set BO_WIDGET_API_URL, BO_WIDGET_API_KEY/,
     );
   });
@@ -99,44 +105,44 @@ describe('resolveDevMode', () => {
     ['ftp://api.example.com/', /BO_WIDGET_API_URL must be an http\(s\) URL, not ftp:/],
     ['https://api.example.com/boapi/proxy/?a=1', /must have no query nor hash/],
     ['https://api.example.com/boapi/proxy/#x', /must have no query nor hash/],
-  ])('refuses the API URL %s', (url, message) => {
-    expect(() => resolveDevMode('token', { ...TOKEN_ENV, BO_WIDGET_API_URL: url })).toThrow(
+  ])('refuses the API URL %s', async (url, message) => {
+    await expect(resolveDevMode('token', { ...TOKEN_ENV, BO_WIDGET_API_URL: url })).rejects.toThrow(
       message,
     );
   });
 
-  it('refuses an API URL with credentials', () => {
-    expect(() =>
+  it('refuses an API URL with credentials', async () => {
+    await expect(
       resolveDevMode('token', { ...TOKEN_ENV, BO_WIDGET_API_URL: 'https://u:p@api.example.com/' }),
-    ).toThrow(/must not contain credentials/);
+    ).rejects.toThrow(/must not contain credentials/);
   });
 
-  it('shows the API URL it cannot parse', () => {
-    expect(() =>
+  it('shows the API URL it cannot parse', async () => {
+    await expect(
       resolveDevMode('token', { ...TOKEN_ENV, BO_WIDGET_API_URL: '"api.example.com"' }),
-    ).toThrow('BO_WIDGET_API_URL is not a valid URL: ""api.example.com""');
+    ).rejects.toThrow('BO_WIDGET_API_URL is not a valid URL: ""api.example.com""');
   });
 
-  it('trims the API key and the URL pasted with spaces', () => {
-    expect(
+  it('trims the API key and the URL pasted with spaces', async () => {
+    await expect(
       resolveDevMode('token', {
         ...TOKEN_ENV,
         BO_WIDGET_API_KEY: ' real-key\r',
         BO_WIDGET_API_URL: ' https://api.example.com/boapi/proxy/ ',
       }),
-    ).toMatchObject({
+    ).resolves.toMatchObject({
       env: { apiKey: 'real-key', apiUrl: 'https://api.example.com/boapi/proxy/' },
     });
   });
 
-  it.each([['   '], ['Bearer'], ['Bearer   ']])('counts the token %j as missing', (token) => {
-    expect(() => resolveDevMode('token', { ...TOKEN_ENV, BO_WIDGET_TOKEN: token })).toThrow(
+  it.each([['   '], ['Bearer'], ['Bearer   ']])('counts the token %j as missing', async (token) => {
+    await expect(resolveDevMode('token', { ...TOKEN_ENV, BO_WIDGET_TOKEN: token })).rejects.toThrow(
       /set BO_WIDGET_TOKEN \(/,
     );
   });
 
-  it('keeps the API URL in its canonical form, the prefix the proxy checks', () => {
-    const resolved = resolveDevMode('token', {
+  it('keeps the API URL in its canonical form, the prefix the proxy checks', async () => {
+    const resolved = await resolveDevMode('token', {
       ...TOKEN_ENV,
       BO_WIDGET_API_URL: 'https://API.Example.com:443/boapi/proxy',
     });
@@ -144,8 +150,8 @@ describe('resolveDevMode', () => {
     expect(resolved).toMatchObject({ env: { apiUrl: 'https://api.example.com/boapi/proxy/' } });
   });
 
-  it('removes a Bearer prefix and spaces pasted with the token', () => {
-    const resolved = resolveDevMode('token', {
+  it('removes a Bearer prefix and spaces pasted with the token', async () => {
+    const resolved = await resolveDevMode('token', {
       ...TOKEN_ENV,
       BO_WIDGET_TOKEN: ' Bearer abc.def.ghi \n',
     });
@@ -153,8 +159,167 @@ describe('resolveDevMode', () => {
     expect(resolved).toMatchObject({ env: { token: 'abc.def.ghi' } });
   });
 
-  it('refuses an unknown mode', () => {
-    expect(() => resolveDevMode('proxy' as 'token', {})).toThrow(/unknown dev\.mode "proxy"/);
+  it('refuses an unknown mode', async () => {
+    await expect(resolveDevMode('proxy' as 'token', {})).rejects.toThrow(
+      /unknown dev\.mode "proxy"/,
+    );
+  });
+
+  describe('with BO_WIDGET_HOST', () => {
+    const HOST = 'bo.example.com';
+    const confFetch = (conf: unknown = BO_CONF) =>
+      vi.fn<typeof fetch>(() => Promise.resolve(Response.json(conf)));
+
+    it('reads the API URL and key from the conf of the host', async () => {
+      const fetchConf = confFetch();
+      const warn = vi.fn();
+
+      const resolved = await resolveDevMode(
+        undefined,
+        { BO_WIDGET_TOKEN: 'real-token', BO_WIDGET_HOST: ` ${HOST} ` },
+        { fetch: fetchConf, warn },
+      );
+
+      expect(resolved).toEqual({
+        mode: 'token',
+        env: {
+          token: 'real-token',
+          apiUrl: 'https://api.bo.example.com/boapi/proxy/',
+          apiKey: 'conf-key',
+          host: HOST,
+        },
+      });
+      expect(fetchConf).toHaveBeenCalledWith(
+        `https://${HOST}/fe-api/anonymous/bo/${HOST}/conf`,
+        expect.anything(),
+      );
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('takes precedence over BO_WIDGET_API_URL and BO_WIDGET_API_KEY, with a warning', async () => {
+      const warn = vi.fn();
+
+      const resolved = await resolveDevMode(
+        undefined,
+        { ...TOKEN_ENV, BO_WIDGET_HOST: HOST },
+        { fetch: confFetch(), warn },
+      );
+
+      expect(resolved).toMatchObject({
+        env: { apiUrl: 'https://api.bo.example.com/boapi/proxy/', apiKey: 'conf-key' },
+      });
+      expect(warn).toHaveBeenCalledOnce();
+      const [message] = warn.mock.calls[0] as [string];
+      expect(message).toMatch(/BO_WIDGET_API_URL and BO_WIDGET_API_KEY ignored/);
+      expect(message).toContain(HOST);
+      for (const value of ['conf-key', 'real-key', 'api.example.com', 'api.bo.example.com']) {
+        expect(message).not.toContain(value);
+      }
+    });
+
+    it('warns about the one variable also set', async () => {
+      const warn = vi.fn();
+
+      await resolveDevMode(
+        undefined,
+        { BO_WIDGET_TOKEN: 't', BO_WIDGET_API_KEY: 'real-key', BO_WIDGET_HOST: HOST },
+        { fetch: confFetch(), warn },
+      );
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(/^\[bo-widget\] BO_WIDGET_API_KEY ignored/),
+      );
+    });
+
+    it('does not warn about blank BO_WIDGET_API_URL and BO_WIDGET_API_KEY', async () => {
+      const warn = vi.fn();
+
+      await resolveDevMode(
+        undefined,
+        {
+          BO_WIDGET_TOKEN: 't',
+          BO_WIDGET_API_URL: '  ',
+          BO_WIDGET_API_KEY: '',
+          BO_WIDGET_HOST: HOST,
+        },
+        { fetch: confFetch(), warn },
+      );
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('stays mock when asked, with the host and without reading the conf', async () => {
+      const fetchConf = confFetch();
+
+      await expect(
+        resolveDevMode('mock', { ...TOKEN_ENV, BO_WIDGET_HOST: HOST }, { fetch: fetchConf }),
+      ).resolves.toEqual({ mode: 'mock', host: HOST });
+      expect(fetchConf).not.toHaveBeenCalled();
+    });
+
+    it('stays mock offline, keeping the host, with a warning when token mode was asked for', async () => {
+      const fetchConf = confFetch();
+      const warn = vi.fn();
+
+      await expect(
+        resolveDevMode(
+          undefined,
+          { BO_WIDGET_TOKEN: 't', BO_WIDGET_HOST: HOST },
+          { fetch: fetchConf, warn, offline: true },
+        ),
+      ).resolves.toEqual({ mode: 'mock', host: HOST });
+      expect(fetchConf).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Test mode: .* stays in mock mode/));
+    });
+
+    it('still checks the mode and the host offline, without a warning in mock mode', async () => {
+      const warn = vi.fn();
+
+      await expect(resolveDevMode('proxy' as 'token', {}, { offline: true })).rejects.toThrow(
+        /unknown dev\.mode "proxy"/,
+      );
+      await expect(
+        resolveDevMode(undefined, { BO_WIDGET_HOST: 'bo.example.com/x' }, { offline: true }),
+      ).rejects.toThrow(/BO_WIDGET_HOST must be the host/);
+      await expect(resolveDevMode(undefined, {}, { warn, offline: true })).resolves.toEqual({
+        mode: 'mock',
+      });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('still needs a token in token mode, without reading the conf', async () => {
+      const fetchConf = confFetch();
+
+      await expect(
+        resolveDevMode('token', { BO_WIDGET_HOST: HOST }, { fetch: fetchConf }),
+      ).rejects.toThrow(/set BO_WIDGET_TOKEN/);
+      expect(fetchConf).not.toHaveBeenCalled();
+    });
+
+    it('only sets the host in mock mode, without reading the conf', async () => {
+      const fetchConf = confFetch();
+
+      await expect(
+        resolveDevMode(undefined, { BO_WIDGET_HOST: HOST }, { fetch: fetchConf }),
+      ).resolves.toEqual({ mode: 'mock', host: HOST });
+      expect(fetchConf).not.toHaveBeenCalled();
+    });
+
+    it('refuses an invalid host, even in mock mode', async () => {
+      await expect(
+        resolveDevMode(undefined, { BO_WIDGET_HOST: 'https://bo.example.com/' }),
+      ).rejects.toThrow(/BO_WIDGET_HOST must be the host of a back office/);
+    });
+
+    it('fails with the error of the conf', async () => {
+      await expect(
+        resolveDevMode(
+          undefined,
+          { BO_WIDGET_TOKEN: 't', BO_WIDGET_HOST: HOST },
+          { fetch: confFetch({ url: {} }) },
+        ),
+      ).rejects.toThrow(`the conf of the back office ${HOST} has no url.baseUrl`);
+    });
   });
 });
 
@@ -294,18 +459,46 @@ describe('fakeBoConfig', () => {
     expect(config.settings).toEqual({ currency: 'EUR', apiBaseUrl: 'https://mw.example.com' });
   });
 
+  it('gives BO_WIDGET_HOST as the host of the context, in both modes', () => {
+    const env = {
+      token: 't',
+      apiUrl: 'https://api.example.com/',
+      apiKey: 'k',
+      host: 'bo.example.com',
+    };
+
+    expect(fakeBoConfig(manifest, {}, { mode: 'mock', host: 'bo.example.com' }).context.host).toBe(
+      'bo.example.com',
+    );
+    expect(fakeBoConfig(manifest, {}, { mode: 'token', env }).context.host).toBe('bo.example.com');
+    expect(fakeBoConfig(manifest, {}, { mode: 'mock' }).context.host).toBe('localhost');
+  });
+
+  it('keeps dev.context.host over BO_WIDGET_HOST', () => {
+    expect(
+      fakeBoConfig(
+        manifest,
+        { context: { host: 'other.example.com' } },
+        {
+          mode: 'mock',
+          host: 'bo.example.com',
+        },
+      ).context.host,
+    ).toBe('other.example.com');
+  });
+
   it('has no fleet in the user when the context has none', () => {
     expect(
       fakeBoConfig(manifest, { context: { fleetId: null } }, { mode: 'mock' }).user.fleets,
     ).toEqual([]);
   });
 
-  it('passes the real token and API key in token mode, with the token expiry', () => {
+  it('passes the real token and API key in token mode, with the token expiry', async () => {
     const token = jwt({ exp: 2_000_000_000 });
     const config = fakeBoConfig(
       manifest,
       {},
-      resolveDevMode(undefined, { ...TOKEN_ENV, BO_WIDGET_TOKEN: token }),
+      await resolveDevMode(undefined, { ...TOKEN_ENV, BO_WIDGET_TOKEN: token }),
     );
 
     expect(config).toMatchObject({
@@ -356,6 +549,7 @@ describe('fake back office dev server', () => {
 
   afterEach(async () => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     await Promise.all(servers.splice(0).map((server) => server.close()));
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
@@ -375,7 +569,7 @@ describe('fake back office dev server', () => {
     return root;
   };
 
-  const serve = async (config: WidgetConfig, files?: Record<string, string>) => {
+  const serve = async (config: WidgetConfig, files?: Record<string, string>, mode?: string) => {
     const root = await project(files);
     const customLogger = createLogger('silent');
     const warn = vi.spyOn(customLogger, 'warn');
@@ -383,6 +577,7 @@ describe('fake back office dev server', () => {
     const server: ViteDevServer = await createServer({
       root,
       configFile: false,
+      ...(mode ? { mode } : {}),
       logLevel: 'silent',
       customLogger,
       server: { port: 0, strictPort: false, ws: false },
@@ -635,6 +830,158 @@ describe('fake back office dev server', () => {
 
     expect(response.status).toBe(502);
     expect(await response.json()).toMatchObject({ error: 'proxy-failed' });
+  });
+
+  describe('with BO_WIDGET_HOST', () => {
+    const HOST = 'bo.example.com';
+    const API = 'https://api.bo.example.com/boapi/proxy/';
+
+    /**
+     * Stands for the network outside the test: the conf of the back office and its API. The calls
+     * to the dev server itself go through the real `fetch`.
+     */
+    const stubNetwork = (
+      conf: () => Promise<Response> = () => Promise.resolve(Response.json(BO_CONF)),
+      api: () => Promise<Response> = () => Promise.resolve(Response.json({ vehicles: 3 })),
+    ) => {
+      const realFetch = globalThis.fetch;
+      const calls: { url: string; headers: Headers }[] = [];
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: string | URL | Request, init?: RequestInit) => {
+          const url = input instanceof Request ? input.url : String(input);
+          if (url.startsWith(`https://${HOST}/`)) return conf();
+          if (url.startsWith(API)) {
+            calls.push({ url, headers: new Headers(init?.headers) });
+            return api();
+          }
+          return realFetch(input, init);
+        }),
+      );
+      vi.stubEnv('BO_WIDGET_HOST', HOST);
+      vi.stubEnv('BO_WIDGET_TOKEN', 'real-token');
+      return calls;
+    };
+
+    const logged = (...spies: { mock: { calls: unknown[][] } }[]): string =>
+      spies.flatMap((spy) => spy.mock.calls.map((call) => String(call[0]))).join('\n');
+
+    it('forwards the calls to the API of the conf, with the host in the context', async () => {
+      const calls = stubNetwork();
+      vi.stubEnv('BO_WIDGET_API_URL', 'https://other.example.com/boapi/proxy/');
+      vi.stubEnv('BO_WIDGET_API_KEY', 'env-key');
+      const { server, origin, customLogger, warn, error } = await serve({ name: 'Fleet report' });
+      const info = vi.spyOn(customLogger, 'info');
+      server.printUrls();
+
+      const response = await fetch(`${origin}${FAKE_API_PATH}fleetmanager/public/fleets/F1`);
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ vehicles: 3 });
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.url).toBe(`${API}fleetmanager/public/fleets/F1`);
+      expect(calls[0]?.headers.get('authorization')).toBe('Bearer real-token');
+      const module = await (await fetch(`${origin}${FAKE_BO_MODULE_URL}`)).text();
+      expect(module).toContain('"mode":"token"');
+      expect(module).toContain(`"host":"${HOST}"`);
+      expect(module).toContain('"apiKey":"conf-key"');
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('BO_WIDGET_API_URL and BO_WIDGET_API_KEY ignored'),
+      );
+      expect(info).toHaveBeenCalledWith(expect.stringContaining(`token mode, API of ${HOST}`));
+      const logs = logged(warn, error, info);
+      expect(logs).not.toContain('conf-key');
+      expect(logs).not.toContain('api.bo.example.com');
+    });
+
+    it('names the host, not the API origin, when the API cannot be reached', async () => {
+      stubNetwork(undefined, () =>
+        Promise.reject(new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } })),
+      );
+      const { origin, error } = await serve({ name: 'Fleet report' });
+
+      const response = await fetch(`${origin}${FAKE_API_PATH}x`);
+
+      expect(response.status).toBe(502);
+      expect(await response.json()).toEqual({
+        error: 'proxy-failed',
+        message: `Cannot reach the API of ${HOST}: ENOTFOUND`,
+      });
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `cannot reach the API of ${HOST} (ENOTFOUND). Check BO_WIDGET_HOST`,
+        ),
+      );
+      expect(logged(error)).not.toContain('api.bo.example.com');
+    });
+
+    it('gives only the error code when the API fails, never a message that may name its origin', async () => {
+      stubNetwork(undefined, () =>
+        Promise.reject(new TypeError(`fetch failed: ${API}`, { cause: { message: `bad ${API}` } })),
+      );
+      const { origin, error } = await serve({ name: 'Fleet report' });
+
+      const response = await fetch(`${origin}${FAKE_API_PATH}x`);
+
+      expect(await response.json()).toEqual({
+        error: 'proxy-failed',
+        message: `Cannot reach the API of ${HOST}: TypeError`,
+      });
+      expect(logged(error)).not.toContain('api.bo.example.com');
+    });
+
+    it('names the host, not the API URL, for a path outside the API', async () => {
+      const calls = stubNetwork();
+      const { origin, warn } = await serve({ name: 'Fleet report' });
+
+      const response = await fetch(`${origin}${FAKE_API_PATH}/admin`);
+
+      expect(response.status).toBe(400);
+      expect(calls).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(`/admin is outside the API of ${HOST}: not forwarded`),
+      );
+      expect(logged(warn)).not.toContain('api.bo.example.com');
+    });
+
+    it('stays in mock mode in the test mode of Vitest, without reading the conf', async () => {
+      stubNetwork(() => Promise.reject(new Error('the conf must not be read')));
+
+      const { origin, warn } = await serve({ name: 'Fleet report' }, undefined, 'test');
+
+      const module = await (await fetch(`${origin}${FAKE_BO_MODULE_URL}`)).text();
+      expect(module).toContain('"mode":"mock"');
+      expect(module).toContain(`"host":"${HOST}"`);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('stays in mock mode'));
+      const urls = vi.mocked(globalThis.fetch).mock.calls.map(([input]) => String(input));
+      expect(urls.filter((url) => url.includes(HOST))).toEqual([]);
+    });
+
+    it.each([
+      [
+        'answers 404',
+        () => Promise.resolve(new Response('Not found', { status: 404 })),
+        /answered 404/,
+      ],
+      [
+        'cannot be reached',
+        () => Promise.reject(new TypeError('fetch failed', { cause: { code: 'ENOTFOUND' } })),
+        /cannot be reached \(ENOTFOUND\)/,
+      ],
+      ['is not JSON', () => Promise.resolve(new Response('<html>')), /is not valid JSON/],
+      [
+        'has no API key',
+        () => Promise.resolve(Response.json({ url: BO_CONF.url })),
+        /has no X-API-Key/,
+      ],
+    ])('fails to start when the conf %s', async (_label, conf, message) => {
+      stubNetwork(conf);
+
+      const failure = serve({ name: 'Fleet report' });
+
+      await expect(failure).rejects.toThrow(message);
+      await expect(failure).rejects.toThrow(`the conf of the back office ${HOST}`);
+    });
   });
 
   it('fails to start in token mode without the API settings', async () => {

@@ -5,7 +5,8 @@ import type { BoContext, BoCurrentUser, BoSettings } from '@vulog/bo-widget-sdk'
  *
  * - `mock`: a fake token, and the Vulog API calls get the static `responses`.
  * - `token`: the Vulog API calls go to a real environment, with the token pasted from its back
- *   office (`BO_WIDGET_TOKEN`, `BO_WIDGET_API_URL`, `BO_WIDGET_API_KEY`).
+ *   office (`BO_WIDGET_TOKEN`), and the API URL and key read from the conf of that back office
+ *   (`BO_WIDGET_HOST`) or copied from it (`BO_WIDGET_API_URL`, `BO_WIDGET_API_KEY`).
  */
 export type FakeBoMode = 'mock' | 'token';
 
@@ -18,8 +19,9 @@ export type MockResponseKey = `${MockMethod} ${string}`;
 /** Options of the fake back office that `vite` serves in dev on `/__bo-widget/`. */
 export interface WidgetDevOptions {
   /**
-   * Defaults to `token` when `BO_WIDGET_TOKEN` is set, `mock` otherwise. Forcing `token` without
-   * the three `BO_WIDGET_*` variables makes `vite` fail at startup.
+   * Defaults to `token` when `BO_WIDGET_TOKEN` is set, `mock` otherwise. Forcing `token` makes
+   * `vite` fail at startup unless `BO_WIDGET_TOKEN` is set, along with either `BO_WIDGET_HOST` or
+   * both `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY`. Always `mock` in the `test` mode (Vitest).
    */
   mode?: FakeBoMode;
   /** Overrides the context of the fake back office (`getContext`). */

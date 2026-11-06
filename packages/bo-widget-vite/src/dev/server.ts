@@ -5,6 +5,7 @@ import { pipeline } from 'node:stream/promises';
 import type { BoContext, BoCurrentUser, BoSettings } from '@vulog/bo-widget-sdk';
 import type { WidgetManifest } from '@vulog/bo-widget-sdk/manifest';
 import type { Logger, ViteDevServer } from 'vite';
+import { fetchBoApi, fetchFailure, fetchFailureCode, parseBoHost } from './boConf.js';
 import type { FakeBoConfig } from './host.js';
 import type { FakeBoMode, WidgetDevOptions } from './options.js';
 
@@ -33,11 +34,34 @@ export interface TokenModeEnv {
   /** Canonical `URL.href` of the API base URL, ending with `/`, without query nor hash. */
   readonly apiUrl: string;
   readonly apiKey: string;
+  /**
+   * `BO_WIDGET_HOST`, when the API URL and key come from the conf of that back office: the logs
+   * then name the host instead of these values.
+   */
+  readonly host?: string;
 }
 
 /** Mode of the fake back office, with the environment of the token mode. */
 export type ResolvedDevMode =
-  { readonly mode: 'mock' } | { readonly mode: 'token'; readonly env: TokenModeEnv };
+  | {
+      readonly mode: 'mock';
+      /** `BO_WIDGET_HOST`, if set, for `getContext().host`. */
+      readonly host?: string;
+    }
+  | { readonly mode: 'token'; readonly env: TokenModeEnv };
+
+/** Dependencies of {@link resolveDevMode}. */
+export interface ResolveDevModeOptions {
+  /** `fetch`, replaced in tests. */
+  readonly fetch?: typeof fetch;
+  /** Logs a warning in the terminal; warnings are dropped when it is omitted. */
+  readonly warn?: (message: string) => void;
+  /**
+   * Never calls the network (tests): the mode and `BO_WIDGET_HOST` are still checked and the host
+   * kept, but token mode falls back to mock mode, with a warning.
+   */
+  readonly offline?: boolean;
+}
 
 /**
  * Tag of a widget as the back office computes it: `widget-` and the first 12 hex characters of
@@ -83,25 +107,65 @@ const canonicalApiUrl = (value: string): string => {
   return url.href;
 };
 
+/** Token-mode environment of `BO_WIDGET_HOST`: the API base URL and key from its conf. */
+const hostTokenEnv = async (
+  host: string,
+  token: string,
+  env: Record<string, string | undefined>,
+  options: ResolveDevModeOptions,
+): Promise<TokenModeEnv> => {
+  if (!token) {
+    throw new Error(
+      'Fake back office in token mode: set BO_WIDGET_TOKEN (in .env.local, the shell or with bo-widget dev --token -). Copy it from the back office of BO_WIDGET_HOST.',
+    );
+  }
+  const overridden = ['BO_WIDGET_API_URL', 'BO_WIDGET_API_KEY'].filter((name) => env[name]?.trim());
+  if (overridden.length > 0) {
+    options.warn?.(
+      `[bo-widget] ${overridden.join(' and ')} ignored: BO_WIDGET_HOST is set, the API URL and key come from the conf of ${host}.`,
+    );
+  }
+  const { apiUrl, apiKey } = await fetchBoApi(host, options.fetch);
+  return { token, apiUrl, apiKey, host };
+};
+
 /**
  * Picks the mode of the fake back office and, in token mode, checks its environment.
  *
+ * In token mode with `BO_WIDGET_HOST`, the API base URL and key come from the anonymous conf of
+ * that back office (see {@link fetchBoApi}), over `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY`
+ * (a warning tells when they are set too). In mock mode, `BO_WIDGET_HOST` only sets the host of
+ * the context, without any call.
+ *
  * @param requested - `dev.mode` of the widget configuration, if any.
  * @param env - Variables prefixed with `BO_WIDGET_`.
- * @returns `mock`, or `token` with the token (without `Bearer ` prefix), the canonical API base
- * URL and the API key.
- * @throws {Error} For an unknown `dev.mode`, and in token mode when `BO_WIDGET_TOKEN`,
- * `BO_WIDGET_API_URL` or `BO_WIDGET_API_KEY` is missing, or `BO_WIDGET_API_URL` is not an http(s)
- * URL without query nor hash.
+ * @param options - `fetch` and the warning logger.
+ * @returns `mock` (with the host, if any), or `token` with the token (without `Bearer ` prefix),
+ * the canonical API base URL, the API key and the host, if any. Always `mock` with `offline`.
+ * @throws {Error} For an unknown `dev.mode` or an invalid `BO_WIDGET_HOST`; in token mode when
+ * `BO_WIDGET_TOKEN` is missing; with `BO_WIDGET_HOST`, when the conf cannot be read or lacks a
+ * field; without it, when `BO_WIDGET_API_URL` or `BO_WIDGET_API_KEY` is missing, or
+ * `BO_WIDGET_API_URL` is not an http(s) URL without credentials, query nor hash.
  */
-export const resolveDevMode = (
+export const resolveDevMode = async (
   requested: FakeBoMode | undefined,
   env: Record<string, string | undefined>,
-): ResolvedDevMode => {
+  options: ResolveDevModeOptions = {},
+): Promise<ResolvedDevMode> => {
   const mode = requested ?? (env.BO_WIDGET_TOKEN ? 'token' : 'mock');
-  if (mode === 'mock') return { mode };
-  if (mode !== 'token') throw new Error(`Fake back office: unknown dev.mode "${String(mode)}"`);
+  if (mode !== 'mock' && mode !== 'token') {
+    throw new Error(`Fake back office: unknown dev.mode "${String(mode)}"`);
+  }
+  const rawHost = (env.BO_WIDGET_HOST ?? '').trim();
+  const host = rawHost ? parseBoHost(rawHost) : undefined;
+  if (mode === 'token' && options.offline) {
+    options.warn?.(
+      '[bo-widget] Test mode: the fake back office stays in mock mode, without token mode nor any call to a back office conf.',
+    );
+  }
+  if (mode === 'mock' || options.offline) return host ? { mode: 'mock', host } : { mode: 'mock' };
   const token = (env.BO_WIDGET_TOKEN ?? '').trim().replace(/^Bearer(?:\s+|$)/i, '');
+  if (host) return { mode, env: await hostTokenEnv(host, token, env, options) };
   const apiKey = (env.BO_WIDGET_API_KEY ?? '').trim();
   const apiUrl = (env.BO_WIDGET_API_URL ?? '').trim();
   const values: Record<string, string> = {
@@ -147,9 +211,10 @@ export const fakeBoConfig = (
   dev: WidgetDevOptions,
   resolved: ResolvedDevMode,
 ): FakeBoConfig => {
+  const host = resolved.mode === 'token' ? resolved.env.host : resolved.host;
   const context: BoContext = {
     fleetId: DEV_FLEET,
-    host: 'localhost',
+    host: host ?? 'localhost',
     locale: 'en_GB',
     timezone: 'Europe/Paris',
     currency: 'EUR',
@@ -295,14 +360,6 @@ export const forwardedHeaders = (incoming: IncomingHttpHeaders, token: string): 
   return headers;
 };
 
-/** The reason behind a `fetch` failure: Node puts it in `cause` (`ECONNREFUSED`, `ENOTFOUND`…). */
-const fetchFailure = (error: unknown): string => {
-  const cause = (error as { cause?: { code?: unknown; message?: unknown } } | null)?.cause;
-  if (typeof cause?.code === 'string') return cause.code;
-  if (typeof cause?.message === 'string') return cause.message;
-  return error instanceof Error ? error.message : String(error);
-};
-
 /**
  * Forwards a call of the local API to the real Vulog API, adding `Authorization: Bearer` when the
  * widget did not, as the back office service worker does for a Web Component. Answers itself
@@ -319,8 +376,10 @@ const proxyToApi = async (
   warnOnce: (key: string, message: string) => void,
 ): Promise<void> => {
   const target = new URL(`${path}${search}`, env.apiUrl);
+  // With BO_WIDGET_HOST, the API origin comes from the conf of the back office: name the host.
+  const api = env.host ? `the API of ${env.host}` : 'BO_WIDGET_API_URL';
   if (!target.href.startsWith(env.apiUrl)) {
-    warnOnce(`outside ${path}`, `[bo-widget] ${path} is outside BO_WIDGET_API_URL: not forwarded.`);
+    warnOnce(`outside ${path}`, `[bo-widget] ${path} is outside ${api}: not forwarded.`);
     sendJson(res, 400, { error: 'outside-api', message: `${path} is outside the API base URL` });
     return;
   }
@@ -341,13 +400,15 @@ const proxyToApi = async (
       res.destroy();
       return;
     }
-    const reason = fetchFailure(error);
+    // With BO_WIDGET_HOST, only the code: the message of a failure may name the API origin.
+    const reason = env.host ? fetchFailureCode(error) : fetchFailure(error);
+    const where = env.host ? `the API of ${env.host}` : target.origin;
     logger.error(
-      `[bo-widget] ${method} ${target.pathname}: cannot reach ${target.origin} (${reason}). Check BO_WIDGET_API_URL and your network.`,
+      `[bo-widget] ${method} ${target.pathname}: cannot reach ${where} (${reason}). Check ${env.host ? 'BO_WIDGET_HOST' : 'BO_WIDGET_API_URL'} and your network.`,
     );
     sendJson(res, 502, {
       error: 'proxy-failed',
-      message: `Cannot reach ${target.origin}: ${reason}`,
+      message: `Cannot reach ${where}: ${reason}`,
     });
     return;
   }
@@ -380,7 +441,7 @@ const proxyToApi = async (
       (error as { code?: unknown }).code !== 'ERR_STREAM_PREMATURE_CLOSE'
     ) {
       logger.error(
-        `[bo-widget] ${method} ${target.pathname}: the API response broke off (${fetchFailure(error)}).`,
+        `[bo-widget] ${method} ${target.pathname}: the API response broke off (${env.host ? fetchFailureCode(error) : fetchFailure(error)}).`,
       );
     }
     res.destroy();
@@ -516,6 +577,8 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
     // With a specific `server.host`, Vite lists the URL under `network` only.
     const base = server.resolvedUrls?.local[0] ?? server.resolvedUrls?.network[0];
     const where = base ? new URL(FAKE_BO_PATH, base).href : FAKE_BO_PATH;
-    logger.info(`  ➜  Fake back office (${resolved.mode} mode): ${where}`);
+    const api =
+      resolved.mode === 'token' && resolved.env.host ? `, API of ${resolved.env.host}` : '';
+    logger.info(`  ➜  Fake back office (${resolved.mode} mode${api}): ${where}`);
   };
 };

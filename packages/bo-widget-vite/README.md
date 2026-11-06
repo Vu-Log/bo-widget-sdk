@@ -87,7 +87,7 @@ The plugin sets `base: './'` (and warns if you set another one) and, for a Web C
 
 The fake BO displays the widget as the BO does: a Web Component registered under a `widget-{hash}` tag with its API injected as `vulogBo`, or an iframe with the `postMessage` handshake. It answers every request of the protocol, and its bar pushes `localeChanged` and `themeChanged`, with the locales in the BO format (`en_GB`, `fr_FR`…). A log at the bottom shows each request and its answer, and `notify` shows a snackbar.
 
-Its context defaults to the fleet `DEV-FLEET`, the locale `en_GB` and the `basename` `/__bo-widget`, the path of its page, so that a widget router matches it. As in the BO, the page is served on every sub-route (`/__bo-widget/stations/1`): a reload or a deep link opens the same screen of a Web Component (an iframe widget page stays on its own URL). `navigate` to a route of the widget's view pushes it to the history and pushes `routeChanged`, as do back and forward; a route outside the view is only shown in the bar, with a warning, since the BO would leave the widget. A `dev.context.basename` must start with `/`, and the dev server warns when it is outside `/__bo-widget`. The fake BO warns too on a locale that is not `language_COUNTRY`.
+Its context defaults to the fleet `DEV-FLEET`, the locale `en_GB`, the host `BO_WIDGET_HOST` (`localhost` without it) and the `basename` `/__bo-widget`, the path of its page, so that a widget router matches it. As in the BO, the page is served on every sub-route (`/__bo-widget/stations/1`): a reload or a deep link opens the same screen of a Web Component (an iframe widget page stays on its own URL). `navigate` to a route of the widget's view pushes it to the history and pushes `routeChanged`, as do back and forward; a route outside the view is only shown in the bar, with a warning, since the BO would leave the widget. A `dev.context.basename` must start with `/`, and the dev server warns when it is outside `/__bo-widget`. The fake BO warns too on a locale that is not `language_COUNTRY`.
 
 As in the BO, permissions are enforced in an iframe only (`FORBIDDEN`); for a Web Component, a request the manifest does not allow is served, with a warning in the log. In an iframe, `authFetch` needs `accessToken` as well as `apiInfo`, since the SDK adds the token itself.
 
@@ -115,19 +115,29 @@ defineWidgetConfig({
 
 ### Token mode
 
-The Vulog API calls go to a real dev environment. Copy a token, the API base URL and the API key from the BO of that environment into `.env.local` (never commit it):
+The Vulog API calls go to a real dev environment. Put the host of its BO and a token of your session in that BO into `.env.local` (never commit it):
 
 ```bash
+BO_WIDGET_HOST=bo.example.com
 BO_WIDGET_TOKEN=eyJ…
+```
+
+Or keep the host in `.env.local` and pass the short-lived token through the standard input, with [`@vulog/bo-widget-cli`](../bo-widget-cli/): `pbpaste | npx bo-widget dev --token -`.
+
+At startup, the dev server reads the API base URL and the API key from the anonymous conf of that BO, as the BO itself does (`https://{host}/fe-api/anonymous/bo/{host}/conf`, fields `url.baseUrl` and `X-API-Key`). The BO must be served over `https:`. The dev server keeps only the origin of `url.baseUrl`, which must be `https:` too, and calls `{origin}/boapi/proxy/`. When the conf cannot be read or lacks a field, `vite` stops with a message that names the host and the field; the values of the conf are never logged. `getContext().host` returns this host, as in the BO (in mock mode too, where the conf is not read); `dev.context.host` still overrides it.
+
+Without `BO_WIDGET_HOST`, copy the API base URL and the API key from the BO instead:
+
+```bash
 BO_WIDGET_API_URL=https://…/boapi/proxy/
 BO_WIDGET_API_KEY=…
 ```
 
-Or keep the API URL and key in `.env.local` and pass the short-lived token through the standard input, with [`@vulog/bo-widget-cli`](../bo-widget-cli/): `pbpaste | npx bo-widget dev --token -`.
+`BO_WIDGET_HOST` takes precedence over these two variables: `vite` warns when they are set too, and ignores them. In the `test` mode of Vitest, the fake BO always stays in mock mode, so that a test run never reads the conf of a BO: the mode and `BO_WIDGET_HOST` are still checked, the host kept, and `vite` warns when token mode was asked for.
 
-The mode switches to `token` when `BO_WIDGET_TOKEN` is set; `dev.mode: 'token'` forces it, and `vite` then fails to start without the three variables. `dev.responses` are ignored in this mode. The dev server forwards each call to `BO_WIDGET_API_URL` and adds `Authorization: Bearer` when the widget did not; the API key reaches the API through `getApiInfo`, as `authFetch` sends it. Context and user stay the `dev` fixtures.
+The mode switches to `token` when `BO_WIDGET_TOKEN` is set; `dev.mode: 'token'` forces it, and `vite` then fails to start without the token and either `BO_WIDGET_HOST` or both `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY`. `dev.responses` are ignored in this mode. The dev server forwards each call to the API and adds `Authorization: Bearer` when the widget did not; the API key reaches the API through `getApiInfo`, as `authFetch` sends it. The user stays the `dev` fixture, and so does the context, apart from its host.
 
-`vite` warns at startup when the token is not a JWT or already expired. Once it expires, the API answers `401` (logged with a hint) and `getAccessToken` rejects (`INTERNAL`, reason `no-token`): paste a new one and restart `vite`. The access token is masked in the log of the fake BO.
+`vite` warns at startup when the token is not a JWT or already expired. Once it expires, the API answers `401` (logged with a hint) and `getAccessToken` rejects (`INTERNAL`, reason `no-token`): paste a new one and restart `vite`. The access token and the API key are masked in the log of the fake BO.
 
 Keep the dev server on `localhost` in token mode: with `server.host`, anyone on your network could call the API with your token through it (the plugin warns).
 

@@ -161,14 +161,13 @@ In mock mode, the Vulog API calls of the widget get the static answers of `dev.r
 
 To call the API of a Vulog environment instead, use the token mode:
 
-1. In the BO of that environment, copy the API base URL (it ends with `/boapi/proxy/`) and the API key into `.env.local`, at the root of the project:
+1. Put the host of the BO of that environment into `.env.local`, at the root of the project:
 
    ```bash
-   BO_WIDGET_API_URL=https://…/boapi/proxy/
-   BO_WIDGET_API_KEY=…
+   BO_WIDGET_HOST=bo.example.com
    ```
 
-   `.env.local` is in the `.gitignore` of the project: never commit it.
+   At startup, the dev server reads the API URL and the API key from the conf of that BO, as the BO itself does. `.env.local` is in the `.gitignore` of the project: never commit it.
 
 2. Copy a token of your BO session, then start the dev server with it. On macOS:
 
@@ -184,7 +183,7 @@ To call the API of a Vulog environment instead, use the token mode:
 
    `--token -` reads the token from the standard input, so that it does not stay in your shell history. Arguments after `--` go to Vite: `npx bo-widget dev --token - -- --port 4000`.
 
-The fake BO forwards each Vulog API call to `BO_WIDGET_API_URL`, with the token, as the BO service worker does. The context and the user stay the `dev` fixtures. The token is short-lived: once it expires, the API answers `401`. Paste a new one and restart.
+The fake BO forwards each Vulog API call to the API of that BO, with the token, as the BO service worker does. `getContext().host` returns `BO_WIDGET_HOST` (unless `dev.context.host` is set); the rest of the context and the user stay the `dev` fixtures. The token is short-lived: once it expires, the API answers `401`. Paste a new one and restart.
 
 Keep the dev server on `localhost` in token mode: anyone who can reach it can call the API with your token.
 
