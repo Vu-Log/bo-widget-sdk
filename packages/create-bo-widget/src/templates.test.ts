@@ -62,6 +62,7 @@ describe('templates', () => {
         '_gitignore',
         '_gitlab-ci.yml',
         '_github/workflows/build.yml',
+        '_github/dependabot.yml',
         'widget.config.ts',
         'vite.config.ts',
         'tsconfig.json',
@@ -69,6 +70,19 @@ describe('templates', () => {
         expect(existsSync(join(dir, file)), file).toBe(true);
       }
       expect(readdirSync(join(dir, 'src')).some((file) => /\.test\.tsx?$/.test(file))).toBe(true);
+    });
+
+    it('pins every GitHub action by commit SHA, kept up to date by Dependabot', () => {
+      const workflow = readFileSync(join(dir, '_github/workflows/build.yml'), 'utf8');
+      const uses = [...workflow.matchAll(/^\s*-?\s*uses:\s*(\S+)(.*)$/gm)];
+      expect(uses.length).toBeGreaterThan(0);
+      for (const [, action, comment] of uses) {
+        expect(action, action).toMatch(/^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/);
+        expect(comment, action).toMatch(/^ # v\d+\.\d+\.\d+$/);
+      }
+      expect(readFileSync(join(dir, '_github/dependabot.yml'), 'utf8')).toContain(
+        'package-ecosystem: github-actions',
+      );
     });
 
     it('stores no dot file, which npm could drop: `_` names, renamed on creation', () => {

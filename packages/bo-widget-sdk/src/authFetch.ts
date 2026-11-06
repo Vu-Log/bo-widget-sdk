@@ -12,6 +12,7 @@ interface Destination {
   vulogApiKey: string | null;
 }
 
+/** True for an absolute URL of any scheme: tells an `authFetch` input from a path relative to `baseUrl`. */
 const isAbsoluteUrl = (value: string): boolean => {
   try {
     new URL(value);
@@ -27,19 +28,29 @@ const toBase = (baseUrl: string): string => {
   return href.endsWith('/') ? href : `${href}/`;
 };
 
+/**
+ * True for an absolute `http:` or `https:` URL: the only schemes a Vulog API can be served on. Guards
+ * against a BO, or a page posing as one around an iframe, that answers a `file:`, `data:` or
+ * `javascript:` `baseUrl`. `http:` stays allowed for the fake BO of the dev server (`http://localhost`,
+ * or a LAN address); an `https:` page cannot call an `http:` URL anyway (mixed content).
+ */
+const isHttpUrl = (value: string): boolean => {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'https:' || protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
+
 const checkApiInfo = (info: unknown): BoApiInfo => {
   const { baseUrl, apiKey } = (info ?? {}) as Partial<BoApiInfo>;
-  if (
-    typeof baseUrl === 'string' &&
-    isAbsoluteUrl(baseUrl) &&
-    typeof apiKey === 'string' &&
-    apiKey
-  ) {
+  if (typeof baseUrl === 'string' && isHttpUrl(baseUrl) && typeof apiKey === 'string' && apiKey) {
     return { baseUrl, apiKey };
   }
   throw new BoError(
     'INTERNAL',
-    'getApiInfo: the back office answered no usable baseUrl and apiKey',
+    'getApiInfo: the back office answered no usable baseUrl (an absolute http: or https: URL) and apiKey',
     {
       reason: 'invalid-api-info',
     },

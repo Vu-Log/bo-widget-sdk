@@ -2,7 +2,7 @@
 
 Creates the project of a widget of the Vulog back office (BO): `npm create @vulog/bo-widget`.
 
-The project is ready to develop in a fake BO, test, build and publish: Vite with [`@vulog/bo-widget-vite`](https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-vite), Vitest, the [`bo-widget`](https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-cli) command that packs the zip, an example CI for GitHub and GitLab that keeps the zip as an artifact, and a README.
+The project is ready to develop in a fake BO, test, build and publish: Vite with [`@vulog/bo-widget-vite`](https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-vite), Vitest, the [`bo-widget`](https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-cli) command that packs the zip, an example CI for GitHub (actions pinned by commit SHA, kept up to date by Dependabot) and GitLab that keeps the zip as an artifact, and a README.
 
 ## Usage
 

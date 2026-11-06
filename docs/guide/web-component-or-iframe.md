@@ -50,7 +50,7 @@ export default defineWidgetConfig({ name: 'Fleet report', runtime: 'iframe' });
 The contract:
 
 - The entry is `index.html`, at the Vite root (the project folder), which loads your module. `entry` does not apply: remove it.
-- `connect()` without element. Pass `widgetId` for diagnostics, and `targetOrigin` when you know the origin of the BO.
+- `connect()` without element. Pass `widgetId` for diagnostics, and `targetOrigin` when you know the origin of the BO (see below).
 - No Shadow DOM: the iframe isolates the widget, so global styles and `document.head` are fine there.
 - `bo.resize({ height })` asks the BO for a height in pixels; `{ height: null }` fills the content zone again.
 
@@ -73,6 +73,12 @@ What the BO does:
 3. Enforces the permissions: a request without its permission rejects with `FORBIDDEN`.
 
 In an iframe, `authFetch` adds the token itself, so a Vulog API call needs `accessToken` as well as `apiInfo`.
+
+### Who can frame the widget
+
+`connect()` posts its handshake to the parent window. Without `targetOrigin`, it goes to any origin (`'*'`): a page of another site that frames your `index.html` can answer it and play the BO. It gets no Vulog token, since it answers `getAccessToken` itself, but it controls everything the BO answers (context, user, settings, theme, permissions, events), `getApiInfo` included: the widget's Vulog API calls and their bodies go to a server it chose, and it receives the payloads of `navigate`, `notify` and `resize`.
+
+Pass `targetOrigin` when the widget is displayed by a single BO, for example from a constant of your build: `connect(null, { targetOrigin: 'https://bo.example.com' })`. The browser then delivers the handshake to that origin only.
 
 ## In the fake back office
 

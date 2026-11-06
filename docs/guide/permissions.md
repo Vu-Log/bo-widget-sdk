@@ -40,7 +40,7 @@ The fake back office follows the same rules: it enforces permissions in an ifram
 
 ## Use them well
 
-- **`accessToken`**: only for a third-party backend that expects the Vulog token. Never call `getAccessToken()` for the Vulog APIs, and never decode the token: use `getCurrentUser()`.
+- **`accessToken`**: only for a third-party backend that expects the Vulog token. `authFetch` sends that token to any absolute URL outside the Vulog API, so call only backends you own (see [Third-party APIs](./calling-vulog-apis#third-party-apis)). Never call `getAccessToken()` for the Vulog APIs, and never decode the token: use `getCurrentUser()`.
 - **`apiInfo`**: never build URLs from `getApiInfo()` by hand, and never add `Authorization` or `X-API-Key` yourself. Call `authFetch` with a path. See [Calling Vulog APIs](./calling-vulog-apis).
 - **`navigate`**: never move the BO with `window.location` or `history`. See [UI guidelines](./ui-guidelines#navigation).
 - **`notify`**: show feedback in the BO snackbar rather than a custom toast. See [UI guidelines](./ui-guidelines#feedback).

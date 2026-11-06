@@ -94,6 +94,7 @@ describe('createWidgetProject', () => {
         expect.arrayContaining([
           '.gitignore',
           '.github/workflows/build.yml',
+          '.github/dependabot.yml',
           '.gitlab-ci.yml',
           'AGENTS.md',
           'CLAUDE.md',

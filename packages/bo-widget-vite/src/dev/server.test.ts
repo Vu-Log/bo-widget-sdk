@@ -1031,6 +1031,44 @@ describe('fake back office dev server', () => {
     );
   });
 
+  it.each<[string, true | string[] | undefined, boolean]>([
+    ['allowedHosts: true', true, true],
+    ['an allowedHosts list', ['dev.example.com'], false],
+    ['the default allowedHosts', undefined, false],
+  ])('warns about DNS rebinding in token mode with %s', async (_label, allowedHosts, warns) => {
+    const api = await upstream();
+    stubTokenEnv(api.url, jwt({ exp: 4_000_000_000 }));
+    const root = await project();
+    const customLogger = createLogger('silent');
+    const warn = vi.spyOn(customLogger, 'warn');
+    const server = await createServer({
+      root,
+      configFile: false,
+      customLogger,
+      server: { ...(allowedHosts !== undefined && { allowedHosts }), ws: false },
+      plugins: [boWidget({ name: 'Fleet report' })],
+    });
+    servers.push(server);
+
+    expect(warn.mock.calls.some(([message]) => message.includes('DNS rebinding'))).toBe(warns);
+  });
+
+  it('does not warn about DNS rebinding in mock mode', async () => {
+    const root = await project();
+    const customLogger = createLogger('silent');
+    const warn = vi.spyOn(customLogger, 'warn');
+    const server = await createServer({
+      root,
+      configFile: false,
+      customLogger,
+      server: { allowedHosts: true, ws: false },
+      plugins: [boWidget({ name: 'Fleet report' })],
+    });
+    servers.push(server);
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('does not warn about the network in mock mode', async () => {
     const root = await project();
     const customLogger = createLogger('silent');

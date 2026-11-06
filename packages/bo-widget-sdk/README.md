@@ -99,7 +99,7 @@ Paths are relative to `baseUrl`, the BO admin API, which already ends with `/boa
 
 When the SDK adds the token, it keeps it in cache while its expiry is known, renews it on the next call once it expires within a minute, shares one request between concurrent calls, and retries a `401` once with a new token. A `ReadableStream` body cannot be sent twice: its `401` is returned without retry, so prefer a string, `Blob` or `FormData` body. A Vulog API call as a Web Component is not retried: the BO service worker owns its token.
 
-To tell a Vulog URL from a third-party one, the SDK asks for the API info once; without the `apiInfo` permission, every absolute URL is a third-party API.
+To tell a Vulog URL from a third-party one, the SDK asks for the API info once; without the `apiInfo` permission, every absolute URL is a third-party API. The user's token goes to **any** absolute URL outside `baseUrl`: only pass URLs of backends you own, never an origin built from a setting or a user input, and use `fetch` for a URL that must not receive it.
 
 A relative path is resolved under `baseUrl`, leading `/` ignored; one that resolves outside it (`../admin` when `baseUrl` has a path) is refused with a `TypeError`, and so is a `Request` object (pass a string or a `URL`). `authFetch` also rejects with what `fetch` rejects with (network `TypeError`, `AbortError`).
 

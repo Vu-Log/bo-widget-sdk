@@ -185,7 +185,7 @@ To call the API of a Vulog environment instead, use the token mode:
 
 The fake BO forwards each Vulog API call to the API of that BO, with the token, as the BO service worker does. `getContext().host` returns `BO_WIDGET_HOST` (unless `dev.context.host` is set); the rest of the context and the user stay the `dev` fixtures. The token is short-lived: once it expires, the API answers `401`. Paste a new one and restart.
 
-Keep the dev server on `localhost` in token mode: anyone who can reach it can call the API with your token.
+Keep the dev server on `localhost` in token mode: anyone who can reach it can call the API with your token. Never set `server.allowedHosts: true` either: it lets a page that rebinds its domain to your machine (DNS rebinding) reach the dev server, and the plugin warns.
 
 The details of both modes are in the [README of `@vulog/bo-widget-vite`](https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-vite#fake-back-office).
 

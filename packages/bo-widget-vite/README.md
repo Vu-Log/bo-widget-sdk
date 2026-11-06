@@ -139,7 +139,7 @@ The mode switches to `token` when `BO_WIDGET_TOKEN` is set; `dev.mode: 'token'` 
 
 `vite` warns at startup when the token is not a JWT or already expired. Once it expires, the API answers `401` (logged with a hint) and `getAccessToken` rejects (`INTERNAL`, reason `no-token`): paste a new one and restart `vite`. The access token and the API key are masked in the log of the fake BO.
 
-Keep the dev server on `localhost` in token mode: with `server.host`, anyone on your network could call the API with your token through it (the plugin warns).
+Keep the dev server on `localhost` in token mode: with `server.host`, anyone on your network could call the API with your token through it (the plugin warns). Keep Vite's default `server.allowedHosts` too: with `true`, a page that rebinds its domain to your machine (DNS rebinding) could call the dev server, and so the API with your token (the plugin warns as well).
 
 ## License
 

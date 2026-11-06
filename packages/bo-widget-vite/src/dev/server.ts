@@ -495,6 +495,11 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
         '[bo-widget] Fake back office in token mode with server.host set: anyone on the network can call the Vulog API with your token through this server.',
       );
     }
+    if (server.config.server.allowedHosts === true) {
+      logger.warn(
+        '[bo-widget] Fake back office in token mode with server.allowedHosts: true: a page that rebinds its domain to this machine (DNS rebinding) could call the Vulog API with your token through this server. Remove allowedHosts: true, or list your hosts.',
+      );
+    }
   }
   const warned = new Set<string>();
   /** Logs a warning the first time only, so that a polling widget does not flood the terminal. */
