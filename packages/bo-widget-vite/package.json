@@ -1,6 +1,6 @@
 {
   "name": "@vulog/bo-widget-vite",
-  "version": "0.1.0-next.2",
+  "version": "0.1.0-next.3",
   "description": "Vite plugin to build Vulog back office widgets: widget.json, bundle layout and a fake back office in dev.",
   "license": "MIT",
   "author": "Vulog",
@@ -44,7 +44,7 @@
     "check:package": "publint --strict && attw --pack . --profile esm-only && node --input-type=module -e \"const m = await import('@vulog/bo-widget-vite'); if (typeof m.boWidget !== 'function' || typeof m.defineWidgetConfig !== 'function') throw new Error('@vulog/bo-widget-vite: exports not resolved from dist');\""
   },
   "dependencies": {
-    "@vulog/bo-widget-sdk": "^0.1.0-next.4"
+    "@vulog/bo-widget-sdk": "^0.1.0-next.5"
   },
   "peerDependencies": {
     "vite": "^7.0.0 || ^8.0.0"
