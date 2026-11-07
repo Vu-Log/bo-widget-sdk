@@ -29,6 +29,7 @@ import {
   fakeBoModule,
   forwardedHeaders,
   isCrossSite,
+  pastedTokenSource,
   resolveDevMode,
   tokenWarnings,
   widgetTag,
@@ -401,6 +402,27 @@ describe('assertLoginServerHost', () => {
   });
 });
 
+describe('pastedTokenSource', () => {
+  it('gives the pasted token until its expiry', async () => {
+    let now = 1_000_000;
+    const source = pastedTokenSource(jwt({ exp: 2_000 }), () => now);
+
+    expect(await source.token()).toBe(jwt({ exp: 2_000 }));
+    now = 2_000_000;
+    expect(await source.token()).toBeNull();
+    expect(source.noTokenReason()).toBe(
+      'the dev token expired, paste a new one in BO_WIDGET_TOKEN and restart vite',
+    );
+  });
+
+  it('keeps a token without a readable expiry, which the API judges', async () => {
+    const source = pastedTokenSource('opaque', () => Number.MAX_SAFE_INTEGER);
+
+    expect(await source.token()).toBe('opaque');
+    expect(source.noTokenReason()).toBe('no dev token');
+  });
+});
+
 describe('installFakeBo', () => {
   it('refuses login mode without a session, as an untyped caller could ask', () => {
     const server = { config: { logger: createLogger('silent'), server: {} } } as ViteDevServer;
@@ -562,7 +584,7 @@ describe('fakeBoConfig', () => {
       settings: { currency: 'CAD' },
       apiPath: FAKE_API_PATH,
       apiKey: 'mock-api-key',
-      auth: { kind: 'static', accessToken: 'mock-access-token', expiresAt: null },
+      auth: { kind: 'mock' },
     });
   });
 
@@ -616,7 +638,7 @@ describe('fakeBoConfig', () => {
     ).toEqual([]);
   });
 
-  it('passes the real token and API key in token mode, with the token expiry', async () => {
+  it('passes the real token and API key in token mode, the token staying on the server', async () => {
     const token = jwt({ exp: 2_000_000_000 });
     const config = fakeBoConfig(
       manifest,
@@ -627,8 +649,11 @@ describe('fakeBoConfig', () => {
     expect(config).toMatchObject({
       mode: 'token',
       apiKey: 'real-key',
-      auth: { kind: 'static', accessToken: token, expiresAt: 2_000_000_000_000 },
+      auth: { kind: 'server', tokenPath: FAKE_TOKEN_PATH },
     });
+    // The module of the page is readable by any page of localhost: the token stays on the server.
+    expect(JSON.stringify(config)).not.toContain(token);
+    expect(fakeBoModule('/host.js', config, '/src/main.ts')).not.toContain(token);
   });
 
   it('passes no token in login mode, only the path to read the latest one from', () => {
@@ -643,7 +668,7 @@ describe('fakeBoConfig', () => {
 
     expect(config).toMatchObject({
       mode: 'login',
-      auth: { kind: 'session', tokenPath: FAKE_TOKEN_PATH },
+      auth: { kind: 'server', tokenPath: FAKE_TOKEN_PATH },
       apiKey: 'conf-key',
       context: { host: 'bo.example.com' },
     });
@@ -927,6 +952,63 @@ describe('fake back office dev server', () => {
     expect(api.received[0]?.headers.cookie).toBeUndefined();
     const module = await (await fetch(`${origin}${FAKE_BO_MODULE_URL}`)).text();
     expect(module).toContain('"mode":"token"');
+  });
+
+  it('keeps the pasted token out of the page module, and gives it to the local pages only', async () => {
+    const token = jwt({ exp: 2_000_000_000 });
+    vi.stubEnv('BO_WIDGET_TOKEN', token);
+    vi.stubEnv('BO_WIDGET_API_URL', 'https://api.example.com/');
+    vi.stubEnv('BO_WIDGET_API_KEY', 'real-key');
+    const { origin } = await serve({ name: 'Fleet report' });
+    // Vite answers the modules to any page of localhost (its default CORS): never the token.
+    const module = await fetch(`${origin}${FAKE_BO_MODULE_URL}`, {
+      headers: { Origin: 'http://localhost:9999' },
+    });
+    expect(await module.text()).not.toContain(token);
+
+    const answer = await fetch(`${origin}${FAKE_TOKEN_PATH}`, {
+      headers: { 'Sec-Fetch-Site': 'same-origin' },
+    });
+    expect(answer.status).toBe(200);
+    expect(answer.headers.get('cache-control')).toBe('no-store');
+    expect(await answer.json()).toEqual({ accessToken: token, expiresAt: 2_000_000_000_000 });
+
+    const otherPort = await fetch(`${origin}${FAKE_TOKEN_PATH}`, {
+      headers: { Origin: 'http://localhost:9999' },
+    });
+    expect(otherPort.status).toBe(403);
+    expect(await otherPort.text()).not.toContain(token);
+    expect(
+      (await fetch(`${origin}${FAKE_TOKEN_PATH}`, { headers: { 'Sec-Fetch-Site': 'same-site' } }))
+        .status,
+    ).toBe(403);
+    expect((await fetch(`${origin}${FAKE_TOKEN_PATH}`, { method: 'POST' })).status).toBe(405);
+  });
+
+  it('answers 401 no-token once the pasted token has expired', async () => {
+    vi.stubEnv('BO_WIDGET_TOKEN', jwt({ exp: 1_000 }));
+    vi.stubEnv('BO_WIDGET_API_URL', 'https://api.example.com/');
+    vi.stubEnv('BO_WIDGET_API_KEY', 'real-key');
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const answer = await fetch(`${origin}${FAKE_TOKEN_PATH}`);
+
+    expect(answer.status).toBe(401);
+    expect(await answer.json()).toEqual({
+      error: 'no-token',
+      message:
+        'No token: the dev token expired, paste a new one in BO_WIDGET_TOKEN and restart vite.',
+    });
+  });
+
+  it('serves no token route in mock mode', async () => {
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const answer = await fetch(`${origin}${FAKE_TOKEN_PATH}`, {
+      headers: { Accept: 'application/json' },
+    });
+
+    expect(answer.headers.get('content-type') ?? '').not.toContain('application/json');
   });
 
   it('keeps the Authorization header the widget sends (iframe)', async () => {

@@ -737,6 +737,43 @@ describe('validateWidgetArchive', () => {
         },
       ]);
     });
+
+    it('accepts an icon that is in the archive', () => {
+      const result = validateWidgetArchive(
+        buildZip([
+          manifestEntry({ ...MANIFEST, icon: 'assets/icon.svg' }),
+          INDEX_JS,
+          { name: 'assets/icon.svg', content: '<svg/>' },
+        ]),
+      );
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('refuses a manifest whose icon file is missing', () => {
+      const result = validateWidgetArchive(
+        buildZip([manifestEntry({ ...MANIFEST, icon: 'assets/icon.svg' }), INDEX_JS]),
+      );
+
+      expect(errorsOf(result)).toEqual([
+        {
+          code: 'manifest-invalid',
+          path: 'widget.json',
+          message: 'widget.json: icon: the file "assets/icon.svg" is missing from the archive',
+        },
+      ]);
+    });
+
+    it('reports a missing entry and a missing icon together, entry first', () => {
+      const result = validateWidgetArchive(
+        buildZip([manifestEntry({ ...IFRAME_MANIFEST, icon: 'icon.png' }), INDEX_JS]),
+      );
+
+      expect(errorsOf(result).map((error) => error.code)).toEqual([
+        'entry-missing',
+        'manifest-invalid',
+      ]);
+    });
   });
 
   describe('customElements.define', () => {

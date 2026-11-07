@@ -45,7 +45,7 @@ Checks a zip; without argument, the only `.zip` of the current folder, or, when 
 | `duplicate-path`        | error   | The same path twice                                                                                                               |
 | `forbidden-extension`   | error   | Extension other than `js mjs css html json svg png jpg webp woff2 map` (lowercase; `jpeg` is refused)                             |
 | `manifest-missing`      | error   | No `widget.json` at the root (the message says where it is when the folder itself was zipped)                                     |
-| `manifest-invalid`      | error   | `widget.json` is not valid JSON, or breaks a rule of the manifest (one error per field)                                           |
+| `manifest-invalid`      | error   | `widget.json` is not valid JSON, breaks a rule of the manifest (one error per field), or names an `icon` that is not in the zip   |
 | `entry-missing`         | error   | The file of `runtime.entry` is not in the zip                                                                                     |
 | `custom-element-define` | warning | A `.js` or `.mjs` of a Web Component calls `customElements.define(`: the BO registers your class itself                           |
 

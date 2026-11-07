@@ -27,21 +27,22 @@ import type { WidgetManifest, WidgetPermission } from '@vulog/bo-widget-sdk/mani
 import type { ResolvedDevMode } from './server.js';
 
 /**
- * Where the fake back office gets its access token from: fixed (mock and token modes), or the
- * latest token of the session, read from the dev server at each `getAccessToken` (login mode).
+ * Where the fake back office gets its access token from: the fake token of mock mode, or the dev
+ * server at each `getAccessToken` (token and login modes). A real token is never written in the
+ * page or its modules: only the pages of the dev server, on `localhost`, can read it.
  */
 export type FakeBoAuth =
-  | {
-      readonly kind: 'static';
-      readonly accessToken: string;
-      /** Expiry of `accessToken` in ms since the epoch, `null` when unknown. */
-      readonly expiresAt: number | null;
-    }
-  | { readonly kind: 'session'; readonly tokenPath: string };
+  { readonly kind: 'mock' } | { readonly kind: 'server'; readonly tokenPath: string };
+
+/** Access token of mock mode: no JWT, no API accepts it. */
+export const MOCK_ACCESS_TOKEN = 'mock-access-token';
 
 /** What the dev server passes to the fake back office (JSON). */
 export interface FakeBoConfig {
-  /** `login`: the token of the session the user opened in the Chrome of `bo-widget dev --login`. */
+  /**
+   * `token`: the token pasted in `BO_WIDGET_TOKEN`; `login`: the token of the session the user
+   * opened in the Chrome of `bo-widget dev --login`. Both are read from the dev server.
+   */
   mode: ResolvedDevMode['mode'];
   runtime: WidgetManifest['runtime']['type'];
   protocolVersion: number;
@@ -176,12 +177,14 @@ const routeEvent = (route: string): BoEventMap['routeChanged'] => {
 const SESSION_TOKEN_TIMEOUT_MS = 45_000;
 
 /**
- * Login mode: the latest token of the session, from the dev server.
+ * Token and login modes: the token the dev server answers, the pasted one or the latest of the
+ * session.
  *
- * @throws {WidgetHostError} `no-token`, with the reason the dev server gives (no session, Chrome
- * closed…), or when it does not answer, answers late or answers something else than a token.
+ * @throws {WidgetHostError} `no-token`, with the reason the dev server gives (expired token, no
+ * session, Chrome closed…), or when it does not answer, answers late or answers something else
+ * than a token.
  */
-const sessionToken = async (path: string): Promise<BoAccessToken> => {
+const serverToken = async (path: string): Promise<BoAccessToken> => {
   let response: Response;
   try {
     response = await fetch(path, {
@@ -251,17 +254,10 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
       baseUrl: new URL(config.apiPath, globalThis.location.href).href,
       apiKey: config.apiKey,
     }),
-    getAccessToken: (): BoAccessToken | Promise<BoAccessToken> => {
-      const { auth } = config;
-      if (auth.kind === 'session') return sessionToken(auth.tokenPath);
-      if (auth.expiresAt !== null && auth.expiresAt <= Date.now()) {
-        throw new WidgetHostError(
-          'no-token',
-          'The dev token expired: paste a new one in BO_WIDGET_TOKEN and restart vite',
-        );
-      }
-      return { accessToken: auth.accessToken, expiresAt: auth.expiresAt };
-    },
+    getAccessToken: (): BoAccessToken | Promise<BoAccessToken> =>
+      config.auth.kind === 'server'
+        ? serverToken(config.auth.tokenPath)
+        : { accessToken: MOCK_ACCESS_TOKEN, expiresAt: null },
     getTheme: () => structuredClone(THEMES[themeMode]),
     navigate: (payload) => {
       const path = (payload as BoNavigatePayload | undefined)?.path;

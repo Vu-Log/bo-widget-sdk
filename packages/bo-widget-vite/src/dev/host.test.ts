@@ -52,7 +52,7 @@ const fakeConfig = (overrides: Partial<FakeBoConfig> = {}): FakeBoConfig => ({
   settings: { currency: 'CAD' },
   apiPath: '/__bo-widget/api/boapi/proxy/',
   apiKey: 'mock-api-key',
-  auth: { kind: 'static', accessToken: 'mock-access-token', expiresAt: null },
+  auth: { kind: 'mock' },
   ...overrides,
 });
 
@@ -415,9 +415,15 @@ describe('startFakeBo as a Web Component', () => {
   });
 
   it('masks the access token in the log', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(Response.json({ accessToken: 'secret-token-value', expiresAt: null })),
+    );
     const { Widget, client } = widgetClass();
     await startFakeBo(
-      fakeConfig({ auth: { kind: 'static', accessToken: 'secret-token-value', expiresAt: null } }),
+      fakeConfig({ mode: 'token', auth: { kind: 'server', tokenPath: '/__bo-widget/token' } }),
       load(Widget),
     );
     const bo = await client();
@@ -668,8 +674,20 @@ describe('createFakeBackOffice on the iframe port', () => {
       fakeConfig({
         runtime: 'iframe',
         mode: 'token',
-        auth: { kind: 'static', accessToken: 'old', expiresAt: Date.now() - 1000 },
+        auth: { kind: 'server', tokenPath: '/__bo-widget/token' },
       }),
+    );
+    // After connectIframe, which removes the global stubs.
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            { error: 'no-token', message: 'No token: the dev token expired.' },
+            { status: 401 },
+          ),
+        ),
     );
 
     await expect(client.getAccessToken()).rejects.toMatchObject({
@@ -802,39 +820,27 @@ describe('createFakeBackOffice host API', () => {
 
     expect(listener).not.toHaveBeenCalled();
   });
-
-  it('throws a WidgetHostError no-token once the dev token expired', async () => {
-    const api = createFakeBackOffice(
-      fakeConfig({
-        mode: 'token',
-        auth: { kind: 'static', accessToken: 'old', expiresAt: Date.now() - 1 },
-      }),
-      fakeUi(),
-    ).createHostApi();
-
-    const error = await api.getAccessToken().catch((caught: unknown) => caught);
-
-    expect(error).toBeInstanceOf(WidgetHostError);
-    expect(error).toMatchObject({ code: 'no-token', status: null });
-  });
-
-  it('serves a dev token that has not expired', async () => {
-    const expiresAt = Date.now() + 60_000;
-    const api = createFakeBackOffice(
-      fakeConfig({ mode: 'token', auth: { kind: 'static', accessToken: 'real', expiresAt } }),
-      fakeUi(),
-    ).createHostApi();
-
-    expect(await api.getAccessToken()).toEqual({ accessToken: 'real', expiresAt });
-  });
 });
 
-describe('createFakeBackOffice host API in login mode', () => {
-  const loginApi = () =>
+describe('createFakeBackOffice host API in token and login modes', () => {
+  const loginApi = (mode: 'token' | 'login' = 'login') =>
     createFakeBackOffice(
-      fakeConfig({ mode: 'login', auth: { kind: 'session', tokenPath: '/__bo-widget/token' } }),
+      fakeConfig({ mode, auth: { kind: 'server', tokenPath: '/__bo-widget/token' } }),
       fakeUi(),
     ).createHostApi();
+
+  it('reads the pasted token from the dev server in token mode, never from its config', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ accessToken: 'pasted', expiresAt: 3000 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await loginApi('token').getAccessToken()).toEqual({
+      accessToken: 'pasted',
+      expiresAt: 3000,
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
 
   afterEach(() => {
     vi.unstubAllGlobals();

@@ -26,7 +26,10 @@ export const FAKE_BO_MODULE_URL = `${FAKE_BO_PATH}fake-bo.js`;
 /** Path of the local Vulog API: `baseUrl` of `getApiInfo` in the fake back office. */
 export const FAKE_API_PATH = `${FAKE_BO_PATH}api/boapi/proxy/`;
 
-/** Path the fake back office reads the latest token of the session from, in login mode. */
+/**
+ * Path the fake back office reads its token from, in token and login modes: the pasted token, or
+ * the latest token of the session.
+ */
 export const FAKE_TOKEN_PATH = `${FAKE_BO_PATH}token`;
 
 /** Publisher segment of the fake back office in the tag hash (the back office uses the publisher's namespace). */
@@ -311,16 +314,12 @@ export const fakeBoConfig = (
 const pageAuth = (resolved: ResolvedDevMode): FakeBoAuth => {
   switch (resolved.mode) {
     case 'mock':
-      return { kind: 'static', accessToken: 'mock-access-token', expiresAt: null };
+      return { kind: 'mock' };
     case 'token':
-      return {
-        kind: 'static',
-        accessToken: resolved.env.token,
-        expiresAt: jwtExpiresAt(resolved.env.token),
-      };
     case 'login':
-      // The page reads the latest token of the session at each `getAccessToken`.
-      return { kind: 'session', tokenPath: FAKE_TOKEN_PATH };
+      // Never in the module of the page, which any page of localhost may read (CORS of Vite): the
+      // page asks the dev server at each `getAccessToken`, which only answers its own pages.
+      return { kind: 'server', tokenPath: FAKE_TOKEN_PATH };
   }
 };
 
@@ -559,16 +558,37 @@ export const isFakeBoPage = (
   );
 };
 
+/** What {@link FAKE_TOKEN_PATH} answers from: the pasted token, or the session of login mode. */
+type PageTokenSource = Pick<TokenSource, 'token' | 'noTokenReason'>;
+
 /**
- * Login mode: answers the latest token of the session to the pages of this dev server, never
- * cached: `{ accessToken, expiresAt }`, or `401 no-token` with the reason. A method other than
- * `GET` gets `405`; a `GET` from another origin, or for another host than `localhost` (DNS
- * rebinding), `403`.
+ * Token mode: the token pasted in `BO_WIDGET_TOKEN`, as long as it has not expired.
+ *
+ * @param token - `BO_WIDGET_TOKEN`.
+ * @param now - Current time in ms; replaced in tests.
+ * @returns A source that gives the token, or `null` once its `exp` has passed.
+ */
+export const pastedTokenSource = (token: string, now: () => number = Date.now): PageTokenSource => {
+  const expiresAt = jwtExpiresAt(token);
+  const expired = (): boolean => expiresAt !== null && expiresAt <= now();
+  return {
+    token: () => Promise.resolve(expired() ? null : token),
+    noTokenReason: () =>
+      expired()
+        ? 'the dev token expired, paste a new one in BO_WIDGET_TOKEN and restart vite'
+        : 'no dev token',
+  };
+};
+
+/**
+ * Token and login modes: answers the token to the pages of this dev server, never cached:
+ * `{ accessToken, expiresAt }`, or `401 no-token` with the reason. A method other than `GET` gets
+ * `405`; a `GET` from another origin, or for another host than `localhost` (DNS rebinding), `403`.
  */
 const answerToken = async (
   req: IncomingMessage,
   res: ServerResponse,
-  session: TokenSource,
+  session: PageTokenSource,
 ): Promise<void> => {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'GET') {
@@ -650,9 +670,9 @@ export const assertLoginServerHost = (host: string | boolean | undefined): void 
 
 /**
  * Serves the fake back office on {@link FAKE_BO_PATH} and its sub-routes, and the local Vulog API
- * under {@link FAKE_API_PATH}: mock responses, or the real API in token and login modes. In login
- * mode, also serves the latest token of the session on {@link FAKE_TOKEN_PATH}, to the pages of
- * this server only. As a Web Component, `/` redirects to the fake back office; in an iframe, `/`
+ * under {@link FAKE_API_PATH}: mock responses, or the real API in token and login modes. In these
+ * two modes, also serves the token (pasted, or the latest of the session) on
+ * {@link FAKE_TOKEN_PATH}, to the pages of this server on `localhost` only. As a Web Component, `/` redirects to the fake back office; in an iframe, `/`
  * stays the widget page it displays.
  *
  * @throws {Error} In login mode with a `server.host` that exposes the dev server to the network:
@@ -663,6 +683,7 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
   const { resolved } = options;
   const host = server.config.server.host;
   let auth: ProxyAuth | null = null;
+  let pageToken: PageTokenSource | null = null;
   if (options.resolved.mode === 'login') {
     // The type pairs the session with login mode; a caller without types may still omit it.
     if (!options.session) throw new Error('Fake back office in login mode: no session to follow');
@@ -672,9 +693,11 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
       logger.warn('[bo-widget] Login mode: dev.responses are ignored, the calls go to the API.');
     }
     auth = { kind: 'session', env: options.resolved.env, session: options.session };
+    pageToken = options.session;
   }
   if (resolved.mode === 'token') {
     auth = { kind: 'static', env: resolved.env };
+    pageToken = pastedTokenSource(resolved.env.token);
     for (const warning of tokenWarnings(resolved.env.token)) logger.warn(`[bo-widget] ${warning}`);
     if (Object.keys(options.responses).length > 0) {
       logger.warn('[bo-widget] Token mode: dev.responses are ignored, the calls go to the API.');
@@ -724,8 +747,8 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
       res.end();
       return;
     }
-    if (pathname === FAKE_TOKEN_PATH && auth?.kind === 'session') {
-      answerToken(req, res, auth.session).catch(next);
+    if (pathname === FAKE_TOKEN_PATH && pageToken) {
+      answerToken(req, res, pageToken).catch(next);
       return;
     }
     if (isFakeBoPage(req, pathname)) {

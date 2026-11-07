@@ -137,7 +137,7 @@ BO_WIDGET_API_KEY=…
 
 The mode switches to `token` when `BO_WIDGET_TOKEN` is set; `dev.mode: 'token'` forces it, and `vite` then fails to start without the token and either `BO_WIDGET_HOST` or both `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY`. `dev.responses` are ignored in this mode. The dev server forwards each call to the API and adds `Authorization: Bearer` when the widget did not; the API key reaches the API through `getApiInfo`, as `authFetch` sends it. The user stays the `dev` fixture, and so does the context, apart from its host.
 
-`vite` warns at startup when the token is not a JWT or already expired. Once it expires, the API answers `401` (logged with a hint) and `getAccessToken` rejects (`INTERNAL`, reason `no-token`): paste a new one and restart `vite`. The access token and the API key are masked in the log of the fake BO.
+`vite` warns at startup when the token is not a JWT or already expired. Once it expires, the API answers `401` (logged with a hint) and `getAccessToken` rejects (`INTERNAL`, reason `no-token`): paste a new one and restart `vite`. The access token and the API key are masked in the log of the fake BO. The token is never written in the page or its modules (Vite serves them to any page of `localhost`): `getAccessToken` asks the dev server for it on `/__bo-widget/token`, which only answers the pages of this dev server, on `localhost`, as in login mode.
 
 Keep the dev server on `localhost` in token mode: with `server.host`, anyone on your network could call the API with your token through it (the plugin warns). Keep Vite's default `server.allowedHosts` too: with `true`, a page that rebinds its domain to your machine (DNS rebinding) could call the dev server, and so the API with your token (the plugin warns as well).
 

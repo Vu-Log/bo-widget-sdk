@@ -409,20 +409,25 @@ const checkManifest = (
     };
   }
 
+  // The files the manifest points to must be in the archive; both are reported, entry first.
+  const errors: WidgetArchiveError[] = [];
   const { entry } = parsed.data.runtime;
   if (!files.some((file) => file.path === entry)) {
-    return {
-      manifest: null,
-      errors: [
-        {
-          code: 'entry-missing',
-          path: entry,
-          message: `The entry file "${entry}" declared in ${WIDGET_MANIFEST_FILE} (runtime.entry) is missing`,
-        },
-      ],
-    };
+    errors.push({
+      code: 'entry-missing',
+      path: entry,
+      message: `The entry file "${entry}" declared in ${WIDGET_MANIFEST_FILE} (runtime.entry) is missing`,
+    });
   }
-  return { manifest: parsed.data, errors: [] };
+  const { icon } = parsed.data;
+  if (icon !== undefined && !files.some((file) => file.path === icon)) {
+    errors.push({
+      code: 'manifest-invalid',
+      path: WIDGET_MANIFEST_FILE,
+      message: `${WIDGET_MANIFEST_FILE}: icon: the file "${icon}" is missing from the archive`,
+    });
+  }
+  return errors.length > 0 ? { manifest: null, errors } : { manifest: parsed.data, errors: [] };
 };
 
 /**
