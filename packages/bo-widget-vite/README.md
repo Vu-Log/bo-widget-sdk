@@ -89,7 +89,7 @@ The fake BO displays the widget as the BO does: a Web Component registered under
 
 Its context defaults to the fleet `DEV-FLEET`, the locale `en_GB`, the host `BO_WIDGET_HOST` (`localhost` without it) and the `basename` `/__bo-widget`, the path of its page, so that a widget router matches it. As in the BO, the page is served on every sub-route (`/__bo-widget/stations/1`): a reload or a deep link opens the same screen of a Web Component (an iframe widget page stays on its own URL). `navigate` to a route of the widget's view pushes it to the history and pushes `routeChanged`, as do back and forward; a route outside the view is only shown in the bar, with a warning, since the BO would leave the widget. A `dev.context.basename` must start with `/`, and the dev server warns when it is outside `/__bo-widget`. The fake BO warns too on a locale that is not `language_COUNTRY`.
 
-As in the BO, permissions are enforced in an iframe only (`FORBIDDEN`); for a Web Component, a request the manifest does not allow is served, with a warning in the log. In an iframe, `authFetch` needs `accessToken` as well as `apiInfo`, since the SDK adds the token itself.
+In an iframe, the fake BO only serves the `hello` of a page of this dev server, and its pages and the widget page can only be framed by this dev server (`Content-Security-Policy: frame-ancestors 'self'`): another site that framed them could otherwise navigate the widget frame to its own page and ask for the token. As in the BO, permissions are enforced in an iframe only (`FORBIDDEN`); for a Web Component, a request the manifest does not allow is served, with a warning in the log. In an iframe, `authFetch` needs `accessToken` as well as `apiInfo`, since the SDK adds the token itself.
 
 Errors the widget throws (loading the entry, constructor, `connectedCallback`, rejected promises) show in the log too, and in the browser console.
 
@@ -137,9 +137,9 @@ BO_WIDGET_API_KEY=…
 
 The mode switches to `token` when `BO_WIDGET_TOKEN` is set; `dev.mode: 'token'` forces it, and `vite` then fails to start without the token and either `BO_WIDGET_HOST` or both `BO_WIDGET_API_URL` and `BO_WIDGET_API_KEY`. `dev.responses` are ignored in this mode. The dev server forwards each call to the API and adds `Authorization: Bearer` when the widget did not; the API key reaches the API through `getApiInfo`, as `authFetch` sends it. The user stays the `dev` fixture, and so does the context, apart from its host.
 
-`vite` warns at startup when the token is not a JWT or already expired. Once it expires, the API answers `401` (logged with a hint) and `getAccessToken` rejects (`INTERNAL`, reason `no-token`): paste a new one and restart `vite`. The access token and the API key are masked in the log of the fake BO.
+`vite` warns at startup when the token is not a JWT or already expired. Once it expires, the API answers `401` (logged with a hint) and `getAccessToken` rejects (`INTERNAL`, reason `no-token`): paste a new one and restart `vite`. The access token and the API key are masked in the log of the fake BO. The token is never written in the page or its modules (Vite serves them to any page of `localhost`): `getAccessToken` asks the dev server for it on `/__bo-widget/token`, which only answers the pages of this dev server, on `localhost`, as in login mode.
 
-Keep the dev server on `localhost` in token mode: with `server.host`, anyone on your network could call the API with your token through it (the plugin warns). Keep Vite's default `server.allowedHosts` too: with `true`, a page that rebinds its domain to your machine (DNS rebinding) could call the dev server, and so the API with your token (the plugin warns as well).
+Keep the dev server on `localhost` in token mode: with `server.host`, anyone on your network could call the API with your token through it (the plugin warns). Keep Vite's default `server.allowedHosts` too: with `true`, a page that rebinds its domain to your machine (DNS rebinding) could call the dev server, and so the API with your token (the plugin warns as well). `/__bo-widget/token` itself only answers a browser of this machine on `localhost`: a client of the network gets `403 not-local`, even when it sends `Host: localhost`. This also refuses a dev server reached through a container port mapping (`docker -p`), where the peer is not `127.0.0.1`; a devcontainer forwarded by the editor still works. The `frame-ancestors 'self'` header of the iframe runtime also keeps the fake BO out of editor preview panes (an embedded browser of the IDE): open it in a browser tab.
 
 ### Login mode
 
@@ -168,7 +168,7 @@ Login mode needs Google Chrome and Node.js 22 or later (Chromium is found on mac
 | `BO_WIDGET_DEBUG_PORT` | `9333`                                         | DevTools port of that Chrome, on `127.0.0.1`.                                |
 | `BO_WIDGET_LOGIN`      | unset (`bo-widget dev --login` sets it to `1`) | `1` or `true` switches to login mode, over `dev.mode` and `BO_WIDGET_TOKEN`. |
 
-`vite` refuses to start in login mode with `server.host` (or `--host`): the token of your session would be served to your network. The token and the local API also answer `403` to a request for another host than `localhost`, `127.0.0.1` or `[::1]`, even with `server.allowedHosts`, so that a page whose domain points to your machine cannot read them. In the `test` mode of Vitest, the fake BO stays in mock mode, with a warning.
+`vite` refuses to start in login mode with `server.host` (or `--host`): the token of your session would be served to your network. The token and the local API also answer `403 not-local` to a request for another host than `localhost`, `127.0.0.1` or `[::1]`, even with `server.allowedHosts`, so that a page whose domain points to your machine cannot read them, and to a request from another machine. In the `test` mode of Vitest, the fake BO stays in mock mode, with a warning.
 
 ### Let an agent drive the fake back office
 

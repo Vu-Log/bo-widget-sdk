@@ -50,6 +50,7 @@ npm test
 | `npm run docs:dev`          | Serves the documentation site (`docs/`, VitePress) with live reload; `docs:build` builds it into `docs/.vitepress/dist` and fails on a dead link                                                                                                                                       |
 | `npm run aima-api:generate` | Regenerates the `aima-api` skill (`plugins/bo-widget/skills/aima-api`) from the public Vulog API reference                                                                                                                                                                             |
 | `npm run changeset`         | Describes a change for the next release (see below)                                                                                                                                                                                                                                    |
+| `npm run version-packages`  | Applies the pending changesets (versions, changelogs), then raises the `@vulog/*` dependencies of the templates to the new versions; the release workflow runs it                                                                                                                      |
 | `npm run release:next:dry`  | Simulates a `next` publication: snapshot version, build, `npm publish --dry-run`. It bumps `package.json` versions, writes `CHANGELOG.md` and deletes the pending changesets: run it on a throwaway copy or in CI only. It fails when no changeset is pending, or in pre-release mode. |
 
 ## Adding a package
@@ -75,8 +76,13 @@ The CI (`.github/workflows/ci.yml`) runs on every pull request and push to `main
 
 Releases are automated by [changesets](https://changesets.dev) in `.github/workflows/release.yml`, on every push to `main`:
 
-1. While changesets are pending, after format check, lint, typecheck and tests with coverage pass, the workflow opens or updates a **Version Packages** pull request (version bumps and changelogs).
-2. Merging that pull request builds and checks the packages (`check:package`), then publishes the new versions to npm under the `latest` tag (or `next`, see below), with provenance, and creates the GitHub releases.
+1. A first job, without any write permission, runs the format check, lint, typecheck, tests with coverage, the build and the package check (`check:package`), and keeps the built `dist` folders.
+2. A second job, the only one allowed to publish, installs the changesets CLI without running any install script. While changesets are pending, it opens or updates a **Version Packages** pull request (version bumps and changelogs).
+3. Merging that pull request publishes the `dist` built by the first job to npm under the `latest` tag (or `next`, see below), with provenance, and creates the GitHub releases.
+
+`npm run version-packages` raises the `@vulog/*` floors of the templates to the new versions. The templates ship in `@vulog/create-bo-widget`: if their floors change while that package has no changeset, the script fails and the Version Packages pull request is not updated, so add a changeset for it.
+
+The publishing job never runs the code of the dependencies (install scripts, tests, build): a compromised dependency cannot use its OpenID Connect token.
 
 The workflow is skipped while the repository is private.
 

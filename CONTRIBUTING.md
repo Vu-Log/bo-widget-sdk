@@ -17,6 +17,7 @@ A pull request is merged only when:
 - a maintainer (see [`.github/CODEOWNERS`](.github/CODEOWNERS)) reviewed and merged it: only maintainers can merge;
 - the CI is green: format, lint, typecheck, tests with coverage, build and package checks. Maintainers approve the CI run of a first-time contributor before it starts;
 - it contains a changeset when it changes a published package (`npm run changeset`);
+- it also contains a changeset for `@vulog/create-bo-widget` when it releases a package that the templates depend on (`@vulog/bo-widget-sdk`, `-react`, `-vite` or `-cli`): the templates ship in `create-bo-widget`, and the Version Packages pull request fails if their floors change while it is not released;
 - new or changed code is covered by tests, colocated with the code (`feature.ts` → `feature.test.ts`).
 
 Pull requests are squash-merged: the pull request title becomes the commit message on `main`.

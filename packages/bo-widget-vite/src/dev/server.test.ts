@@ -21,14 +21,17 @@ import {
   FAKE_BO_MODULE_URL,
   FAKE_BO_PATH,
   FAKE_TOKEN_PATH,
+  answerToken,
   assertLoginServerHost,
   fakeBoConfig,
   installFakeBo,
   isLocalRequest,
+  isLoopbackAddress,
   isFakeBoPage,
   fakeBoModule,
   forwardedHeaders,
   isCrossSite,
+  pastedTokenSource,
   resolveDevMode,
   tokenWarnings,
   widgetTag,
@@ -401,6 +404,27 @@ describe('assertLoginServerHost', () => {
   });
 });
 
+describe('pastedTokenSource', () => {
+  it('gives the pasted token until its expiry', async () => {
+    let now = 1_000_000;
+    const source = pastedTokenSource(jwt({ exp: 2_000 }), () => now);
+
+    expect(await source.token()).toBe(jwt({ exp: 2_000 }));
+    now = 2_000_000;
+    expect(await source.token()).toBeNull();
+    expect(source.noTokenReason()).toBe(
+      'the dev token expired, paste a new one in BO_WIDGET_TOKEN and restart vite',
+    );
+  });
+
+  it('keeps a token without a readable expiry, which the API judges', async () => {
+    const source = pastedTokenSource('opaque', () => Number.MAX_SAFE_INTEGER);
+
+    expect(await source.token()).toBe('opaque');
+    expect(source.noTokenReason()).toBe('no dev token');
+  });
+});
+
 describe('installFakeBo', () => {
   it('refuses login mode without a session, as an untyped caller could ask', () => {
     const server = { config: { logger: createLogger('silent'), server: {} } } as ViteDevServer;
@@ -440,6 +464,85 @@ describe('isLocalRequest', () => {
 
   it('refuses a request without Host', () => {
     expect(isLocalRequest({ headers: {} })).toBe(false);
+  });
+});
+
+describe('isLoopbackAddress', () => {
+  it.each([['127.0.0.1'], ['127.1.2.3'], ['::1'], ['::ffff:127.0.0.1'], ['::FFFF:127.0.0.1']])(
+    'accepts %s',
+    (address) => {
+      expect(isLoopbackAddress(address)).toBe(true);
+    },
+  );
+
+  it.each([
+    ['a LAN address', '192.168.1.20'],
+    ['a mapped LAN address', '::ffff:192.168.1.20'],
+    ['an IPv6 address', 'fe80::1'],
+    ['a look-alike', '127.0.0.1.example'],
+    ['no address', undefined],
+    ['an empty address', ''],
+  ])('refuses %s', (_label, address) => {
+    expect(isLoopbackAddress(address)).toBe(false);
+  });
+});
+
+describe('answerToken', () => {
+  /** A request of the fake back office page for the token, from `remoteAddress`. */
+  const request = (remoteAddress: string | undefined, host = 'localhost:5173') =>
+    ({
+      method: 'GET',
+      headers: { host, 'sec-fetch-site': 'same-origin' },
+      socket: { remoteAddress },
+    }) as unknown as IncomingMessage;
+
+  /** Records the status, headers and JSON body sent. */
+  const response = () => {
+    const sent = { status: 0, headers: {} as Record<string, unknown>, body: undefined as unknown };
+    const res = {
+      set statusCode(status: number) {
+        sent.status = status;
+      },
+      setHeader: (name: string, value: unknown) => {
+        sent.headers[name.toLowerCase()] = value;
+      },
+      end: (body: string) => {
+        sent.body = JSON.parse(body);
+      },
+    } as unknown as ServerResponse;
+    return { res, sent };
+  };
+
+  const session = { token: () => Promise.resolve('real-token'), noTokenReason: () => 'none' };
+
+  it('answers the token to a page of this machine', async () => {
+    const { res, sent } = response();
+
+    await answerToken(request('127.0.0.1'), res, session);
+
+    expect(sent.status).toBe(200);
+    expect(sent.headers['cache-control']).toBe('no-store');
+    expect(sent.body).toEqual({ accessToken: 'real-token', expiresAt: null });
+  });
+
+  it('refuses a client of the network that sends Host: localhost (server.host set)', async () => {
+    const { res, sent } = response();
+    const token = vi.fn(session.token);
+
+    await answerToken(request('192.168.1.20'), res, { ...session, token });
+
+    expect(sent.status).toBe(403);
+    expect(sent.body).toMatchObject({ error: 'not-local' });
+    expect(token).not.toHaveBeenCalled();
+  });
+
+  it('refuses another host than localhost, even from this machine (DNS rebinding)', async () => {
+    const { res, sent } = response();
+
+    await answerToken(request('127.0.0.1', 'attacker.example:5173'), res, session);
+
+    expect(sent.status).toBe(403);
+    expect(sent.body).toMatchObject({ error: 'not-local' });
   });
 });
 
@@ -562,7 +665,7 @@ describe('fakeBoConfig', () => {
       settings: { currency: 'CAD' },
       apiPath: FAKE_API_PATH,
       apiKey: 'mock-api-key',
-      auth: { kind: 'static', accessToken: 'mock-access-token', expiresAt: null },
+      auth: { kind: 'mock' },
     });
   });
 
@@ -616,7 +719,7 @@ describe('fakeBoConfig', () => {
     ).toEqual([]);
   });
 
-  it('passes the real token and API key in token mode, with the token expiry', async () => {
+  it('passes the real token and API key in token mode, the token staying on the server', async () => {
     const token = jwt({ exp: 2_000_000_000 });
     const config = fakeBoConfig(
       manifest,
@@ -627,8 +730,11 @@ describe('fakeBoConfig', () => {
     expect(config).toMatchObject({
       mode: 'token',
       apiKey: 'real-key',
-      auth: { kind: 'static', accessToken: token, expiresAt: 2_000_000_000_000 },
+      auth: { kind: 'server', tokenPath: FAKE_TOKEN_PATH },
     });
+    // The module of the page is readable by any page of localhost: the token stays on the server.
+    expect(JSON.stringify(config)).not.toContain(token);
+    expect(fakeBoModule('/host.js', config, '/src/main.ts')).not.toContain(token);
   });
 
   it('passes no token in login mode, only the path to read the latest one from', () => {
@@ -643,7 +749,7 @@ describe('fakeBoConfig', () => {
 
     expect(config).toMatchObject({
       mode: 'login',
-      auth: { kind: 'session', tokenPath: FAKE_TOKEN_PATH },
+      auth: { kind: 'server', tokenPath: FAKE_TOKEN_PATH },
       apiKey: 'conf-key',
       context: { host: 'bo.example.com' },
     });
@@ -927,6 +1033,95 @@ describe('fake back office dev server', () => {
     expect(api.received[0]?.headers.cookie).toBeUndefined();
     const module = await (await fetch(`${origin}${FAKE_BO_MODULE_URL}`)).text();
     expect(module).toContain('"mode":"token"');
+  });
+
+  it('keeps the pasted token out of the page module, and gives it to the local pages only', async () => {
+    const token = jwt({ exp: 2_000_000_000 });
+    vi.stubEnv('BO_WIDGET_TOKEN', token);
+    vi.stubEnv('BO_WIDGET_API_URL', 'https://api.example.com/');
+    vi.stubEnv('BO_WIDGET_API_KEY', 'real-key');
+    const { origin } = await serve({ name: 'Fleet report' });
+    // Vite answers the modules to any page of localhost (its default CORS): never the token.
+    const module = await fetch(`${origin}${FAKE_BO_MODULE_URL}`, {
+      headers: { Origin: 'http://localhost:9999' },
+    });
+    expect(await module.text()).not.toContain(token);
+
+    const answer = await fetch(`${origin}${FAKE_TOKEN_PATH}`, {
+      headers: { 'Sec-Fetch-Site': 'same-origin' },
+    });
+    expect(answer.status).toBe(200);
+    expect(answer.headers.get('cache-control')).toBe('no-store');
+    expect(await answer.json()).toEqual({ accessToken: token, expiresAt: 2_000_000_000_000 });
+
+    const otherPort = await fetch(`${origin}${FAKE_TOKEN_PATH}`, {
+      headers: { Origin: 'http://localhost:9999' },
+    });
+    expect(otherPort.status).toBe(403);
+    expect(await otherPort.text()).not.toContain(token);
+    expect(
+      (await fetch(`${origin}${FAKE_TOKEN_PATH}`, { headers: { 'Sec-Fetch-Site': 'same-site' } }))
+        .status,
+    ).toBe(403);
+    expect((await fetch(`${origin}${FAKE_TOKEN_PATH}`, { method: 'POST' })).status).toBe(405);
+  });
+
+  it('answers 401 no-token once the pasted token has expired', async () => {
+    vi.stubEnv('BO_WIDGET_TOKEN', jwt({ exp: 1_000 }));
+    vi.stubEnv('BO_WIDGET_API_URL', 'https://api.example.com/');
+    vi.stubEnv('BO_WIDGET_API_KEY', 'real-key');
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const answer = await fetch(`${origin}${FAKE_TOKEN_PATH}`);
+
+    expect(answer.status).toBe(401);
+    expect(await answer.json()).toEqual({
+      error: 'no-token',
+      message:
+        'No token: the dev token expired, paste a new one in BO_WIDGET_TOKEN and restart vite.',
+    });
+  });
+
+  it('serves no token route in mock mode: the path is left to Vite', async () => {
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const answer = await fetch(`${origin}${FAKE_TOKEN_PATH}`, {
+      headers: { Accept: 'application/json', 'Sec-Fetch-Site': 'same-origin' },
+    });
+    const body = await answer.text();
+
+    expect(answer.headers.get('content-type') ?? '').not.toContain('application/json');
+    expect(answer.headers.get('cache-control')).not.toBe('no-store');
+    expect(body).not.toMatch(/accessToken|no-token|cross-site|not-local/);
+  });
+
+  it('lets only the pages of the dev server frame the fake back office and the widget page', async () => {
+    const { origin } = await serve({ name: 'Fleet report', runtime: 'iframe' });
+    const page = (path: string) => fetch(`${origin}${path}`, { headers: { Accept: 'text/html' } });
+
+    expect((await page('/__bo-widget/')).headers.get('content-security-policy')).toBe(
+      "frame-ancestors 'self'",
+    );
+    expect((await page('/')).headers.get('content-security-policy')).toBe("frame-ancestors 'self'");
+    expect((await page('/reports/2')).headers.get('content-security-policy')).toBe(
+      "frame-ancestors 'self'",
+    );
+    // Modules and the local API are not pages.
+    expect(
+      (await fetch(`${origin}${FAKE_BO_MODULE_URL}`)).headers.get('content-security-policy'),
+    ).toBeNull();
+  });
+
+  it('leaves the widget page of a Web Component without frame-ancestors (it redirects)', async () => {
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const answer = await fetch(`${origin}/`, {
+      headers: { Accept: 'text/html' },
+      redirect: 'manual',
+    });
+
+    expect(answer.status).toBe(302);
+    expect(answer.headers.get('content-security-policy')).toBeNull();
   });
 
   it('keeps the Authorization header the widget sends (iframe)', async () => {

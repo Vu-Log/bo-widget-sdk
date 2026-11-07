@@ -126,6 +126,11 @@ describe('templates', () => {
           semver.satisfies(workspaceVersion(dependency), range, { includePrerelease: true }),
           `${dependency}@${range} does not accept ${workspaceVersion(dependency)}: update the template`,
         ).toBe(true);
+        // A lower floor would let npm install an older package than what the README describes.
+        expect(
+          range,
+          `${dependency}: run node scripts/template-floors.mjs (npm run version-packages does it)`,
+        ).toBe(`^${workspaceVersion(dependency)}`);
       }
     });
   });

@@ -11,10 +11,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Version or publish
+  verify:
+    name: Check and build
     # Skipped while the repository is private: npm provenance requires a public repository.
     if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    # No id-token and no write token here: the install scripts, the tests and the build run the
+    # code of every dependency, which must never be able to publish the packages.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # This workflow runs in parallel with CI: never publish a commit that fails its checks.
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+      - run: npm run check:package
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: packages/*/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Version or publish
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -27,13 +58,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           registry-url: https://registry.npmjs.org
-      - run: npm ci
-      # This workflow runs in parallel with CI: never publish a commit that fails its checks. The
-      # package check (publint, attw, dist import) runs in the publish script, after the build.
-      - run: npm run format:check
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run test:coverage
+      # Only the changesets CLI is needed: no install script runs, and nothing is built or tested
+      # here. The packages are published from the dist built and checked by the verify job.
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: packages
       - name: Check the release GitHub token
         run: |
           if [ -z "$RELEASE_GITHUB_TOKEN" ]; then
@@ -46,7 +77,9 @@ jobs:
           # Pull requests opened with the default token do not trigger CI: use a fine-grained
           # personal access token so that the Version Packages pull request is checked.
           github-token: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
-          publish-script: npm run release
+          # Bumps the versions, then raises the @vulog/* floors of the templates to them.
+          version-script: npm run version-packages
+          publish-script: npx changeset publish
           create-github-releases: true
         # npm trusted publishing: npm authenticates this workflow through OIDC (`id-token: write`),
         # no npm token is involved.
