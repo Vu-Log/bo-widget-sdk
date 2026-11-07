@@ -25,8 +25,9 @@ jobs:
       - run: npm ci
       - run: npm run format:check
       - run: npm run lint
-      # Checks the workflows, including the inputs of each action: an unknown input is only a
-      # warning on GitHub, and the step then silently runs with its defaults.
+      # Checks the syntax and expressions of the workflows. It does not check the inputs of actions
+      # pinned by SHA (actionlint only knows popular actions at tag refs): check a new or renamed
+      # input against the action.yml of the pinned SHA, since GitHub only warns about an unknown one.
       - name: Lint the workflows
         run: |
           curl -sSfL -o "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
