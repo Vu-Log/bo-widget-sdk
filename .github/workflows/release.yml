@@ -78,7 +78,7 @@ jobs:
           # personal access token so that the Version Packages pull request is checked.
           github-token: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
           # Bumps the versions, then raises the @vulog/* floors of the templates to them.
-          version: npm run version-packages
+          version-script: npm run version-packages
           publish-script: npx changeset publish
           create-github-releases: true
         # npm trusted publishing: npm authenticates this workflow through OIDC (`id-token: write`),

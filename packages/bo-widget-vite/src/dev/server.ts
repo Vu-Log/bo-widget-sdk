@@ -540,6 +540,14 @@ const proxyToApi = async (
   }
 };
 
+/** A page request: `GET` or `HEAD` accepting HTML. */
+const isPageRequest = (req: Pick<IncomingMessage, 'method' | 'headers'>): boolean => {
+  const method = req.method ?? 'GET';
+  return (
+    (method === 'GET' || method === 'HEAD') && (req.headers.accept ?? '').includes('text/html')
+  );
+};
+
 /**
  * True for a request of the fake back office page: its path, or a page request (`GET` or `HEAD`
  * accepting HTML) of a sub-route, which a widget router reloads. Its module and the local API are
@@ -552,10 +560,7 @@ export const isFakeBoPage = (
   if (pathname === FAKE_BO_PATH || pathname === FAKE_BO_BASENAME) return true;
   if (!pathname.startsWith(FAKE_BO_PATH) || pathname === FAKE_BO_MODULE_URL) return false;
   if (pathname.startsWith(FAKE_API_PATH)) return false;
-  const method = req.method ?? 'GET';
-  return (
-    (method === 'GET' || method === 'HEAD') && (req.headers.accept ?? '').includes('text/html')
-  );
+  return isPageRequest(req);
 };
 
 /** What {@link FAKE_TOKEN_PATH} answers from: the pasted token, or the session of login mode. */
@@ -583,9 +588,13 @@ export const pastedTokenSource = (token: string, now: () => number = Date.now): 
 /**
  * Token and login modes: answers the token to the pages of this dev server, never cached:
  * `{ accessToken, expiresAt }`, or `401 no-token` with the reason. A method other than `GET` gets
- * `405`; a `GET` from another origin, or for another host than `localhost` (DNS rebinding), `403`.
+ * `405`; a `GET` from another origin gets `403 cross-site`; one for another host than `localhost`
+ * (DNS rebinding), or from another machine (a `Host: localhost` sent over the network when
+ * `server.host` exposes the dev server), `403 not-local`.
+ *
+ * @internal Exported for the tests.
  */
-const answerToken = async (
+export const answerToken = async (
   req: IncomingMessage,
   res: ServerResponse,
   session: PageTokenSource,
@@ -596,10 +605,17 @@ const answerToken = async (
     sendJson(res, 405, { error: 'method-not-allowed', message: 'Only GET' });
     return;
   }
-  if (isCrossSite(req) || !isLocalRequest(req)) {
+  if (isCrossSite(req)) {
     sendJson(res, 403, {
       error: 'cross-site',
       message: 'The token is only given to the pages of this dev server, on localhost.',
+    });
+    return;
+  }
+  if (!isFromThisMachine(req)) {
+    sendJson(res, 403, {
+      error: 'not-local',
+      message: 'The token is only given on localhost, to a browser of this machine.',
     });
     return;
   }
@@ -646,6 +662,29 @@ export const isLocalRequest = (req: Pick<IncomingMessage, 'headers'>): boolean =
     return false;
   }
 };
+
+/**
+ * Whether a peer address is this machine: `127.0.0.0/8`, `::1`, or an IPv4-mapped `127.x`.
+ *
+ * @param address - `socket.remoteAddress` of the request.
+ */
+export const isLoopbackAddress = (address: string | undefined): boolean => {
+  if (!address) return false;
+  const ipv4 = address.toLowerCase().startsWith('::ffff:')
+    ? address.slice('::ffff:'.length)
+    : address;
+  return ipv4 === '::1' || /^127(?:\.\d{1,3}){3}$/.test(ipv4);
+};
+
+/**
+ * Whether the request names this machine in its `Host` and comes from it. The `Host` alone can be
+ * forged by a client of the network when `server.host` exposes the dev server.
+ */
+const isFromThisMachine = (req: Pick<IncomingMessage, 'headers' | 'socket'>): boolean =>
+  isLocalRequest(req) && isLoopbackAddress(req.socket?.remoteAddress);
+
+/** Header that lets only the pages of this dev server frame a page. */
+const FRAME_ANCESTORS_SELF = "frame-ancestors 'self'";
 
 /** The token of a `Bearer` `Authorization` header, `null` for another scheme. */
 const bearerToken = (header: string | undefined): string | null =>
@@ -747,6 +786,11 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
       res.end();
       return;
     }
+    // Another site that framed these pages could navigate the widget frame to its own page and
+    // take its place in the hello: only the pages of this dev server may frame them.
+    if (options.runtime === 'iframe' && !pathname.startsWith(FAKE_BO_PATH) && isPageRequest(req)) {
+      res.setHeader('Content-Security-Policy', FRAME_ANCESTORS_SELF);
+    }
     if (pathname === FAKE_TOKEN_PATH && pageToken) {
       answerToken(req, res, pageToken).catch(next);
       return;
@@ -756,6 +800,7 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
         .transformIndexHtml(pathname, FAKE_BO_HTML)
         .then((html) => {
           res.setHeader('Content-Type', 'text/html');
+          res.setHeader('Content-Security-Policy', FRAME_ANCESTORS_SELF);
           res.end(html);
         })
         .catch(next);
@@ -777,7 +822,7 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
       });
       return;
     }
-    if (auth?.kind === 'session' && !isLocalRequest(req)) {
+    if (auth?.kind === 'session' && !isFromThisMachine(req)) {
       warnOnce(
         `not local ${String(req.headers.host)}`,
         '[bo-widget] Login mode: refused a call of the local Vulog API for another host than localhost.',

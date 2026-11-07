@@ -463,13 +463,18 @@ describe('startFakeBo as a Web Component', () => {
 const iframeConfig = (overrides: Partial<FakeBoConfig> = {}) =>
   fakeConfig({ runtime: 'iframe', ...overrides });
 
-/** Posts a `hello` from the widget iframe, as the SDK does. */
-const hello = (data: Record<string, unknown> = {}, ports?: MessagePort[]) => {
+/** Posts a `hello` from the widget iframe, as the SDK does, from this dev server by default. */
+const hello = (
+  data: Record<string, unknown> = {},
+  ports?: MessagePort[],
+  origin = window.location.origin,
+) => {
   const frame = document.querySelector('iframe') as HTMLIFrameElement;
   window.dispatchEvent(
     new MessageEvent('message', {
       data: { protocol: 'vulog-bo', version: 2, type: 'hello', ...data },
       source: frame.contentWindow,
+      origin,
       ports: ports ?? [],
     }),
   );
@@ -566,6 +571,26 @@ describe('startFakeBo as an iframe', () => {
     port1.close();
   });
 
+  it('ignores a hello from another origin, such as a page the widget frame was navigated to', async () => {
+    await startFakeBo(iframeConfig());
+    const { port1, port2 } = new MessageChannel();
+    const received = collect(port1);
+
+    hello({}, [port2], 'http://localhost:9999');
+    hello({}, [], '');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(received).toEqual([]);
+    const warnings = [...document.querySelectorAll('.bo-log .warning')].map(
+      (line) => line.textContent,
+    );
+    expect(warnings).toEqual([
+      'ignored a message from the widget page: message from http://localhost:9999, not from this dev server',
+      'ignored a message from the widget page: message from an opaque origin, not from this dev server',
+    ]);
+    port1.close();
+  });
+
   it('logs a hello without MessagePort', async () => {
     await startFakeBo(iframeConfig());
 
@@ -607,6 +632,7 @@ describe('startFakeBo as an iframe', () => {
       new MessageEvent('message', {
         data: { protocol: 'vulog-bo', version: 2, type: 'hello', widgetId: 'fleet-report' },
         source: frame.contentWindow,
+        origin: window.location.origin,
         ports: [port2],
       }),
     );

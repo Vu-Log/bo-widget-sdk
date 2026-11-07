@@ -3,10 +3,13 @@
  * Raises the `@vulog/*` dependencies of the project templates to the versions of this repository,
  * so that a new project never installs a package older than what its README describes. Run after
  * `changeset version` (`npm run version-packages`), which bumps the packages but not the templates.
+ * The templates ship in `@vulog/create-bo-widget`: when their floors change while that package is
+ * not released, the script fails, so that the new floors are not left unpublished.
  *
  * @packageDocumentation
  */
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -77,7 +80,62 @@ export const syncTemplateFloors = (templatesDir = TEMPLATES_DIR, packagesDir = P
   return lines;
 };
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+const CREATE_PACKAGE = '@vulog/create-bo-widget';
+
+/**
+ * Error to report when the floors of the templates changed but `@vulog/create-bo-widget`, which
+ * ships them, is not released: its version did not change since the last commit.
+ *
+ * @param {string[]} changes - Lines returned by {@link syncTemplateFloors}.
+ * @param {string} version - Version of `@vulog/create-bo-widget` after `changeset version`.
+ * @param {string | null} previousVersion - Its version at the last commit, `null` when unknown.
+ * @returns {string | null} The message, `null` when there is nothing to report.
+ */
+export const unreleasedFloorsError = (changes, version, previousVersion) => {
+  if (changes.length === 0 || previousVersion === null || version !== previousVersion) return null;
+  return `The floors of the templates changed, but ${CREATE_PACKAGE} is not released (still ${version}): add a changeset for ${CREATE_PACKAGE} (npm run changeset), so that new projects get the new floors.`;
+};
+
+/**
+ * Whether this module is the script that Node runs. Both paths are resolved, so that a checkout
+ * reached through a symbolic link (`/tmp` on macOS) still runs the script.
+ *
+ * @param {string | undefined} scriptPath - `process.argv[1]`.
+ * @param {string} moduleUrl - `import.meta.url`.
+ */
+export const isMainModule = (scriptPath, moduleUrl) => {
+  if (!scriptPath) return false;
+  try {
+    return realpathSync(scriptPath) === realpathSync(fileURLToPath(moduleUrl));
+  } catch {
+    return false;
+  }
+};
+
+/** Version of `@vulog/create-bo-widget` at the last commit, `null` outside a git checkout. */
+const committedCreateVersion = () => {
+  try {
+    const manifest = execFileSync('git', ['show', 'HEAD:packages/create-bo-widget/package.json'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return JSON.parse(manifest).version;
+  } catch {
+    return null;
+  }
+};
+
+if (isMainModule(process.argv[1], import.meta.url)) {
   const lines = syncTemplateFloors();
   console.log(lines.length > 0 ? lines.join('\n') : 'Template floors are up to date.');
+  const error = unreleasedFloorsError(
+    lines,
+    workspaceVersions()[CREATE_PACKAGE],
+    committedCreateVersion(),
+  );
+  if (error) {
+    console.error(error);
+    process.exitCode = 1;
+  }
 }

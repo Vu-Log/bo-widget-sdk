@@ -80,6 +80,8 @@ Releases are automated by [changesets](https://changesets.dev) in `.github/workf
 2. A second job, the only one allowed to publish, installs the changesets CLI without running any install script. While changesets are pending, it opens or updates a **Version Packages** pull request (version bumps and changelogs).
 3. Merging that pull request publishes the `dist` built by the first job to npm under the `latest` tag (or `next`, see below), with provenance, and creates the GitHub releases.
 
+`npm run version-packages` raises the `@vulog/*` floors of the templates to the new versions. The templates ship in `@vulog/create-bo-widget`: if their floors change while that package has no changeset, the script fails and the Version Packages pull request is not updated, so add a changeset for it.
+
 The publishing job never runs the code of the dependencies (install scripts, tests, build): a compromised dependency cannot use its OpenID Connect token.
 
 The workflow is skipped while the repository is private.

@@ -1,8 +1,15 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { syncTemplateFloors, withTemplateFloors, workspaceVersions } from './template-floors.mjs';
+import {
+  isMainModule,
+  syncTemplateFloors,
+  unreleasedFloorsError,
+  withTemplateFloors,
+  workspaceVersions,
+} from './template-floors.mjs';
 
 const VERSIONS = { '@vulog/bo-widget-sdk': '0.2.0', '@vulog/bo-widget-cli': '0.1.5' };
 
@@ -92,5 +99,57 @@ describe('syncTemplateFloors', () => {
       '@vulog/bo-widget-vite',
       '@vulog/create-bo-widget',
     ]);
+  });
+});
+
+describe('unreleasedFloorsError', () => {
+  const changes = ['vue: @vulog/bo-widget-sdk ^0.1.0 -> ^0.2.0'];
+
+  it('asks for a changeset when the floors changed but create-bo-widget is not released', () => {
+    expect(unreleasedFloorsError(changes, '0.1.0', '0.1.0')).toContain(
+      'add a changeset for @vulog/create-bo-widget',
+    );
+  });
+
+  it('accepts changed floors when create-bo-widget is released, and unchanged floors', () => {
+    expect(unreleasedFloorsError(changes, '0.1.1', '0.1.0')).toBeNull();
+    expect(unreleasedFloorsError([], '0.1.0', '0.1.0')).toBeNull();
+  });
+
+  it('says nothing when the committed version is unknown (no git checkout)', () => {
+    expect(unreleasedFloorsError(changes, '0.1.0', null)).toBeNull();
+  });
+});
+
+describe('isMainModule', () => {
+  const roots = [];
+
+  afterEach(() => {
+    for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  });
+
+  it('matches the script through a symbolic link of its folder', () => {
+    const root = mkdtempSync(join(tmpdir(), 'template-floors-main-'));
+    roots.push(root);
+    mkdirSync(join(root, 'real'));
+    const script = join(root, 'real', 'script.mjs');
+    writeFileSync(script, '');
+    symlinkSync(join(root, 'real'), join(root, 'link'));
+
+    expect(isMainModule(join(root, 'link', 'script.mjs'), pathToFileURL(script).href)).toBe(true);
+    expect(isMainModule(script, pathToFileURL(join(root, 'link', 'script.mjs')).href)).toBe(true);
+  });
+
+  it('is false for another script, a missing path or no path', () => {
+    const root = mkdtempSync(join(tmpdir(), 'template-floors-main-'));
+    roots.push(root);
+    const script = join(root, 'script.mjs');
+    const other = join(root, 'other.mjs');
+    writeFileSync(script, '');
+    writeFileSync(other, '');
+
+    expect(isMainModule(other, pathToFileURL(script).href)).toBe(false);
+    expect(isMainModule(join(root, 'missing.mjs'), pathToFileURL(script).href)).toBe(false);
+    expect(isMainModule(undefined, pathToFileURL(script).href)).toBe(false);
   });
 });

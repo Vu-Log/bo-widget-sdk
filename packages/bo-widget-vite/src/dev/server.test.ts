@@ -21,10 +21,12 @@ import {
   FAKE_BO_MODULE_URL,
   FAKE_BO_PATH,
   FAKE_TOKEN_PATH,
+  answerToken,
   assertLoginServerHost,
   fakeBoConfig,
   installFakeBo,
   isLocalRequest,
+  isLoopbackAddress,
   isFakeBoPage,
   fakeBoModule,
   forwardedHeaders,
@@ -462,6 +464,85 @@ describe('isLocalRequest', () => {
 
   it('refuses a request without Host', () => {
     expect(isLocalRequest({ headers: {} })).toBe(false);
+  });
+});
+
+describe('isLoopbackAddress', () => {
+  it.each([['127.0.0.1'], ['127.1.2.3'], ['::1'], ['::ffff:127.0.0.1'], ['::FFFF:127.0.0.1']])(
+    'accepts %s',
+    (address) => {
+      expect(isLoopbackAddress(address)).toBe(true);
+    },
+  );
+
+  it.each([
+    ['a LAN address', '192.168.1.20'],
+    ['a mapped LAN address', '::ffff:192.168.1.20'],
+    ['an IPv6 address', 'fe80::1'],
+    ['a look-alike', '127.0.0.1.example'],
+    ['no address', undefined],
+    ['an empty address', ''],
+  ])('refuses %s', (_label, address) => {
+    expect(isLoopbackAddress(address)).toBe(false);
+  });
+});
+
+describe('answerToken', () => {
+  /** A request of the fake back office page for the token, from `remoteAddress`. */
+  const request = (remoteAddress: string | undefined, host = 'localhost:5173') =>
+    ({
+      method: 'GET',
+      headers: { host, 'sec-fetch-site': 'same-origin' },
+      socket: { remoteAddress },
+    }) as unknown as IncomingMessage;
+
+  /** Records the status, headers and JSON body sent. */
+  const response = () => {
+    const sent = { status: 0, headers: {} as Record<string, unknown>, body: undefined as unknown };
+    const res = {
+      set statusCode(status: number) {
+        sent.status = status;
+      },
+      setHeader: (name: string, value: unknown) => {
+        sent.headers[name.toLowerCase()] = value;
+      },
+      end: (body: string) => {
+        sent.body = JSON.parse(body);
+      },
+    } as unknown as ServerResponse;
+    return { res, sent };
+  };
+
+  const session = { token: () => Promise.resolve('real-token'), noTokenReason: () => 'none' };
+
+  it('answers the token to a page of this machine', async () => {
+    const { res, sent } = response();
+
+    await answerToken(request('127.0.0.1'), res, session);
+
+    expect(sent.status).toBe(200);
+    expect(sent.headers['cache-control']).toBe('no-store');
+    expect(sent.body).toEqual({ accessToken: 'real-token', expiresAt: null });
+  });
+
+  it('refuses a client of the network that sends Host: localhost (server.host set)', async () => {
+    const { res, sent } = response();
+    const token = vi.fn(session.token);
+
+    await answerToken(request('192.168.1.20'), res, { ...session, token });
+
+    expect(sent.status).toBe(403);
+    expect(sent.body).toMatchObject({ error: 'not-local' });
+    expect(token).not.toHaveBeenCalled();
+  });
+
+  it('refuses another host than localhost, even from this machine (DNS rebinding)', async () => {
+    const { res, sent } = response();
+
+    await answerToken(request('127.0.0.1', 'attacker.example:5173'), res, session);
+
+    expect(sent.status).toBe(403);
+    expect(sent.body).toMatchObject({ error: 'not-local' });
   });
 });
 
@@ -1001,14 +1082,46 @@ describe('fake back office dev server', () => {
     });
   });
 
-  it('serves no token route in mock mode', async () => {
+  it('serves no token route in mock mode: the path is left to Vite', async () => {
     const { origin } = await serve({ name: 'Fleet report' });
 
     const answer = await fetch(`${origin}${FAKE_TOKEN_PATH}`, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', 'Sec-Fetch-Site': 'same-origin' },
     });
+    const body = await answer.text();
 
     expect(answer.headers.get('content-type') ?? '').not.toContain('application/json');
+    expect(answer.headers.get('cache-control')).not.toBe('no-store');
+    expect(body).not.toMatch(/accessToken|no-token|cross-site|not-local/);
+  });
+
+  it('lets only the pages of the dev server frame the fake back office and the widget page', async () => {
+    const { origin } = await serve({ name: 'Fleet report', runtime: 'iframe' });
+    const page = (path: string) => fetch(`${origin}${path}`, { headers: { Accept: 'text/html' } });
+
+    expect((await page('/__bo-widget/')).headers.get('content-security-policy')).toBe(
+      "frame-ancestors 'self'",
+    );
+    expect((await page('/')).headers.get('content-security-policy')).toBe("frame-ancestors 'self'");
+    expect((await page('/reports/2')).headers.get('content-security-policy')).toBe(
+      "frame-ancestors 'self'",
+    );
+    // Modules and the local API are not pages.
+    expect(
+      (await fetch(`${origin}${FAKE_BO_MODULE_URL}`)).headers.get('content-security-policy'),
+    ).toBeNull();
+  });
+
+  it('leaves the widget page of a Web Component without frame-ancestors (it redirects)', async () => {
+    const { origin } = await serve({ name: 'Fleet report' });
+
+    const answer = await fetch(`${origin}/`, {
+      headers: { Accept: 'text/html' },
+      redirect: 'manual',
+    });
+
+    expect(answer.status).toBe(302);
+    expect(answer.headers.get('content-security-policy')).toBeNull();
   });
 
   it('keeps the Authorization header the widget sends (iframe)', async () => {

@@ -610,6 +610,12 @@ const startIframe = (
     const data: unknown = event.data;
     // A page left behind (removed iframe) no longer answers.
     if (!frame.isConnected || event.source !== frame.contentWindow) return;
+    // The widget page is served by this dev server. A page that framed the fake back office can
+    // navigate the widget frame to its own origin: its hello must not get the token.
+    if (event.origin !== globalThis.location.origin) {
+      ignore(`message from ${event.origin || 'an opaque origin'}, not from this dev server`);
+      return;
+    }
     if (!isRecord(data) || data.protocol !== 'vulog-bo') {
       ignore('no protocol "vulog-bo"');
       return;
