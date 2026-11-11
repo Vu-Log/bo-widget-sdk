@@ -23,7 +23,7 @@ You are writing or changing a **Vulog back office (BO) widget**: a page the BO s
 8. Use `getCurrentUser()` to know who is connected. Never decode the token.
 9. Handle a `401` from `authFetch` (session lost) by showing a message, never by retrying in a loop. When the SDK adds the token itself (iframe, or a third-party URL), it has already retried once with a new token.
 10. Keep secrets out of the widget bundle: it is public. Settings needing a secret belong to your backend.
-11. Log with `bo.log.warn(message, context?)` and `bo.log.error(...)` (`debug` and `info` are kept only while the debug mode of the installation is on). `console.log` never reaches the BO. Never put personal data, tokens or secrets in a message or a context; keep the context small (3 KB of JSON at most, otherwise it becomes `{ truncated: true, reason }`); pass a caught error as `{ error }`, its name, message and stack are kept. In an iframe, uncaught errors are sent for you.
+11. Log with `bo.log.warn(message, context?)` and `bo.log.error(...)` (`debug` and `info` are kept only while the debug mode of the installation is on). `console.log` never reaches the BO. Never put personal data, tokens or secrets in a message or a context; keep the context small (3 KB of JSON at most, otherwise it becomes `{ truncated: true, reason }`); pass a caught error as `{ error }`, its name, message and stack (cut) are kept. In an iframe, uncaught errors are sent for you.
 
 ## Finding a Vulog API endpoint
 

@@ -93,8 +93,8 @@ bo.log.error('Cannot read the vehicles', { fleetId });
 
 - `console.log` (and the other `console` methods) is never relayed: use `bo.log`.
 - The message is a string, cut at 2048 characters; a blank one is sent as `(empty message)`, so that its context is kept.
-- The context is copied as JSON, and an `Error` in it keeps its `name`, `message` and stack (`bo.log.error('Export failed', { error })`). A context that is not a plain object, bigger than 3 KB, deeper than 5 levels, circular or not serializable becomes `{ truncated: true, reason }`, `reason` being `not-an-object`, `not-serializable`, `too-big` or `too-deep`.
-- The same log is sent at once, then at most once every 10 s while it repeats, with `context.repeated`, the number of repeats since the last send. `repeated`, `truncated` and `reason` are reserved keys of the context.
+- The context is copied as JSON, and an `Error` in it keeps its `name`, `message` and stack (cut at 1500 characters) (`bo.log.error('Export failed', { error })`). A context that is not an object (an array, a string…), bigger than 3 KB, deeper than 5 levels, circular or not serializable becomes `{ truncated: true, reason }`, `reason` being `not-an-object`, `not-serializable`, `too-big` or `too-deep`.
+- The same log is sent at once, then at most once every 10 s while it repeats (and on `disconnect`), with `context.repeated`, the number of repeats since the last send. `repeated`, `truncated` and `reason` are reserved keys of the context.
 - In an iframe, the errors nobody catches (`error` and `unhandledrejection` of the window) are sent as `error` logs, with their stack, until `disconnect`. As a Web Component, the SDK captures nothing: the BO catches the errors it can attribute to the widget.
 - **Never put personal data or secrets in a log**: the platform cannot check what the context holds.
 

@@ -103,7 +103,8 @@ export type BoLogLevel = 'debug' | 'info' | 'warn' | 'error';
 /**
  * Free data attached to a log. Copied as JSON when the log is taken: what JSON drops (functions,
  * `undefined`) is dropped, a `Date` becomes its ISO string, an `Error` keeps its `name`,
- * `message` and stack. Never put personal data in it.
+ * `message` and stack (cut; `cause` and other properties are dropped). Never put personal data
+ * in it.
  *
  * Reserved keys, set by the SDK: `repeated` (number of repeats a log stands for) and `truncated`
  * with `reason` (the context was replaced). A widget's own `repeated` key is overwritten on a
@@ -237,11 +238,12 @@ export interface BoClient extends BoRequests {
    *
    * - The message is turned into a string, cut at 2048 characters with `…`; a blank one is sent
    *   as `(empty message)`, so that its context is kept.
-   * - The context is copied as JSON. One that is not a plain object, bigger than 3 KB once
-   *   serialized, deeper than 5 levels, circular or not serializable is replaced by
-   *   `{ truncated: true, reason }`.
+   * - The context is copied as JSON. One that is not an object (an array, a string…), bigger
+   *   than 3 KB once serialized, deeper than 5 levels, circular or not serializable is replaced
+   *   by `{ truncated: true, reason }`.
    * - The same log (level, message and context) is sent at once, then at most once every 10 s
-   *   while it repeats, with `context.repeated`, the number of repeats since the last send.
+   *   while it repeats (and on `disconnect`), with `context.repeated`, the number of repeats
+   *   since the last send.
    * - In an iframe, errors nobody catches (`error` and `unhandledrejection` of the window) are
    *   sent as `error` logs too. As a Web Component, the SDK captures nothing: the back office
    *   catches the errors it can attribute to the widget.
