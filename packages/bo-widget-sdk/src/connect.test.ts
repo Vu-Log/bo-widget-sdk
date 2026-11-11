@@ -30,7 +30,15 @@ class HostError extends Error {
  */
 const fakeBackOffice = () => {
   const listeners = new Map<string, Set<(data: unknown) => void>>();
+  /** Logs received, from the injected API or the port. */
+  const logs: { level: string; message: string; context?: unknown }[] = [];
+  const logAt =
+    (level: string) =>
+    (message: string, context?: unknown): void => {
+      logs.push(context === undefined ? { level, message } : { level, message, context });
+    };
   const hostApi = {
+    log: { debug: logAt('debug'), info: logAt('info'), warn: logAt('warn'), error: logAt('error') },
     protocolVersion: 2,
     getContext: async () => structuredClone(context),
     getCurrentUser: async () => ({ id: 'u1', fullName: 'Jane Doe' }),
@@ -75,6 +83,11 @@ const fakeBackOffice = () => {
         context,
       });
       port.onmessage = async ({ data: { id, type, payload } }) => {
+        if (type === 'log') {
+          hostApi.log[payload.level as keyof typeof hostApi.log](payload.message, payload.context);
+          port.postMessage({ id, ok: true, result: null });
+          return;
+        }
         const method = (hostApi as Record<string, unknown>)[type];
         if (typeof method !== 'function' || type === 'on' || type === 'off') {
           port.postMessage({ id, ok: false, error: { code: 'UNKNOWN_TYPE', message: type } });
@@ -98,7 +111,7 @@ const fakeBackOffice = () => {
       };
     },
   });
-  return { hostApi, emit, parentWindow, ports };
+  return { hostApi, emit, parentWindow, ports, logs };
 };
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -371,5 +384,114 @@ describe('connect: same contract in both modes', () => {
     await expect(
       connect({ vulogBo: fakeBackOffice().hostApi }, { requestTimeout: -1 }),
     ).rejects.toThrow(TypeError);
+  });
+});
+
+describe('connect: logs', () => {
+  /** An iframe window: the back office as parent, and the events of a real window. */
+  const iframeWindow = (backOffice: ReturnType<typeof fakeBackOffice>) =>
+    Object.assign(new EventTarget(), { parent: backOffice.parentWindow([]) });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('sends a log of each level, the same way as a Web Component and in an iframe', async () => {
+    const backOffice = fakeBackOffice();
+    const asWebComponent = await connect({ vulogBo: backOffice.hostApi });
+    vi.stubGlobal('window', iframeWindow(backOffice));
+    const inIframe = await connect();
+    for (const bo of [asWebComponent, inIframe]) {
+      bo.log.debug('d');
+      bo.log.info('i', { step: 1 });
+      bo.log.warn('w');
+      bo.log.error('e', { status: 500 });
+    }
+    const expected = [
+      { level: 'debug', message: 'd' },
+      { level: 'info', message: 'i', context: { step: 1 } },
+      { level: 'warn', message: 'w' },
+      { level: 'error', message: 'e', context: { status: 500 } },
+    ];
+    await vi.waitFor(() => expect(backOffice.logs).toHaveLength(8));
+    expect(backOffice.logs).toEqual([...expected, ...expected]);
+    asWebComponent.disconnect();
+    inIframe.disconnect();
+  });
+
+  it('sends the uncaught errors and rejections of an iframe without code of the widget', async () => {
+    const backOffice = fakeBackOffice();
+    const view = iframeWindow(backOffice);
+    vi.stubGlobal('window', view);
+    const bo = await connect();
+    const error = new TypeError('x is undefined');
+    view.dispatchEvent(
+      Object.assign(new Event('error'), { error, message: 'Uncaught TypeError: x is undefined' }),
+    );
+    view.dispatchEvent(
+      Object.assign(new Event('unhandledrejection'), { reason: new Error('fetch failed') }),
+    );
+    await vi.waitFor(() => expect(backOffice.logs).toHaveLength(2));
+    expect(backOffice.logs[0]).toMatchObject({
+      level: 'error',
+      message: 'Uncaught TypeError: x is undefined',
+      context: { name: 'TypeError' },
+    });
+    expect(backOffice.logs[1]).toMatchObject({
+      level: 'error',
+      message: 'Unhandled rejection: Error: fetch failed',
+    });
+
+    bo.disconnect();
+    view.dispatchEvent(Object.assign(new Event('error'), { error: new Error('after') }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backOffice.logs).toHaveLength(2);
+  });
+
+  it('does not capture the errors of the window as a Web Component', async () => {
+    const backOffice = fakeBackOffice();
+    const view = iframeWindow(backOffice);
+    vi.stubGlobal('window', view);
+    const bo = await connect({ vulogBo: backOffice.hostApi });
+    view.dispatchEvent(Object.assign(new Event('error'), { error: new Error('page error') }));
+    expect(backOffice.logs).toEqual([]);
+    bo.disconnect();
+  });
+
+  it('never relays console.log', async () => {
+    const backOffice = fakeBackOffice();
+    const bo = await connect({ vulogBo: backOffice.hostApi });
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      console.log('local only');
+      expect(backOffice.logs).toEqual([]);
+    } finally {
+      spy.mockRestore();
+      bo.disconnect();
+    }
+  });
+
+  it('groups repeats and sends their count on disconnect, then drops logs', async () => {
+    const backOffice = fakeBackOffice();
+    const bo = await connect({ vulogBo: backOffice.hostApi });
+    for (let i = 0; i < 3; i += 1) bo.log.warn('Retrying');
+    expect(backOffice.logs).toEqual([{ level: 'warn', message: 'Retrying' }]);
+    bo.disconnect();
+    expect(backOffice.logs).toEqual([
+      { level: 'warn', message: 'Retrying' },
+      { level: 'warn', message: 'Retrying', context: { repeated: 2 } },
+    ]);
+    bo.log.error('late');
+    expect(backOffice.logs).toHaveLength(2);
+  });
+
+  it('truncates a context too big', async () => {
+    const backOffice = fakeBackOffice();
+    const bo = await connect({ vulogBo: backOffice.hostApi });
+    bo.log.error('Big', { dump: 'x'.repeat(10_000) });
+    expect(backOffice.logs).toEqual([
+      { level: 'error', message: 'Big', context: { truncated: true } },
+    ]);
+    bo.disconnect();
   });
 });

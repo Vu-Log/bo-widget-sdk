@@ -5,7 +5,9 @@ import { buildManifest } from '../manifest.js';
 import { FAKE_BO_PATH, fakeBoConfig } from './server.js';
 import {
   createFakeBackOffice,
+  formatWidgetLog,
   isInView,
+  parseWidgetLog,
   resolveRoute,
   startFakeBo,
   WidgetHostError,
@@ -61,6 +63,7 @@ const fakeUi = () => ({
   notify: vi.fn<FakeBoUi['notify']>(),
   navigate: vi.fn<FakeBoUi['navigate']>(),
   resize: vi.fn<FakeBoUi['resize']>(),
+  widgetLog: vi.fn<FakeBoUi['widgetLog']>(),
 });
 
 /** A loader of the widget entry, as the dev server generates it. */
@@ -975,6 +978,157 @@ describe('createFakeBackOffice host API in token and login modes', () => {
       .catch((caught: unknown) => caught);
 
     expect(error).toMatchObject({ code: 'no-token' });
+  });
+});
+
+describe('widget logs', () => {
+  it('shows a log of a Web Component in the page, the console and the terminal', async () => {
+    const terminal = vi.fn();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig(), load(Widget), terminal);
+    const bo = await client();
+
+    bo.log.warn('Export failed', { status: 500 });
+
+    const line = document.querySelector('.bo-log .warning:last-child');
+    expect(line?.textContent).toBe('widget warn: Export failed {"status":500}');
+    expect(warn).toHaveBeenCalledWith('[widget] Export failed', { status: 500 });
+    expect(terminal).toHaveBeenCalledWith({
+      level: 'warn',
+      message: 'Export failed',
+      context: { status: 500 },
+    });
+  });
+
+  it('shows each level with its console method and line class', async () => {
+    const methods = (['debug', 'info', 'warn', 'error'] as const).map((level) =>
+      vi.spyOn(console, level).mockImplementation(() => {}),
+    );
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig(), load(Widget));
+    const bo = await client();
+
+    bo.log.debug('d');
+    bo.log.info('i');
+    bo.log.warn('w');
+    bo.log.error('e');
+
+    for (const method of methods) expect(method).toHaveBeenCalledTimes(1);
+    const lines = [...document.querySelectorAll('.bo-log > div')]
+      .filter((line) => line.textContent?.startsWith('widget '))
+      .map((line) => [line.className, line.textContent]);
+    expect(lines).toEqual([
+      ['info', 'widget debug: d'],
+      ['info', 'widget info: i'],
+      ['warning', 'widget warn: w'],
+      ['error', 'widget error: e'],
+    ]);
+  });
+
+  it('keeps showing the log when the terminal is gone', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { Widget, client } = widgetClass();
+    await startFakeBo(fakeConfig(), load(Widget), () => {
+      throw new Error('closed');
+    });
+    const bo = await client();
+
+    expect(() => bo.log.error('still shown')).not.toThrow();
+    expect(document.querySelector('.bo-log .error:last-child')?.textContent).toBe(
+      'widget error: still shown',
+    );
+    expect(warn).toHaveBeenCalledWith(
+      '[bo-widget] cannot show the log in the terminal',
+      expect.any(Error),
+    );
+  });
+
+  it('receives the logs of an iframe on the port, without a request line', async () => {
+    const { client, ui } = await connectIframe(fakeConfig({ runtime: 'iframe' }));
+
+    client.log.info('Loaded', { rows: 3 });
+
+    await vi.waitFor(() =>
+      expect(ui.widgetLog).toHaveBeenCalledWith({
+        level: 'info',
+        message: 'Loaded',
+        context: { rows: 3 },
+      }),
+    );
+    await flush();
+    expect(ui.log).not.toHaveBeenCalledWith(expect.stringMatching(/^log →/), expect.anything());
+    client.disconnect();
+  });
+
+  it('refuses a malformed log on the port, like the back office', async () => {
+    const ui = fakeUi();
+    const backOffice = createFakeBackOffice(fakeConfig({ runtime: 'iframe' }), ui);
+    const { port1, port2 } = new MessageChannel();
+    const answers = collect(port1);
+    backOffice.servePort(port2);
+
+    port1.postMessage({ id: '1', type: 'log', payload: { level: 'fatal', message: 'x' } });
+    await vi.waitFor(() => expect(answers).toHaveLength(2));
+
+    expect(answers[1]).toEqual({
+      id: '1',
+      ok: false,
+      error: {
+        code: 'INVALID_PAYLOAD',
+        message: 'log: level must be one of debug, info, warn, error',
+      },
+    });
+    expect(ui.widgetLog).not.toHaveBeenCalled();
+    expect(ui.log).toHaveBeenCalledWith(expect.stringMatching(/^log → /), 'error');
+  });
+
+  it('never throws from the injected log, and shows its refusal', () => {
+    const ui = fakeUi();
+    const api = createFakeBackOffice(fakeConfig(), ui).createHostApi();
+
+    expect(() => api.log.warn('   ')).not.toThrow();
+
+    expect(ui.widgetLog).not.toHaveBeenCalled();
+    expect(ui.log).toHaveBeenCalledWith(
+      'log refused: log: message must be a non-blank string',
+      'warning',
+    );
+  });
+});
+
+describe('parseWidgetLog', () => {
+  it('reads a log, with or without context', () => {
+    expect(parseWidgetLog({ level: 'warn', message: 'w', context: { a: 1 } })).toEqual({
+      level: 'warn',
+      message: 'w',
+      context: { a: 1 },
+    });
+    expect(parseWidgetLog({ level: 'error', message: 'e' })).toEqual({
+      level: 'error',
+      message: 'e',
+    });
+  });
+
+  it.each([
+    undefined,
+    null,
+    'warn',
+    { level: 'trace', message: 'x' },
+    { level: 'warn' },
+    { level: 'warn', message: ' ' },
+  ])('refuses %j', (payload) => {
+    expect(() => parseWidgetLog(payload)).toThrow(WidgetHostError);
+  });
+});
+
+describe('formatWidgetLog', () => {
+  it('shows the level, the message and the context as JSON', () => {
+    expect(formatWidgetLog({ level: 'info', message: 'i' })).toBe('widget info: i');
+    expect(formatWidgetLog({ level: 'error', message: 'e', context: { a: 1 } })).toBe(
+      'widget error: e {"a":1}',
+    );
   });
 });
 

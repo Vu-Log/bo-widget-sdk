@@ -32,6 +32,7 @@ import {
   forwardedHeaders,
   isCrossSite,
   pastedTokenSource,
+  printWidgetLog,
   resolveDevMode,
   tokenWarnings,
   widgetTag,
@@ -768,7 +769,10 @@ describe('fakeBoModule', () => {
 
     expect(code).toContain('import { startFakeBo } from "/pkg/host.js";');
     expect(code).toContain(
-      `startFakeBo(${JSON.stringify(config)}, () => import("/app/src/main.ts")).catch(`,
+      `startFakeBo(${JSON.stringify(config)}, () => import("/app/src/main.ts"), terminal).catch(`,
+    );
+    expect(code).toContain(
+      'const terminal = (entry) => import.meta.hot?.send("bo-widget:log", entry);',
     );
     expect(code).toContain('Fake back office failed to start');
   });
@@ -785,7 +789,7 @@ describe('fakeBoModule', () => {
     );
 
     expect(code).not.toContain('import(');
-    expect(code).toMatch(/startFakeBo\(\{.*\}\)\.catch\(/);
+    expect(code).toMatch(/startFakeBo\(\{.*\}, undefined, terminal\)\.catch\(/);
   });
 });
 
@@ -1366,6 +1370,47 @@ describe('fake back office dev server', () => {
     );
   });
 
+  it('prints the widget logs the page sends on the HMR channel in the terminal', async () => {
+    const root = await project();
+    const customLogger = createLogger('silent');
+    const warn = vi.spyOn(customLogger, 'warn');
+    const server = await createServer({
+      root,
+      configFile: false,
+      logLevel: 'silent',
+      customLogger,
+      server: { port: 0, strictPort: false },
+      plugins: [boWidget({ name: 'Fleet report' })],
+    });
+    servers.push(server);
+    await server.listen();
+    const { port } = server.httpServer?.address() as AddressInfo;
+    const socket = new WebSocket(
+      `ws://localhost:${port}/?token=${server.config.webSocketToken}`,
+      'vite-hmr',
+    );
+    try {
+      await new Promise((resolve, reject) => {
+        socket.addEventListener('open', resolve);
+        socket.addEventListener('error', reject);
+      });
+      socket.send(
+        JSON.stringify({
+          type: 'custom',
+          event: 'bo-widget:log',
+          data: { level: 'warn', message: 'Export failed', context: { status: 500 } },
+        }),
+      );
+      await vi.waitFor(() =>
+        expect(warn).toHaveBeenCalledWith('[bo-widget] widget warn: Export failed {"status":500}', {
+          timestamp: true,
+        }),
+      );
+    } finally {
+      socket.close();
+    }
+  });
+
   it.each<[string, true | string[] | undefined, boolean]>([
     ['allowedHosts: true', true, true],
     ['an allowedHosts list', ['dev.example.com'], false],
@@ -1671,5 +1716,74 @@ describe('isFakeBoPage', () => {
     expect(isFakeBoPage({ method: 'GET', headers: {} }, `${FAKE_BO_PATH}stations/1`)).toBe(false);
     expect(isFakeBoPage(page, '/__bo-widget-other/x')).toBe(false);
     expect(isFakeBoPage(page, '/src/main.ts')).toBe(false);
+  });
+});
+
+describe('printWidgetLog', () => {
+  const logger = () => {
+    const customLogger = createLogger('silent');
+    return {
+      customLogger,
+      info: vi.spyOn(customLogger, 'info'),
+      warn: vi.spyOn(customLogger, 'warn'),
+      error: vi.spyOn(customLogger, 'error'),
+    };
+  };
+
+  it('prints each level with the matching logger method', () => {
+    const { customLogger, info, warn, error } = logger();
+    printWidgetLog(customLogger, { level: 'debug', message: 'd' });
+    printWidgetLog(customLogger, { level: 'info', message: 'i' });
+    printWidgetLog(customLogger, { level: 'warn', message: 'w' });
+    printWidgetLog(customLogger, { level: 'error', message: 'e', context: { status: 500 } });
+    expect(info.mock.calls).toEqual([
+      ['[bo-widget] widget debug: d', { timestamp: true }],
+      ['[bo-widget] widget info: i', { timestamp: true }],
+    ]);
+    expect(warn).toHaveBeenCalledWith('[bo-widget] widget warn: w', { timestamp: true });
+    expect(error).toHaveBeenCalledWith('[bo-widget] widget error: e {"status":500}', {
+      timestamp: true,
+    });
+  });
+
+  it('removes the control characters, so that a widget cannot drive the terminal', () => {
+    const { customLogger, error } = logger();
+    printWidgetLog(customLogger, {
+      level: 'error',
+      message: '\u001b[2J\u001b[31mred\u0007\u009b1m\nnext line',
+      context: { note: '\u001b]0;title\u0007' },
+    });
+    expect(error).toHaveBeenCalledWith(
+      '[bo-widget] widget error: [2J[31mred1m\nnext line {"note":"\\u001b]0;title\\u0007"}',
+      { timestamp: true },
+    );
+  });
+
+  it('cuts a very long line', () => {
+    const { customLogger, warn } = logger();
+    printWidgetLog(customLogger, { level: 'warn', message: 'x'.repeat(10_000) });
+    const text = String(warn.mock.calls[0]?.[0]);
+    expect(text.endsWith('…')).toBe(true);
+    expect(text.length).toBeLessThan(4_100);
+  });
+
+  it('shows a context it cannot serialize', () => {
+    const { customLogger, warn } = logger();
+    printWidgetLog(customLogger, { level: 'warn', message: 'w', context: { big: 1n } });
+    expect(warn).toHaveBeenCalledWith('[bo-widget] widget warn: w [context not serializable]', {
+      timestamp: true,
+    });
+  });
+
+  it.each([
+    undefined,
+    null,
+    'text',
+    { level: 'fatal', message: 'x' },
+    { level: 'warn', message: 1 },
+  ])('ignores what is not a widget log: %j', (data) => {
+    const { customLogger, info, warn, error } = logger();
+    printWidgetLog(customLogger, data);
+    expect([...info.mock.calls, ...warn.mock.calls, ...error.mock.calls]).toEqual([]);
   });
 });

@@ -48,7 +48,8 @@ const isStringArray = (value: unknown): value is string[] =>
  * Opens the channel of an iframe widget: posts `hello` with a `MessagePort` to the back office,
  * waits for `welcome`, then sends each request `{ id, type, payload }` on the port and matches the
  * answers `{ id, ok, result | error }` by `id`. Events `{ type: 'event', name, data }` are
- * dispatched to the listeners added with `on`.
+ * dispatched to the listeners added with `on`. A log is a `log` request whose answer is not waited
+ * for.
  *
  * When the back office closes its end of the port (widget removed), pending and later requests
  * reject with `DISCONNECTED` and no event is delivered any more. A browser without the `close`
@@ -162,7 +163,7 @@ export const openPortTransport = (options: PortTransportOptions): Promise<BoTran
   }
 
   const request =
-    (type: keyof BoRequests) =>
+    (type: keyof BoRequests | 'log') =>
     (payload?: unknown): Promise<never> =>
       new Promise((resolve, reject) => {
         if (closed) {
@@ -242,6 +243,9 @@ export const openPortTransport = (options: PortTransportOptions): Promise<BoTran
       failHandshake = null;
       clearTimeout(timer);
       handshakeDone = true;
+      // Answered `null` by the back office: nothing to wait for. A rejection (older back office
+      // without `log`, timeout, closed channel) is dropped: logging must not break the widget.
+      const sendLog = request('log');
       resolve({
         mode: 'iframe',
         protocolVersion: message.protocolVersion,
@@ -262,6 +266,12 @@ export const openPortTransport = (options: PortTransportOptions): Promise<BoTran
         },
         off<K extends BoEventName>(name: K, listener: BoEventListener<K>) {
           listeners.get(name)?.delete(listener as Listener);
+        },
+        log(level, message, context) {
+          if (closed) return;
+          sendLog(context === undefined ? { level, message } : { level, message, context }).catch(
+            () => {},
+          );
         },
         close: () => close(),
       });

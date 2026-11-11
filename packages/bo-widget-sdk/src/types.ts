@@ -97,6 +97,29 @@ export interface BoResizePayload {
   height: number | null;
 }
 
+/** Level of a widget log, from the most verbose to the most severe. */
+export type BoLogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+/**
+ * Free data attached to a log. Copied as JSON when the log is taken: what JSON drops (functions,
+ * `undefined`) is dropped, a `Date` becomes its ISO string. Never put personal data in it.
+ */
+export type BoLogContext = Record<string, unknown>;
+
+/**
+ * Logs of the widget, relayed to the back office, which forwards them to Vulog (`bo.log`).
+ *
+ * Each method takes `(message, context?)`, returns nothing and never throws: logging cannot
+ * break the widget. Only `warn` and `error` are kept by default; `debug` and `info` are kept
+ * while the debug mode of the widget installation is on. `console.log` is never relayed.
+ */
+export interface BoLogger {
+  debug(message: string, context?: BoLogContext): void;
+  info(message: string, context?: BoLogContext): void;
+  warn(message: string, context?: BoLogContext): void;
+  error(message: string, context?: BoLogContext): void;
+}
+
 /** Data of each event the back office pushes to the widget. */
 export interface BoEventMap {
   /** The new language, in the format of {@link BoContext.locale} (`en_GB`). */
@@ -147,6 +170,11 @@ export interface BoTransport extends BoRequests {
   readonly grantedPermissions: readonly string[] | null;
   on<K extends BoEventName>(name: K, listener: BoEventListener<K>): void;
   off<K extends BoEventName>(name: K, listener: BoEventListener<K>): void;
+  /**
+   * Sends one log, already capped by the client. Never throws nor rejects; does nothing once
+   * closed.
+   */
+  log(level: BoLogLevel, message: string, context: BoLogContext | undefined): void;
   close(): void;
 }
 
@@ -200,8 +228,24 @@ export interface BoClient extends BoRequests {
    */
   authFetch: AuthFetch;
   /**
+   * Logs of the widget, relayed to the back office: `bo.log.warn('Export failed', { status })`.
+   *
+   * - The message is turned into a string; a blank one is ignored, a longer one than 2048
+   *   characters is cut with `…`.
+   * - The context is copied as JSON. One bigger than 3 KB once serialized, deeper than 5 levels,
+   *   circular or not serializable is replaced by `{ truncated: true }`.
+   * - The same log (level, message and context) repeated within 10 s is sent once, then once more
+   *   at the end of the 10 s with `context.repeated`, the number of repeats it stands for.
+   * - In an iframe, errors nobody catches (`error` and `unhandledrejection` of the window) are
+   *   sent as `error` logs too. As a Web Component, the back office catches them itself.
+   *
+   * After `disconnect`, logs are dropped.
+   */
+  readonly log: BoLogger;
+  /**
    * Stops listening to the back office: listeners are removed, and pending and later requests
-   * reject with `DISCONNECTED`, the same way in both modes.
+   * reject with `DISCONNECTED`, the same way in both modes. Repeated logs still waiting are sent
+   * first.
    */
   disconnect(): void;
 }

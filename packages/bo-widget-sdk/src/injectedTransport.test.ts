@@ -267,3 +267,54 @@ describe('createInjectedTransport', () => {
     }
   });
 });
+
+describe('createInjectedTransport: log', () => {
+  const hostLog = () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() });
+
+  it('relays each level to vulogBo.log', () => {
+    const log = hostLog();
+    const transport = createInjectedTransport(fakeHostApi({ log }).api);
+    transport.log('debug', 'd', undefined);
+    transport.log('info', 'i', undefined);
+    transport.log('warn', 'w', { status: 500 });
+    transport.log('error', 'e', undefined);
+    expect(log.debug).toHaveBeenCalledWith('d', undefined);
+    expect(log.info).toHaveBeenCalledWith('i', undefined);
+    expect(log.warn).toHaveBeenCalledWith('w', { status: 500 });
+    expect(log.error).toHaveBeenCalledWith('e', undefined);
+  });
+
+  it('drops logs for a back office without log, or without the level', () => {
+    const transport = createInjectedTransport(fakeHostApi().api);
+    expect(() => transport.log('warn', 'w', undefined)).not.toThrow();
+    const partial = createInjectedTransport(fakeHostApi({ log: { error: vi.fn() } }).api);
+    expect(() => partial.log('warn', 'w', undefined)).not.toThrow();
+  });
+
+  it('drops logs once closed', () => {
+    const log = hostLog();
+    const transport = createInjectedTransport(fakeHostApi({ log }).api);
+    transport.close();
+    transport.log('error', 'late', undefined);
+    expect(log.error).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when the back office log throws, and rethrows its error later', async () => {
+    const thrown: unknown[] = [];
+    const onError = (error: unknown) => thrown.push(error);
+    process.on('uncaughtException', onError);
+    try {
+      const failure = new Error('log failed');
+      const log = {
+        error: vi.fn(() => {
+          throw failure;
+        }),
+      };
+      const transport = createInjectedTransport(fakeHostApi({ log }).api);
+      expect(() => transport.log('error', 'e', undefined)).not.toThrow();
+      await vi.waitFor(() => expect(thrown).toEqual([failure]));
+    } finally {
+      process.off('uncaughtException', onError);
+    }
+  });
+});

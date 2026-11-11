@@ -1,6 +1,8 @@
 import { createAuthFetch } from './authFetch.js';
+import { captureUncaughtErrors, type ErrorEventTarget } from './errorCapture.js';
 import { BoError } from './errors.js';
 import { createInjectedTransport, isInjectedHostApi } from './injectedTransport.js';
+import { createLogger } from './log.js';
 import { openPortTransport } from './portTransport.js';
 import type { BoClient, BoTransport } from './types.js';
 
@@ -36,8 +38,21 @@ const readTimeout = (name: string, value: number | undefined, fallback: number):
   return Math.min(value, MAX_TIMEOUT);
 };
 
-const toClient = (transport: BoTransport): BoClient => {
+const isErrorEventTarget = (value: unknown): value is ErrorEventTarget =>
+  typeof (value as ErrorEventTarget | undefined)?.addEventListener === 'function' &&
+  typeof (value as ErrorEventTarget | undefined)?.removeEventListener === 'function';
+
+/**
+ * Wraps a transport as the client given to the widget.
+ *
+ * @param errorTarget - The window whose uncaught errors are sent as logs (iframe only).
+ */
+const toClient = (transport: BoTransport, errorTarget?: unknown): BoClient => {
   const authFetch = createAuthFetch(transport);
+  const logger = createLogger((level, message, context) => transport.log(level, message, context));
+  const stopCapture = isErrorEventTarget(errorTarget)
+    ? captureUncaughtErrors(errorTarget, logger.api)
+    : null;
   let disconnected = false;
   const client: BoClient = {
     mode: transport.mode,
@@ -57,6 +72,7 @@ const toClient = (transport: BoTransport): BoClient => {
       return () => transport.off(name, listener);
     },
     off: (name, listener) => transport.off(name, listener),
+    log: logger.api,
     // Its cache would otherwise keep sending authenticated calls after `disconnect`.
     authFetch: (input, init) =>
       disconnected
@@ -66,6 +82,9 @@ const toClient = (transport: BoTransport): BoClient => {
         : authFetch(input, init),
     disconnect: () => {
       disconnected = true;
+      stopCapture?.();
+      // Sends the repeats still counted while the channel is open.
+      logger.stop();
       transport.close();
     },
   };
@@ -80,7 +99,9 @@ const toClient = (transport: BoTransport): BoClient => {
  * - In an iframe, call it without element: the client opens a channel with the back office (parent
  *   window) through `postMessage`.
  *
- * Either way, the returned client has the same API, so the widget's code is the same.
+ * Either way, the returned client has the same API, so the widget's code is the same. In an
+ * iframe, the errors nobody catches are also sent as logs (see {@link BoClient.log}) until
+ * `disconnect`.
  *
  * An element without `vulogBo` inside an iframe falls back to the iframe channel.
  *
@@ -158,5 +179,5 @@ export const connect = async (
     handshakeTimeout,
     requestTimeout,
   });
-  return toClient(transport);
+  return toClient(transport, window);
 };

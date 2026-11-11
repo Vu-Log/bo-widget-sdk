@@ -42,6 +42,7 @@ Every request is async.
 | `navigate({ path })`             | `navigate`                                     | Navigates the BO: `/app/...` is a BO route under the current fleet, `details/1` is relative to the widget's view |
 | `notify({ message, severity? })` | `notify`                                       | Shows a BO snackbar: `success`, `info` (default), `warning` or `error`                                           |
 | `resize({ height })`             |                                                | Asks for a height in pixels, or `null` (iframe only)                                                             |
+| `log.warn(message, context?)`    |                                                | Sends a log to the BO, see [Logs](#logs); also `log.debug`, `log.info` and `log.error`                           |
 | `authFetch(input, init?)`        | see [Calling Vulog APIs](./calling-vulog-apis) | `fetch` with the Vulog authentication                                                                            |
 
 `getCurrentUser()` is the way to know who is connected. Never decode the token.
@@ -81,6 +82,23 @@ bo.on('localeChanged', ({ locale }) => setLocale(locale));
 
 No request gives the current route: `getContext().basename` is the path of the widget's view in the BO router, then follow `routeChanged`.
 
+## Logs
+
+```ts
+bo.log.warn('Export failed', { status: response.status });
+bo.log.error('Cannot read the vehicles', { fleetId });
+```
+
+`bo.log.debug`, `info`, `warn` and `error` take `(message, context?)`. They return nothing and never throw: the BO filters, caps and sends the logs to Vulog in batches, and the widget's administrators read them in the BO. Only `warn` and `error` are kept by default; `debug` and `info` are kept while the debug mode of the widget installation is on.
+
+- `console.log` (and the other `console` methods) is never relayed: use `bo.log`.
+- The message is a string, cut at 2048 characters. The context is copied as JSON; one bigger than 3 KB, deeper than 5 levels, circular or not serializable becomes `{ truncated: true }`.
+- The same log repeated within 10 s is sent once, then once more at the end of the 10 s with `context.repeated`, the number of repeats.
+- In an iframe, the errors nobody catches (`error` and `unhandledrejection` of the window) are sent as `error` logs, with their stack, until `disconnect`. As a Web Component, the BO catches the errors it can attribute to the widget itself.
+- **Never put personal data or secrets in a log**: the platform cannot check what the context holds.
+
+On the port, a log is the request `{ id, type: 'log', payload: { level, message, context? } }`, without permission, answered `null`. A BO without logs answers `UNKNOWN_TYPE`, which the SDK drops. In the fake back office (`bo-widget dev`), the logs show in its log panel, the browser console and the terminal of the dev server.
+
 ## `disconnect`
 
 ```ts
@@ -89,7 +107,7 @@ disconnectedCallback() {
 }
 ```
 
-`disconnect()` removes the listeners. Pending and later requests, `authFetch` included, reject with `DISCONNECTED`, in both modes. Call it when the widget is removed: in `disconnectedCallback` for a Web Component, on unmount in a framework.
+`disconnect()` removes the listeners. Pending and later requests, `authFetch` included, reject with `DISCONNECTED`, in both modes; repeated logs still counted are sent, then logs are dropped. Call it when the widget is removed: in `disconnectedCallback` for a Web Component, on unmount in a framework.
 
 `connectedCallback` can run again when the element is moved, and `disconnectedCallback` can run before `connect()` resolves. Keep the promise of `connect`, so that cleanup can wait for it:
 
