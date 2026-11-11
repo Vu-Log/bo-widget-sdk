@@ -1,5 +1,11 @@
 # @vulog/create-bo-widget
 
+## 0.1.0-next.5
+
+### Patch Changes
+
+- dbfdad8: New projects depend on the versions of `@vulog/bo-widget-sdk` and `@vulog/bo-widget-vite` that bring widget logs (`bo.log`) and their display in the fake back office.
+
 ## 0.1.0-next.4
 
 ### Patch Changes
