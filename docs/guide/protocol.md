@@ -42,6 +42,7 @@ Every request is async.
 | `navigate({ path })`             | `navigate`                                     | Navigates the BO: `/app/...` is a BO route under the current fleet, `details/1` is relative to the widget's view |
 | `notify({ message, severity? })` | `notify`                                       | Shows a BO snackbar: `success`, `info` (default), `warning` or `error`                                           |
 | `resize({ height })`             |                                                | Asks for a height in pixels, or `null` (iframe only)                                                             |
+| `log.warn(message, context?)`    |                                                | Sends a log to the BO, see [Logs](#logs); also `log.debug`, `log.info` and `log.error`                           |
 | `authFetch(input, init?)`        | see [Calling Vulog APIs](./calling-vulog-apis) | `fetch` with the Vulog authentication                                                                            |
 
 `getCurrentUser()` is the way to know who is connected. Never decode the token.
@@ -81,6 +82,24 @@ bo.on('localeChanged', ({ locale }) => setLocale(locale));
 
 No request gives the current route: `getContext().basename` is the path of the widget's view in the BO router, then follow `routeChanged`.
 
+## Logs
+
+```ts
+bo.log.warn('Export failed', { status: response.status });
+bo.log.error('Cannot read the vehicles', { fleetId });
+```
+
+`bo.log.debug`, `info`, `warn` and `error` take `(message, context?)`. They return nothing and never throw: the BO filters, caps and sends the logs to Vulog in batches, and the widget's administrators read them in the BO. Only `warn` and `error` are kept by default; `debug` and `info` are kept while the debug mode of the widget installation is on.
+
+- `console.log` (and the other `console` methods) is never relayed: use `bo.log`.
+- The message is a string, cut at 2048 characters; a blank one is sent as `(empty message)`, so that its context is kept.
+- The context is copied as JSON, and an `Error` in it keeps its `name`, `message` and stack (cut at 1500 characters) (`bo.log.error('Export failed', { error })`). A context that is not an object (an array, a string…), bigger than 3 KB, deeper than 5 levels, circular or not serializable becomes `{ truncated: true, reason }`, `reason` being `not-an-object`, `not-serializable`, `too-big` or `too-deep`.
+- The same log is sent at once, then at most once every 10 s while it repeats (and on `disconnect`), with `context.repeated`, the number of repeats since the last send. `repeated`, `truncated` and `reason` are reserved keys of the context.
+- In an iframe, the errors nobody catches (`error` and `unhandledrejection` of the window) are sent as `error` logs, with their stack, until `disconnect`. As a Web Component, the SDK captures nothing: the BO catches the errors it can attribute to the widget.
+- **Never put personal data or secrets in a log**: the platform cannot check what the context holds.
+
+On the port, a log is the request `{ id, type: 'log', payload: { level, message, context? } }`, without permission, answered `null`. A BO without logs answers `UNKNOWN_TYPE`, which the SDK drops. In the fake back office (`bo-widget dev`), the logs show in its log panel, the browser console and the terminal of the dev server.
+
 ## `disconnect`
 
 ```ts
@@ -89,7 +108,7 @@ disconnectedCallback() {
 }
 ```
 
-`disconnect()` removes the listeners. Pending and later requests, `authFetch` included, reject with `DISCONNECTED`, in both modes. Call it when the widget is removed: in `disconnectedCallback` for a Web Component, on unmount in a framework.
+`disconnect()` removes the listeners. Pending and later requests, `authFetch` included, reject with `DISCONNECTED`, in both modes; repeated logs still counted are sent, then logs are dropped. Call it when the widget is removed: in `disconnectedCallback` for a Web Component, on unmount in a framework.
 
 `connectedCallback` can run again when the element is moved, and `disconnectedCallback` can run before `connect()` resolves. Keep the promise of `connect`, so that cleanup can wait for it:
 

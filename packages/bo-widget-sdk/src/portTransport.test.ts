@@ -440,3 +440,67 @@ describe('openPortTransport: edge cases', () => {
     expect(next).not.toHaveBeenCalled();
   });
 });
+
+describe('openPortTransport: log', () => {
+  it('sends a log request with the level, message and context', async () => {
+    const requests: unknown[] = [];
+    const { target } = servingParent((request) => {
+      requests.push(request);
+      return { id: request.id, ok: true, result: null };
+    });
+    const transport = await open(options(target));
+    transport.log('warn', 'Export failed', { status: 500 });
+    transport.log('info', 'Loaded', undefined);
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests).toEqual([
+      {
+        id: '1',
+        type: 'log',
+        payload: { level: 'warn', message: 'Export failed', context: { status: 500 } },
+      },
+      { id: '2', type: 'log', payload: { level: 'info', message: 'Loaded' } },
+    ]);
+  });
+
+  it('drops the error of an older back office without log', async () => {
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    try {
+      const { target } = servingParent((request) => ({
+        id: request.id,
+        ok: false,
+        error: { code: 'UNKNOWN_TYPE', message: 'Unknown request log' },
+      }));
+      const transport = await open(options(target));
+      const answered = transport.getContext().catch(() => null);
+      transport.log('error', 'boom', undefined);
+      await answered;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off('unhandledRejection', unhandled);
+    }
+  });
+
+  it('drops a log left without answer when the channel closes, and logs nothing once closed', async () => {
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    try {
+      const requests: unknown[] = [];
+      const { target } = servingParent((request) => {
+        requests.push(request);
+        return undefined;
+      });
+      const transport = await open(options(target));
+      transport.log('error', 'pending', undefined);
+      await vi.waitFor(() => expect(requests).toHaveLength(1));
+      transport.close();
+      transport.log('error', 'late', undefined);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(requests).toHaveLength(1);
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off('unhandledRejection', unhandled);
+    }
+  });
+});

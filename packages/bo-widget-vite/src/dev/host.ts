@@ -16,6 +16,7 @@ import type {
   BoCurrentUser,
   BoEventMap,
   BoEventName,
+  BoLogLevel,
   BoNavigatePayload,
   BoNotifyPayload,
   BoNotifySeverity,
@@ -71,7 +72,32 @@ export interface FakeBoUi {
    */
   navigate(route: string, inView: boolean): void;
   resize(height: number | null): void;
+  /** Shows a log of the widget (`bo.log`, or an uncaught error the SDK sent). */
+  widgetLog(entry: WidgetLogEntry): void;
 }
+
+/** A log of the widget, as the fake back office receives it. */
+export interface WidgetLogEntry {
+  readonly level: BoLogLevel;
+  readonly message: string;
+  /**
+   * As the widget sent it: the SDK sends a plain object, but a widget calling `vulogBo.log`
+   * itself may pass anything, which the back office accepts too.
+   */
+  readonly context?: unknown;
+}
+
+/**
+ * Shows a log of the widget in the terminal of the dev server: the page sends it on the Vite HMR
+ * channel, under {@link WIDGET_LOG_EVENT}.
+ */
+export type WidgetLogTerminal = (entry: WidgetLogEntry) => void;
+
+/** Name of the Vite HMR event a widget log is sent to the dev server with. */
+export const WIDGET_LOG_EVENT = 'bo-widget:log';
+
+/** Levels a widget log may have, as the back office accepts them. */
+export const WIDGET_LOG_LEVELS: readonly BoLogLevel[] = ['debug', 'info', 'warn', 'error'];
 
 /** Codes of the errors the back office API throws, which the SDK turns into `reason`. */
 export type WidgetHostErrorCode = 'invalid-payload' | 'no-token';
@@ -100,7 +126,8 @@ type HandlerName =
   | 'getTheme'
   | 'navigate'
   | 'notify'
-  | 'resize';
+  | 'resize'
+  | 'log';
 
 /** Permission each request needs; the others are always served. */
 const REQUIRED_PERMISSION: Partial<Record<HandlerName, WidgetPermission>> = {
@@ -233,6 +260,25 @@ const forLog = (value: unknown): string => {
 };
 
 /**
+ * Reads a `log` request like the back office does: `{ level, message, context? }`.
+ *
+ * @throws {WidgetHostError} `invalid-payload` when `level` is unknown or `message` is not a
+ * non-blank string.
+ */
+export const parseWidgetLog = (payload: unknown): WidgetLogEntry => {
+  const { level, message, context } = (isRecord(payload) ? payload : {}) as Partial<WidgetLogEntry>;
+  if (!WIDGET_LOG_LEVELS.includes(level as BoLogLevel)) {
+    throw invalidPayload(`log: level must be one of ${WIDGET_LOG_LEVELS.join(', ')}`);
+  }
+  if (typeof message !== 'string' || !message.trim()) {
+    throw invalidPayload('log: message must be a non-blank string');
+  }
+  return context === undefined
+    ? { level: level as BoLogLevel, message }
+    : { level: level as BoLogLevel, message, context };
+};
+
+/**
  * The state and the requests of the fake back office, without the page around it.
  *
  * @param config - Fixtures and widget identity from the dev server.
@@ -296,6 +342,10 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
       ui.resize(height);
       return { height };
     },
+    log: (payload) => {
+      ui.widgetLog(parseWidgetLog(payload));
+      return null;
+    },
   };
 
   const missingPermission = (type: HandlerName): WidgetPermission | null => {
@@ -324,7 +374,7 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
    */
   const createHostApi = () => {
     const call =
-      (type: Exclude<HandlerName, 'resize'>) =>
+      (type: Exclude<HandlerName, 'resize' | 'log'>) =>
       async (payload?: unknown): Promise<unknown> => {
         const permission = missingPermission(type);
         if (permission) {
@@ -342,8 +392,25 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
           throw error;
         }
       };
+    /** `vulogBo.log`: never throws nor waits, like the back office. */
+    const log: Readonly<Record<BoLogLevel, (message: unknown, context?: unknown) => void>> =
+      Object.freeze(
+        Object.fromEntries(
+          WIDGET_LOG_LEVELS.map((level) => [
+            level,
+            (message: unknown, context?: unknown) => {
+              try {
+                handlers.log({ level, message, context });
+              } catch (error) {
+                ui.log(`log refused: ${(error as Error).message}`, 'warning');
+              }
+            },
+          ]),
+        ) as Record<BoLogLevel, (message: unknown, context?: unknown) => void>,
+      );
     return Object.freeze({
       protocolVersion: config.protocolVersion,
+      log,
       getContext: call('getContext'),
       getCurrentUser: call('getCurrentUser'),
       getSettings: call('getSettings'),
@@ -415,10 +482,12 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
         return;
       }
       const response = await answer(message.type, message.payload);
-      ui.log(
-        `${String(message.type)} → ${forLog(response.ok ? response.result : response.error)}`,
-        response.ok ? 'info' : 'error',
-      );
+      // A log is already shown by `widgetLog`; only its refusal is worth a line.
+      if (message.type !== 'log' || !response.ok)
+        ui.log(
+          `${String(message.type)} → ${forLog(response.ok ? response.result : response.error)}`,
+          response.ok ? 'info' : 'error',
+        );
       if (ports.has(port)) port.postMessage({ id: message.id, ...response });
     };
     port.onmessageerror = () => ui.log('a message from the widget could not be read', 'error');
@@ -492,8 +561,26 @@ const element = <K extends keyof HTMLElementTagNameMap>(
   props: Partial<HTMLElementTagNameMap[K]> = {},
 ): HTMLElementTagNameMap[K] => Object.assign(document.createElement(tag), props);
 
-/** Builds the page of the fake back office (bar, content zone, log, snackbars) and returns its parts. */
-const createPage = (config: FakeBoConfig) => {
+/** Class of a widget log line in the log panel. */
+const LOG_LINE_CLASS: Record<BoLogLevel, 'info' | 'warning' | 'error'> = {
+  debug: 'info',
+  info: 'info',
+  warn: 'warning',
+  error: 'error',
+};
+
+/** A widget log as one line: `widget warn: message {"status":500}`. */
+export const formatWidgetLog = ({ level, message, context }: WidgetLogEntry): string =>
+  context === undefined
+    ? `widget ${level}: ${message}`
+    : `widget ${level}: ${message} ${forLog(context)}`;
+
+/**
+ * Builds the page of the fake back office (bar, content zone, log, snackbars) and returns its parts.
+ *
+ * @param terminal - Shows the widget logs in the terminal of the dev server too.
+ */
+const createPage = (config: FakeBoConfig, terminal?: WidgetLogTerminal) => {
   document.title = `${config.widget.name} · fake back office`;
   document.head.append(element('style', { textContent: STYLES }));
 
@@ -549,6 +636,18 @@ const createPage = (config: FakeBoConfig) => {
     resize(height) {
       const frame = content.querySelector('iframe');
       if (frame) frame.style.height = height === null ? '100%' : `${height}px`;
+    },
+    widgetLog(entry) {
+      ui.log(formatWidgetLog(entry), LOG_LINE_CLASS[entry.level]);
+      const args = entry.context === undefined ? [] : [entry.context];
+      // The message is not a format string: a `%c` of the widget must not eat the context.
+      console[entry.level]('[widget] %s', entry.message, ...args);
+      try {
+        terminal?.(entry);
+      } catch (error) {
+        // The HMR channel is closed (dev server stopped): the page and the console still show it.
+        console.warn('[bo-widget] cannot show the log in the terminal', error);
+      }
     },
   };
   /** Shows an error in the content zone and the log. */
@@ -703,10 +802,15 @@ const startWebComponent = async (
  * @param config - Fixtures and widget identity from the dev server.
  * @param load - Loads the widget entry, whose default export is the element class (Web Component
  * only).
+ * @param terminal - Shows the widget logs in the terminal of the dev server too.
  * @returns Once the widget is displayed, or its error shown.
  */
-export const startFakeBo = async (config: FakeBoConfig, load?: WidgetLoader): Promise<void> => {
-  const page = createPage(config);
+export const startFakeBo = async (
+  config: FakeBoConfig,
+  load?: WidgetLoader,
+  terminal?: WidgetLogTerminal,
+): Promise<void> => {
+  const page = createPage(config, terminal);
   const backOffice = createFakeBackOffice(config, page.ui);
   page.locale.addEventListener('change', () => backOffice.setLocale(page.locale.value));
   page.theme.addEventListener('click', () => {

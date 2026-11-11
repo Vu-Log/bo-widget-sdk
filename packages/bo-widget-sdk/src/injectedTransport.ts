@@ -2,6 +2,8 @@ import { BoError, fromHostError } from './errors.js';
 import {
   PROTOCOL_VERSION,
   type BoEventListener,
+  type BoLogContext,
+  type BoLogLevel,
   type BoEventName,
   type BoRequests,
   type BoTransport,
@@ -10,10 +12,13 @@ import {
 /**
  * API the back office injects into a Web Component as `element.vulogBo`, before inserting it. It
  * has no `resize`: a Web Component already fills the content zone. A request an older back office
- * does not serve is missing: it rejects with `UNKNOWN_TYPE`.
+ * does not serve is missing: it rejects with `UNKNOWN_TYPE`. Without `log` (older back office), logs
+ * are dropped.
  */
 export interface InjectedHostApi extends Partial<Omit<BoRequests, 'resize'>> {
   readonly protocolVersion?: number;
+  /** One method per level, which never waits: the back office filters, caps and sends in batches. */
+  readonly log?: Partial<Record<BoLogLevel, (message: string, context?: BoLogContext) => void>>;
   on(name: string, listener: (data: unknown) => void): void;
   off(name: string, listener: (data: unknown) => void): void;
 }
@@ -41,14 +46,21 @@ export const isInjectedHostApi = (value: unknown): value is InjectedHostApi => {
   );
 };
 
+/** Rethrows `error` outside the current call stack, so that the widget's code goes on. */
+const reportLater = (error: unknown): void => {
+  queueMicrotask(() => {
+    throw error;
+  });
+};
+
 const disconnected = (request: string): BoError =>
   new BoError('DISCONNECTED', `${request}: the connection to the back office is closed`);
 
 /**
  * Wraps the API injected into a Web Component as a transport, with the behavior of the port: same
  * requests, errors converted to `BoError`, `resize` answered `{ height: null }`, a listener added
- * twice called once, and after `close` pending and new requests reject with `DISCONNECTED` and no
- * event is delivered.
+ * twice called once, and after `close` pending and new requests reject with `DISCONNECTED`, no
+ * event is delivered and logs are dropped.
  */
 export const createInjectedTransport = (hostApi: InjectedHostApi): BoTransport => {
   // Listeners added through this transport, so that `close` removes them from the host API.
@@ -104,6 +116,17 @@ export const createInjectedTransport = (hostApi: InjectedHostApi): BoTransport =
       if (!listeners.get(name)?.delete(listener as Listener)) return;
       hostApi.off(name, listener as Listener);
     },
+    log(level, message, context) {
+      if (closed) return;
+      const method = hostApi.log?.[level];
+      if (typeof method !== 'function') return;
+      try {
+        method.call(hostApi.log, message, context);
+      } catch (error) {
+        // A back office bug: logging must not break the widget.
+        reportLater(error);
+      }
+    },
     close() {
       if (closed) return;
       closed = true;
@@ -115,9 +138,7 @@ export const createInjectedTransport = (hostApi: InjectedHostApi): BoTransport =
           try {
             hostApi.off(name, listener);
           } catch (error) {
-            queueMicrotask(() => {
-              throw error;
-            });
+            reportLater(error);
           }
         }
       }

@@ -7,7 +7,13 @@ import type { WidgetManifest } from '@vulog/bo-widget-sdk/manifest';
 import type { Logger, ViteDevServer } from 'vite';
 import { fetchBoApi, fetchFailure, fetchFailureCode, parseBoHost } from './boConf.js';
 import { jwtExpiresAt } from './jwt.js';
-import type { FakeBoAuth, FakeBoConfig } from './host.js';
+import {
+  WIDGET_LOG_EVENT,
+  WIDGET_LOG_LEVELS,
+  type FakeBoAuth,
+  type FakeBoConfig,
+  type WidgetLogEntry,
+} from './host.js';
 import type { TokenSource } from './login/session.js';
 import type { FakeBoMode, WidgetDevOptions } from './options.js';
 
@@ -325,7 +331,8 @@ const pageAuth = (resolved: ResolvedDevMode): FakeBoAuth => {
 
 /**
  * Source of the module that starts the fake back office. The widget entry is imported lazily, so
- * that the page is up to show an error thrown while the entry loads.
+ * that the page is up to show an error thrown while the entry loads. The widget logs are sent to
+ * the dev server on the HMR channel, to show them in the terminal.
  */
 export const fakeBoModule = (
   hostModule: string,
@@ -334,7 +341,8 @@ export const fakeBoModule = (
 ): string =>
   [
     `import { startFakeBo } from ${JSON.stringify(hostModule)};`,
-    `startFakeBo(${JSON.stringify(config)}${entry ? `, () => import(${JSON.stringify(entry)})` : ''}).catch((error) => {`,
+    `const terminal = (entry) => import.meta.hot?.send(${JSON.stringify(WIDGET_LOG_EVENT)}, entry);`,
+    `startFakeBo(${JSON.stringify(config)}, ${entry ? `() => import(${JSON.stringify(entry)})` : 'undefined'}, terminal).catch((error) => {`,
     '  console.error(error);',
     '  document.body.textContent = `Fake back office failed to start: ${error}`;',
     '});',
@@ -352,6 +360,46 @@ const FAKE_BO_HTML = `<!doctype html>
   </body>
 </html>
 `;
+
+/** Longest widget log line printed in the terminal. */
+export const MAX_TERMINAL_LOG_LENGTH = 4000;
+
+/**
+ * Control characters, ANSI escape sequences included: a widget must not drive the terminal
+ * (colors, cursor moves, a fake prompt). Line feeds (`\n`) are kept; `\r` and tabs are removed.
+ */
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARACTERS = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g;
+
+/**
+ * Prints a widget log the page sent on the HMR channel, as `[bo-widget] widget warn: …`, with the
+ * logger of Vite: `warn` and `error` at their level, `debug` and `info` as `info`. A message that
+ * is not a widget log (another page of localhost may send anything on the channel) is ignored.
+ *
+ * @param logger - Logger of the Vite dev server.
+ * @param data - What the page sent.
+ */
+export const printWidgetLog = (logger: Logger, data: unknown): void => {
+  if (typeof data !== 'object' || data === null) return;
+  const { level, message, context } = data as Partial<WidgetLogEntry>;
+  if (!WIDGET_LOG_LEVELS.includes(level as WidgetLogEntry['level'])) return;
+  if (typeof message !== 'string') return;
+  let details = '';
+  if (context !== undefined) {
+    try {
+      details = ` ${JSON.stringify(context)}`;
+    } catch {
+      details = ' [context not serializable]';
+    }
+  }
+  let line = `${message}${details}`.replace(CONTROL_CHARACTERS, '');
+  if (line.length > MAX_TERMINAL_LOG_LENGTH)
+    line = `${line.slice(0, MAX_TERMINAL_LOG_LENGTH - 1)}…`;
+  const text = `[bo-widget] widget ${String(level)}: ${line}`;
+  if (level === 'error') logger.error(text, { timestamp: true });
+  else if (level === 'warn') logger.warn(text, { timestamp: true });
+  else logger.info(text, { timestamp: true });
+};
 
 const sendJson = (res: ServerResponse, status: number, body: unknown): void => {
   res.statusCode = status;
@@ -752,6 +800,7 @@ export const installFakeBo = (server: ViteDevServer, options: FakeBoServerOption
       );
     }
   }
+  server.ws.on(WIDGET_LOG_EVENT, (data: unknown) => printWidgetLog(logger, data));
   const warned = new Set<string>();
   /** Logs a warning the first time only, so that a polling widget does not flood the terminal. */
   const warnOnce = (key: string, message: string): void => {
