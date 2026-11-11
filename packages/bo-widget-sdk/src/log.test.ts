@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MAX_ERROR_STACK_LENGTH } from './errorCapture.js';
 import {
+  EMPTY_LOG_MESSAGE,
   LOG_REPEAT_WINDOW_MS,
   MAX_LOG_CONTEXT_BYTES,
   MAX_LOG_MESSAGE_LENGTH,
@@ -7,6 +9,7 @@ import {
   createLogger,
   toLogContext,
   toLogMessage,
+  UNPRINTABLE_LOG_MESSAGE,
 } from './log.js';
 import type { BoLogContext, BoLogLevel } from './types.js';
 
@@ -20,20 +23,20 @@ describe('toLogMessage', () => {
     expect(toLogMessage(new Error('boom'))).toBe('Error: boom');
   });
 
-  it('ignores a blank message', () => {
-    expect(toLogMessage('')).toBeNull();
-    expect(toLogMessage('  \n')).toBeNull();
+  it('replaces a blank message, so that its context is kept', () => {
+    expect(toLogMessage('')).toBe(EMPTY_LOG_MESSAGE);
+    expect(toLogMessage('  \n')).toBe(EMPTY_LOG_MESSAGE);
   });
 
-  it('ignores a value that cannot be turned into a string', () => {
-    expect(toLogMessage(Object.create(null))).toBeNull();
+  it('replaces a value that cannot be turned into a string', () => {
+    expect(toLogMessage(Object.create(null))).toBe(UNPRINTABLE_LOG_MESSAGE);
     expect(
       toLogMessage({
         toString() {
           throw new Error('no');
         },
       }),
-    ).toBeNull();
+    ).toBe(UNPRINTABLE_LOG_MESSAGE);
   });
 
   it('cuts a message longer than the limit, with an ellipsis', () => {
@@ -70,45 +73,75 @@ describe('toLogContext', () => {
   });
 
   it('truncates a context bigger than the limit', () => {
-    expect(toLogContext({ data: 'x'.repeat(MAX_LOG_CONTEXT_BYTES) })).toEqual({ truncated: true });
+    expect(toLogContext({ data: 'x'.repeat(MAX_LOG_CONTEXT_BYTES) })).toEqual({
+      truncated: true,
+      reason: 'too-big',
+    });
   });
 
   it('counts the bytes, not the characters', () => {
     // 3 bytes each in UTF-8: fewer characters than the limit, more bytes.
     expect(toLogContext({ data: '€'.repeat(MAX_LOG_CONTEXT_BYTES / 2) })).toEqual({
       truncated: true,
+      reason: 'too-big',
     });
   });
 
   it('keeps a context of 5 levels and truncates a deeper one', () => {
     const five = { a: { b: { c: { d: { e: 1 } } } } };
     expect(toLogContext(five)).toEqual(five);
-    expect(toLogContext({ a: { b: { c: { d: { e: { f: 1 } } } } } })).toEqual({ truncated: true });
+    expect(toLogContext({ a: { b: { c: { d: { e: { f: 1 } } } } } })).toEqual({
+      truncated: true,
+      reason: 'too-deep',
+    });
   });
 
   it('truncates a circular context', () => {
     const context: Record<string, unknown> = {};
     context.self = context;
-    expect(toLogContext(context)).toEqual({ truncated: true });
+    expect(toLogContext(context)).toEqual({ truncated: true, reason: 'not-serializable' });
   });
 
   it('truncates a context JSON cannot serialize', () => {
-    expect(toLogContext({ big: 1n })).toEqual({ truncated: true });
+    const notSerializable = { truncated: true, reason: 'not-serializable' };
+    expect(toLogContext({ big: 1n })).toEqual(notSerializable);
     expect(
       toLogContext({
         toJSON() {
           throw new Error('no');
         },
       }),
-    ).toEqual({ truncated: true });
-    expect(toLogContext({ toJSON: () => undefined })).toEqual({ truncated: true });
-    expect(toLogContext({ toJSON: () => 'text' })).toEqual({ truncated: true });
+    ).toEqual(notSerializable);
   });
 
-  it('truncates a context that is not an object', () => {
-    expect(toLogContext('text')).toEqual({ truncated: true });
-    expect(toLogContext(42)).toEqual({ truncated: true });
-    expect(toLogContext([1, 2])).toEqual({ truncated: true });
+  it('truncates a context that is not a plain object, even after its toJSON', () => {
+    const notAnObject = { truncated: true, reason: 'not-an-object' };
+    expect(toLogContext('text')).toEqual(notAnObject);
+    expect(toLogContext(42)).toEqual(notAnObject);
+    expect(toLogContext([1, 2])).toEqual(notAnObject);
+    expect(toLogContext({ toJSON: () => undefined })).toEqual(notAnObject);
+    expect(toLogContext({ toJSON: () => 'text' })).toEqual(notAnObject);
+  });
+
+  it('keeps the name, message and stack of an Error, which JSON would empty', () => {
+    const error = new TypeError('x is undefined');
+    expect(toLogContext({ error, status: 500 })).toEqual({
+      error: { name: 'TypeError', message: 'x is undefined', stack: error.stack },
+      status: 500,
+    });
+  });
+
+  it('takes an Error given as the context itself', () => {
+    const error = new Error('boom');
+    expect(toLogContext(error)).toEqual({ name: 'Error', message: 'boom', stack: error.stack });
+  });
+
+  it('cuts the stack of an Error in the context', () => {
+    const error = new Error('deep');
+    error.stack = 'x'.repeat(MAX_ERROR_STACK_LENGTH * 2);
+    const stack = (toLogContext({ error })?.error as { stack: string }).stack;
+    expect(stack).toHaveLength(MAX_ERROR_STACK_LENGTH);
+    expect(stack.endsWith('…')).toBe(true);
   });
 });
 
@@ -154,20 +187,23 @@ describe('createLogger', () => {
     circular.self = circular;
     expect(() => api.error(Object.create(null) as string)).not.toThrow();
     expect(() => api.error('circular', circular)).not.toThrow();
-    expect(sent).toEqual([['error', 'circular', { truncated: true }]]);
+    expect(sent).toEqual([
+      ['error', UNPRINTABLE_LOG_MESSAGE, undefined],
+      ['error', 'circular', { truncated: true, reason: 'not-serializable' }],
+    ]);
   });
 
-  it('ignores a blank message', () => {
+  it('sends a blank message with its context', () => {
     const { api } = createLogger(send);
-    api.warn('   ');
-    expect(sent).toEqual([]);
+    api.error('', { stack: 'at main.ts:1' });
+    expect(sent).toEqual([['error', EMPTY_LOG_MESSAGE, { stack: 'at main.ts:1' }]]);
   });
 
   it('caps the message and the context it sends', () => {
     const { api } = createLogger(send);
     api.warn('x'.repeat(MAX_LOG_MESSAGE_LENGTH + 1), { data: 'x'.repeat(MAX_LOG_CONTEXT_BYTES) });
     expect(sent[0]?.[1]).toHaveLength(MAX_LOG_MESSAGE_LENGTH);
-    expect(sent[0]?.[2]).toEqual({ truncated: true });
+    expect(sent[0]?.[2]).toEqual({ truncated: true, reason: 'too-big' });
   });
 
   it('groups the repeats of a log and sends their count at the end of the window', () => {

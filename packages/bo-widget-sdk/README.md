@@ -110,7 +110,7 @@ A relative path is resolved under `baseUrl`, leading `/` ignored; one that resol
 bo.log.warn('Export failed', { status: response.status });
 ```
 
-`bo.log.debug`, `info`, `warn` and `error` return nothing and never throw. The BO keeps `warn` and `error`, and `debug` and `info` while the debug mode of the installation is on. `console.log` is never relayed. The message is cut at 2048 characters; a context bigger than 3 KB as JSON, deeper than 5 levels or not serializable becomes `{ truncated: true }`; the same log repeated within 10 s is sent once, then with `context.repeated`. In an iframe, uncaught errors and unhandled rejections are sent as `error` logs. Never log personal data or secrets.
+`bo.log.debug`, `info`, `warn` and `error` return nothing and never throw. The BO keeps `warn` and `error`, and `debug` and `info` while the debug mode of the installation is on. `console.log` is never relayed. The message is cut at 2048 characters; an `Error` in the context keeps its name, message and stack; a context bigger than 3 KB as JSON, deeper than 5 levels or not serializable becomes `{ truncated: true, reason }`; a repeated log is sent at once, then at most once every 10 s with `context.repeated`. In an iframe, uncaught errors and unhandled rejections are sent as `error` logs. Never log personal data or secrets.
 
 ### Errors
 

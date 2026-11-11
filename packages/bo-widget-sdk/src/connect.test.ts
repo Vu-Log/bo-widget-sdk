@@ -485,12 +485,26 @@ describe('connect: logs', () => {
     expect(backOffice.logs).toHaveLength(2);
   });
 
+  it('sends the counted repeats on disconnect in an iframe too', async () => {
+    const backOffice = fakeBackOffice();
+    vi.stubGlobal('window', iframeWindow(backOffice));
+    const bo = await connect();
+    for (let i = 0; i < 3; i += 1) bo.log.warn('Retrying');
+    bo.disconnect();
+    await vi.waitFor(() =>
+      expect(backOffice.logs).toEqual([
+        { level: 'warn', message: 'Retrying' },
+        { level: 'warn', message: 'Retrying', context: { repeated: 2 } },
+      ]),
+    );
+  });
+
   it('truncates a context too big', async () => {
     const backOffice = fakeBackOffice();
     const bo = await connect({ vulogBo: backOffice.hostApi });
     bo.log.error('Big', { dump: 'x'.repeat(10_000) });
     expect(backOffice.logs).toEqual([
-      { level: 'error', message: 'Big', context: { truncated: true } },
+      { level: 'error', message: 'Big', context: { truncated: true, reason: 'too-big' } },
     ]);
     bo.disconnect();
   });

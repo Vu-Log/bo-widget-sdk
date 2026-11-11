@@ -92,9 +92,10 @@ bo.log.error('Cannot read the vehicles', { fleetId });
 `bo.log.debug`, `info`, `warn` and `error` take `(message, context?)`. They return nothing and never throw: the BO filters, caps and sends the logs to Vulog in batches, and the widget's administrators read them in the BO. Only `warn` and `error` are kept by default; `debug` and `info` are kept while the debug mode of the widget installation is on.
 
 - `console.log` (and the other `console` methods) is never relayed: use `bo.log`.
-- The message is a string, cut at 2048 characters. The context is copied as JSON; one bigger than 3 KB, deeper than 5 levels, circular or not serializable becomes `{ truncated: true }`.
-- The same log repeated within 10 s is sent once, then once more at the end of the 10 s with `context.repeated`, the number of repeats.
-- In an iframe, the errors nobody catches (`error` and `unhandledrejection` of the window) are sent as `error` logs, with their stack, until `disconnect`. As a Web Component, the BO catches the errors it can attribute to the widget itself.
+- The message is a string, cut at 2048 characters; a blank one is sent as `(empty message)`, so that its context is kept.
+- The context is copied as JSON, and an `Error` in it keeps its `name`, `message` and stack (`bo.log.error('Export failed', { error })`). A context that is not a plain object, bigger than 3 KB, deeper than 5 levels, circular or not serializable becomes `{ truncated: true, reason }`, `reason` being `not-an-object`, `not-serializable`, `too-big` or `too-deep`.
+- The same log is sent at once, then at most once every 10 s while it repeats, with `context.repeated`, the number of repeats since the last send. `repeated`, `truncated` and `reason` are reserved keys of the context.
+- In an iframe, the errors nobody catches (`error` and `unhandledrejection` of the window) are sent as `error` logs, with their stack, until `disconnect`. As a Web Component, the SDK captures nothing: the BO catches the errors it can attribute to the widget.
 - **Never put personal data or secrets in a log**: the platform cannot check what the context holds.
 
 On the port, a log is the request `{ id, type: 'log', payload: { level, message, context? } }`, without permission, answered `null`. A BO without logs answers `UNKNOWN_TYPE`, which the SDK drops. In the fake back office (`bo-widget dev`), the logs show in its log panel, the browser console and the terminal of the dev server.

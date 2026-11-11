@@ -102,7 +102,12 @@ export type BoLogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 /**
  * Free data attached to a log. Copied as JSON when the log is taken: what JSON drops (functions,
- * `undefined`) is dropped, a `Date` becomes its ISO string. Never put personal data in it.
+ * `undefined`) is dropped, a `Date` becomes its ISO string, an `Error` keeps its `name`,
+ * `message` and stack. Never put personal data in it.
+ *
+ * Reserved keys, set by the SDK: `repeated` (number of repeats a log stands for) and `truncated`
+ * with `reason` (the context was replaced). A widget's own `repeated` key is overwritten on a
+ * repeat log.
  */
 export type BoLogContext = Record<string, unknown>;
 
@@ -230,14 +235,16 @@ export interface BoClient extends BoRequests {
   /**
    * Logs of the widget, relayed to the back office: `bo.log.warn('Export failed', { status })`.
    *
-   * - The message is turned into a string; a blank one is ignored, a longer one than 2048
-   *   characters is cut with `…`.
-   * - The context is copied as JSON. One bigger than 3 KB once serialized, deeper than 5 levels,
-   *   circular or not serializable is replaced by `{ truncated: true }`.
-   * - The same log (level, message and context) repeated within 10 s is sent once, then once more
-   *   at the end of the 10 s with `context.repeated`, the number of repeats it stands for.
+   * - The message is turned into a string, cut at 2048 characters with `…`; a blank one is sent
+   *   as `(empty message)`, so that its context is kept.
+   * - The context is copied as JSON. One that is not a plain object, bigger than 3 KB once
+   *   serialized, deeper than 5 levels, circular or not serializable is replaced by
+   *   `{ truncated: true, reason }`.
+   * - The same log (level, message and context) is sent at once, then at most once every 10 s
+   *   while it repeats, with `context.repeated`, the number of repeats since the last send.
    * - In an iframe, errors nobody catches (`error` and `unhandledrejection` of the window) are
-   *   sent as `error` logs too. As a Web Component, the back office catches them itself.
+   *   sent as `error` logs too. As a Web Component, the SDK captures nothing: the back office
+   *   catches the errors it can attribute to the widget.
    *
    * After `disconnect`, logs are dropped.
    */

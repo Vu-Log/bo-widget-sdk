@@ -86,15 +86,15 @@ const widgetClass = () => {
  * Connects the real SDK as an iframe to a fake back office: the `hello` the SDK posts to its
  * parent is served by `servePort`.
  */
-const connectIframe = async (config: FakeBoConfig, ui = fakeUi()) => {
+const connectIframe = async (config: FakeBoConfig, ui = fakeUi(), view?: EventTarget) => {
   const backOffice = createFakeBackOffice(config, ui);
-  vi.stubGlobal('window', {
-    parent: {
-      postMessage: (_message: unknown, _origin: string, [port]: MessagePort[]) => {
-        if (port) backOffice.servePort(port);
-      },
+  const parent = {
+    postMessage: (_message: unknown, _origin: string, [port]: MessagePort[]) => {
+      if (port) backOffice.servePort(port);
     },
-  });
+  };
+  // `view`: the window of the iframe, whose uncaught errors the SDK captures.
+  vi.stubGlobal('window', view ? Object.assign(view, { parent }) : { parent });
   try {
     return {
       client: await connect(undefined, { handshakeTimeout: 1000, requestTimeout: 1000 }),
@@ -993,7 +993,7 @@ describe('widget logs', () => {
 
     const line = document.querySelector('.bo-log .warning:last-child');
     expect(line?.textContent).toBe('widget warn: Export failed {"status":500}');
-    expect(warn).toHaveBeenCalledWith('[widget] Export failed', { status: 500 });
+    expect(warn).toHaveBeenCalledWith('[widget] %s', 'Export failed', { status: 500 });
     expect(terminal).toHaveBeenCalledWith({
       level: 'warn',
       message: 'Export failed',
@@ -1059,6 +1059,45 @@ describe('widget logs', () => {
     );
     await flush();
     expect(ui.log).not.toHaveBeenCalledWith(expect.stringMatching(/^log →/), expect.anything());
+    client.disconnect();
+  });
+
+  it('shows the uncaught errors of an iframe, sent by the SDK without code of the widget', async () => {
+    const view = new EventTarget();
+    const { client, ui } = await connectIframe(fakeConfig({ runtime: 'iframe' }), fakeUi(), view);
+
+    const error = new TypeError('x is undefined');
+    view.dispatchEvent(
+      Object.assign(new Event('error'), {
+        error,
+        message: 'Uncaught TypeError: x is undefined',
+        filename: 'http://localhost/src/main.ts',
+        lineno: 4,
+        colno: 2,
+      }),
+    );
+    view.dispatchEvent(
+      Object.assign(new Event('unhandledrejection'), { reason: new Error('fetch failed') }),
+    );
+
+    await vi.waitFor(() => expect(ui.widgetLog).toHaveBeenCalledTimes(2));
+    expect(ui.widgetLog).toHaveBeenNthCalledWith(1, {
+      level: 'error',
+      message: 'Uncaught TypeError: x is undefined',
+      context: {
+        name: 'TypeError',
+        stack: error.stack,
+        filename: 'http://localhost/src/main.ts',
+        lineno: 4,
+        colno: 2,
+      },
+    });
+    expect(ui.widgetLog).toHaveBeenNthCalledWith(2, {
+      level: 'error',
+      message: 'Unhandled rejection: Error: fetch failed',
+      context: expect.objectContaining({ name: 'Error' }),
+    });
+    expect(ui.log).not.toHaveBeenCalledWith(expect.stringMatching(/^log → /), 'error');
     client.disconnect();
   });
 

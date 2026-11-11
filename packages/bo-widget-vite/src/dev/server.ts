@@ -366,7 +366,7 @@ export const MAX_TERMINAL_LOG_LENGTH = 4000;
 
 /**
  * Control characters, ANSI escape sequences included: a widget must not drive the terminal
- * (colors, cursor moves, a fake prompt). Line breaks are kept.
+ * (colors, cursor moves, a fake prompt). Line feeds (`\n`) are kept; `\r` and tabs are removed.
  */
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARACTERS = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g;

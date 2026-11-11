@@ -1,3 +1,4 @@
+import { MAX_ERROR_STACK_LENGTH } from './errorCapture.js';
 import type { BoLogContext, BoLogger, BoLogLevel } from './types.js';
 
 /** Longest message sent, in UTF-16 code units (the back office cuts at the same length). */
@@ -18,8 +19,20 @@ export const LOG_REPEAT_WINDOW_MS = 10_000;
 /** Distinct logs followed for repeats at the same time; the oldest is closed beyond. */
 export const MAX_LOG_REPEAT_KEYS = 100;
 
-/** What a context too big, too deep or not serializable is replaced with. */
-const TRUNCATED_CONTEXT: BoLogContext = Object.freeze({ truncated: true });
+/** Message sent instead of a blank one, so that its context is not lost. */
+export const EMPTY_LOG_MESSAGE = '(empty message)';
+
+/** Message sent instead of one that cannot be turned into a string. */
+export const UNPRINTABLE_LOG_MESSAGE = '(unprintable message)';
+
+/** Why a context was replaced by `{ truncated: true, reason }`. */
+export type TruncatedReason = 'not-an-object' | 'not-serializable' | 'too-big' | 'too-deep';
+
+const truncated = (reason: TruncatedReason): BoLogContext => ({ truncated: true, reason });
+
+/** Cuts `text` to `max` UTF-16 code units, the last one being `…`. */
+const cut = (text: string, max: number): string =>
+  text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
 /** The function a logger sends its logs with: the transport's `log`. */
 export type LogSender = (
@@ -29,22 +42,35 @@ export type LogSender = (
 ) => void;
 
 /**
- * The message of a log, as sent: a string, cut to {@link MAX_LOG_MESSAGE_LENGTH} with `…`.
- *
- * @returns `null` for a blank message, or one that cannot be turned into a string.
+ * The message of a log, as sent: a string, cut to {@link MAX_LOG_MESSAGE_LENGTH} with `…`. A
+ * blank message becomes {@link EMPTY_LOG_MESSAGE}, and one that cannot be turned into a string
+ * {@link UNPRINTABLE_LOG_MESSAGE}: the log and its context are still sent.
  */
-export const toLogMessage = (message: unknown): string | null => {
+export const toLogMessage = (message: unknown): string => {
   let text: string;
   try {
     text = String(message);
   } catch {
     // An object without `toString` (`Object.create(null)`), or whose `toString` throws.
-    return null;
+    return UNPRINTABLE_LOG_MESSAGE;
   }
-  if (!text.trim()) return null;
-  return text.length > MAX_LOG_MESSAGE_LENGTH
-    ? `${text.slice(0, MAX_LOG_MESSAGE_LENGTH - 1)}…`
-    : text;
+  if (!text.trim()) return EMPTY_LOG_MESSAGE;
+  return cut(text, MAX_LOG_MESSAGE_LENGTH);
+};
+
+const isError = (value: unknown): value is Error =>
+  Object.prototype.toString.call(value) === '[object Error]';
+
+/**
+ * Replacer of the context JSON: drops `__proto__` keys, and keeps the `name`, `message` and
+ * stack (cut) of an `Error`, which JSON would turn into `{}`.
+ */
+const contextReplacer = (key: string, value: unknown): unknown => {
+  if (key === '__proto__') return undefined;
+  if (!isError(value)) return value;
+  const stack =
+    typeof value.stack === 'string' ? cut(value.stack, MAX_ERROR_STACK_LENGTH) : undefined;
+  return { name: value.name, message: value.message, stack };
 };
 
 const depthOf = (value: unknown): number => {
@@ -59,30 +85,31 @@ const isPlainContext = (value: unknown): value is BoLogContext =>
 
 /**
  * The context of a log, as sent: a JSON copy, which can be posted on a port and that the widget
- * can no longer change.
+ * can no longer change. An `Error`, in it or as the context itself, keeps its `name`, `message`
+ * and stack. Keys named
+ * `__proto__` are dropped.
  *
- * @returns `undefined` without context, `{ truncated: true }` for a context that is not an object,
- * is bigger than {@link MAX_LOG_CONTEXT_BYTES} once serialized, deeper than
- * {@link MAX_LOG_CONTEXT_DEPTH}, circular, or that JSON cannot serialize (a `BigInt`, a `toJSON`
- * that throws). Keys named `__proto__` are dropped.
+ * @returns `undefined` without context, or `{ truncated: true, reason }` for a context that is
+ * not a plain object (an array, a string…: `not-an-object`), that JSON cannot serialize (circular,
+ * a `BigInt`, a `toJSON` that throws: `not-serializable`), bigger than
+ * {@link MAX_LOG_CONTEXT_BYTES} once serialized (`too-big`), or deeper than
+ * {@link MAX_LOG_CONTEXT_DEPTH} (`too-deep`).
  */
 export const toLogContext = (context: unknown): BoLogContext | undefined => {
   if (context === undefined || context === null) return undefined;
-  if (!isPlainContext(context)) return TRUNCATED_CONTEXT;
+  if (!isPlainContext(context)) return truncated('not-an-object');
   let json: string | undefined;
   try {
-    json = JSON.stringify(context, (key, value: unknown) =>
-      key === '__proto__' ? undefined : value,
-    );
+    json = JSON.stringify(context, contextReplacer);
   } catch {
-    return TRUNCATED_CONTEXT;
+    return truncated('not-serializable');
   }
   // A `toJSON` may turn the object into anything.
-  if (json === undefined || new TextEncoder().encode(json).length > MAX_LOG_CONTEXT_BYTES) {
-    return TRUNCATED_CONTEXT;
-  }
+  if (json === undefined) return truncated('not-an-object');
+  if (new TextEncoder().encode(json).length > MAX_LOG_CONTEXT_BYTES) return truncated('too-big');
   const copy: unknown = JSON.parse(json);
-  if (!isPlainContext(copy) || depthOf(copy) > MAX_LOG_CONTEXT_DEPTH) return TRUNCATED_CONTEXT;
+  if (!isPlainContext(copy)) return truncated('not-an-object');
+  if (depthOf(copy) > MAX_LOG_CONTEXT_DEPTH) return truncated('too-deep');
   return copy;
 };
 
@@ -146,7 +173,6 @@ export const createLogger = (send: LogSender): Logger => {
   const log = (level: BoLogLevel, rawMessage: unknown, rawContext: unknown): void => {
     if (stopped) return;
     const message = toLogMessage(rawMessage);
-    if (message === null) return;
     const context = toLogContext(rawContext);
     const key = JSON.stringify([level, message, context ?? null]);
     const entry = followed.get(key);

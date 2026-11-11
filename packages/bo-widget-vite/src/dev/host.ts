@@ -16,7 +16,6 @@ import type {
   BoCurrentUser,
   BoEventMap,
   BoEventName,
-  BoLogContext,
   BoLogLevel,
   BoNavigatePayload,
   BoNotifyPayload,
@@ -79,9 +78,13 @@ export interface FakeBoUi {
 
 /** A log of the widget, as the fake back office receives it. */
 export interface WidgetLogEntry {
-  level: BoLogLevel;
-  message: string;
-  context?: BoLogContext;
+  readonly level: BoLogLevel;
+  readonly message: string;
+  /**
+   * As the widget sent it: the SDK sends a plain object, but a widget calling `vulogBo.log`
+   * itself may pass anything, which the back office accepts too.
+   */
+  readonly context?: unknown;
 }
 
 /**
@@ -637,7 +640,8 @@ const createPage = (config: FakeBoConfig, terminal?: WidgetLogTerminal) => {
     widgetLog(entry) {
       ui.log(formatWidgetLog(entry), LOG_LINE_CLASS[entry.level]);
       const args = entry.context === undefined ? [] : [entry.context];
-      console[entry.level](`[widget] ${entry.message}`, ...args);
+      // The message is not a format string: a `%c` of the widget must not eat the context.
+      console[entry.level]('[widget] %s', entry.message, ...args);
       try {
         terminal?.(entry);
       } catch (error) {
