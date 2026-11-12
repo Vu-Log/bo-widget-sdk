@@ -6,8 +6,19 @@ import {
   type BoLogLevel,
   type BoEventName,
   type BoRequests,
+  type BoStorageOp,
+  type BoStorageRequest,
+  type BoStorageSpace,
   type BoTransport,
 } from './types.js';
+
+/**
+ * `vulogBo.storage` / `vulogBo.sharedStorage`: one method per operation, the collection first.
+ * Rejects with an error whose `code` is `FORBIDDEN`, `invalid-payload` or a server code.
+ */
+export type InjectedStorageApi = Partial<
+  Record<BoStorageOp, (collection: string, ...args: unknown[]) => Promise<unknown>>
+>;
 
 /**
  * API the back office injects into a Web Component as `element.vulogBo`, before inserting it. It
@@ -19,6 +30,10 @@ export interface InjectedHostApi extends Partial<Omit<BoRequests, 'resize'>> {
   readonly protocolVersion?: number;
   /** One method per level, which never waits: the back office filters, caps and sends in batches. */
   readonly log?: Partial<Record<BoLogLevel, (message: string, context?: BoLogContext) => void>>;
+  /** The widget's data space. Missing on an older back office: storage requests reject with `UNKNOWN_TYPE`. */
+  readonly storage?: InjectedStorageApi;
+  /** The shared data space of the widget's publisher. */
+  readonly sharedStorage?: InjectedStorageApi;
   on(name: string, listener: (data: unknown) => void): void;
   off(name: string, listener: (data: unknown) => void): void;
 }
@@ -57,6 +72,28 @@ const disconnected = (request: string): BoError =>
   new BoError('DISCONNECTED', `${request}: the connection to the back office is closed`);
 
 /**
+ * The arguments of a `vulogBo.storage` method for a request: the collection, then the id, the
+ * value and the options the operation takes, in this order.
+ */
+const storageArguments = ({ op, collection, id, value, options }: BoStorageRequest): unknown[] => {
+  switch (op) {
+    case 'get':
+    case 'delete':
+      return [collection, id];
+    case 'set':
+    case 'update':
+      return [collection, id, value, options];
+    case 'add':
+      return [collection, value, options];
+    case 'list':
+    case 'query':
+      return [collection, options];
+    case 'clear':
+      return [collection];
+  }
+};
+
+/**
  * Wraps the API injected into a Web Component as a transport, with the behavior of the port: same
  * requests, errors converted to `BoError`, `resize` answered `{ height: null }`, a listener added
  * twice called once, and after `close` pending and new requests reject with `DISCONNECTED`, no
@@ -66,28 +103,41 @@ export const createInjectedTransport = (hostApi: InjectedHostApi): BoTransport =
   // Listeners added through this transport, so that `close` removes them from the host API.
   const listeners = new Map<string, Set<Listener>>();
   // Rejects of the requests in flight, with their name, called by `close`.
-  const pending = new Map<(error: BoError) => void, HostRequest>();
+  const pending = new Map<(error: BoError) => void, string>();
   let closed = false;
+
+  /**
+   * Calls a method of the host API: rejects with `DISCONNECTED` once closed, `UNKNOWN_TYPE` when
+   * the back office does not serve it, and the host's error as a `BoError`.
+   */
+  const invoke = (
+    request: string,
+    target: object | undefined,
+    method: unknown,
+    args: unknown[],
+  ): Promise<never> =>
+    new Promise<never>((resolve, reject) => {
+      if (closed) {
+        reject(disconnected(request));
+        return;
+      }
+      if (typeof method !== 'function') {
+        reject(new BoError('UNKNOWN_TYPE', `${request}: not served by this back office`));
+        return;
+      }
+      pending.set(reject, request);
+      Promise.resolve()
+        .then(() => (method as (...args: unknown[]) => unknown).apply(target, args))
+        .then(resolve as (value: unknown) => void, (error: unknown) =>
+          reject(fromHostError(error, request)),
+        )
+        .finally(() => pending.delete(reject));
+    });
 
   const call =
     (request: HostRequest) =>
     (payload?: unknown): Promise<never> =>
-      new Promise<never>((resolve, reject) => {
-        if (closed) {
-          reject(disconnected(request));
-          return;
-        }
-        const method = hostApi[request] as ((payload?: unknown) => Promise<never>) | undefined;
-        if (typeof method !== 'function') {
-          reject(new BoError('UNKNOWN_TYPE', `${request}: not served by this back office`));
-          return;
-        }
-        pending.set(reject, request);
-        Promise.resolve()
-          .then(() => method.call(hostApi, payload))
-          .then(resolve, (error: unknown) => reject(fromHostError(error, request)))
-          .finally(() => pending.delete(reject));
-      });
+      invoke(request, hostApi, hostApi[request], [payload]);
 
   return {
     mode: 'webcomponent',
@@ -115,6 +165,11 @@ export const createInjectedTransport = (hostApi: InjectedHostApi): BoTransport =
     off<K extends BoEventName>(name: K, listener: BoEventListener<K>) {
       if (!listeners.get(name)?.delete(listener as Listener)) return;
       hostApi.off(name, listener as Listener);
+    },
+    storage(space: BoStorageSpace, request: BoStorageRequest) {
+      const api = hostApi[space];
+      const method = typeof api === 'object' && api !== null ? api[request.op] : undefined;
+      return invoke(`${space}.${request.op}`, api, method, storageArguments(request));
     },
     log(level, message, context) {
       if (closed) return;

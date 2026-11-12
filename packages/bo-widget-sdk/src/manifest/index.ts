@@ -77,8 +77,19 @@ export const WIDGET_RUNTIME_ENTRIES = {
   iframe: 'index.html',
 } as const satisfies Record<(typeof WIDGET_RUNTIME_TYPES)[number], string>;
 
-/** Permissions a widget may declare; the requests that need none are always served. */
-export const WIDGET_PERMISSIONS = ['accessToken', 'apiInfo', 'navigate', 'notify'] as const;
+/**
+ * Permissions a widget may declare; the requests that need none are always served. `storage` and
+ * `sharedStorage` give access to the widget's data space and to the space its publisher's widgets
+ * share on the back office host.
+ */
+export const WIDGET_PERMISSIONS = [
+  'accessToken',
+  'apiInfo',
+  'navigate',
+  'notify',
+  'storage',
+  'sharedStorage',
+] as const;
 
 /** Value types of an installation setting, which pick the input of the settings form. */
 export const WIDGET_SETTING_TYPES = ['string', 'url', 'number', 'boolean'] as const;

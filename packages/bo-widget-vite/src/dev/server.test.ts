@@ -925,6 +925,28 @@ describe('fake back office dev server', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('serves the browser modules the host module imports (storage, errors)', async () => {
+    const { origin } = await serve({ name: 'Fleet report' });
+    const module = await (await fetch(`${origin}${FAKE_BO_MODULE_URL}`)).text();
+    const hostUrl = /from\s+"([^"]*host\.[jt]s)"/.exec(module)?.[1] ?? '';
+    const host = await (await fetch(`${origin}${hostUrl}`)).text();
+    // `hostError` is imported and re-exported: two statements, one module.
+    const imports = [
+      ...new Set(
+        [...host.matchAll(/from\s+"([^"]*\/(?:storage|hostError)\.[jt]s[^"]*)"/g)].map(
+          ([, url]) => url ?? '',
+        ),
+      ),
+    ];
+
+    expect(imports).toHaveLength(2);
+    const [storage, hostError] = await Promise.all(
+      imports.map(async (url) => (await fetch(`${origin}${url}`)).text()),
+    );
+    expect(`${storage}${hostError}`).toContain('createFakeStorage');
+    expect(`${storage}${hostError}`).toContain('class WidgetHostError');
+  });
+
   it('serves the fake back office page on a sub-route, which a widget router reloads', async () => {
     const { origin } = await serve({ name: 'Fleet report' });
 

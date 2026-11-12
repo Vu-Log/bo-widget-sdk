@@ -29,7 +29,7 @@ Before you say a change is done: `npm test` and `npm run build` pass.
 - Keep every style in the shadow root: nothing in `document.head`.
 - Read the initial state (`getContext`, `getCurrentUser`, `getTheme`), then follow the events (`localeChanged`, `fleetChanged`, `themeChanged`…): the BO does not push the initial state.
 - Navigate with `bo.navigate({ path })`, show feedback with `bo.notify({ message, severity })`: never `window.location`, `history` or `alert`.
-- A request needing a permission (`apiInfo`, `accessToken`, `navigate`, `notify`) needs it in `permissions` of `widget.config.ts`.
+- A request needing a permission (`apiInfo`, `accessToken`, `navigate`, `notify`, `storage`, `sharedStorage`) needs it in `permissions` of `widget.config.ts`.
 - The bundle is public: no secret, no API key, no token in the code or in `widget.config.ts`. `.env.local` holds the developer's values and is never committed.
 - Errors the BO cannot see (anything after the element is inserted) are shown by the widget itself, with a loading and an error state.
 

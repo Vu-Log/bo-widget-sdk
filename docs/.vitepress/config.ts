@@ -41,6 +41,7 @@ export default defineConfig({
           { text: 'The protocol', link: '/guide/protocol' },
           { text: 'Permissions', link: '/guide/permissions' },
           { text: 'Calling Vulog APIs', link: '/guide/calling-vulog-apis' },
+          { text: 'Storing data', link: '/guide/storage' },
           { text: 'Layout and isolation', link: '/guide/layout-and-isolation' },
           { text: 'UI guidelines', link: '/guide/ui-guidelines' },
           { text: 'Testing', link: '/guide/testing' },

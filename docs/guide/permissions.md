@@ -1,5 +1,5 @@
 ---
-description: The four widget permissions (accessToken, apiInfo, navigate, notify), what each unlocks, and how they behave in an iframe and as a Web Component.
+description: The widget permissions (accessToken, apiInfo, navigate, notify, storage, sharedStorage), what each unlocks, and how they behave in an iframe and as a Web Component.
 ---
 
 # Permissions
@@ -15,12 +15,14 @@ export default defineWidgetConfig({
 
 Requests not listed below need no permission: `getContext`, `getCurrentUser`, `getSettings`, `getTheme`, `resize`, the events and `disconnect`.
 
-| Permission    | Unlocks                                          | Needed for                                                                                                     |
-| ------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `apiInfo`     | `getApiInfo()`: `{ baseUrl, apiKey }`            | `authFetch` to the Vulog admin API, in both modes                                                              |
-| `accessToken` | `getAccessToken()`: `{ accessToken, expiresAt }` | `authFetch` to the Vulog admin API **in an iframe**, and `authFetch` or `getAccessToken` for a third-party API |
-| `navigate`    | `navigate({ path })`                             | Moving the BO to another route                                                                                 |
-| `notify`      | `notify({ message, severity })`                  | Showing a BO snackbar                                                                                          |
+| Permission      | Unlocks                                          | Needed for                                                                                                     |
+| --------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `apiInfo`       | `getApiInfo()`: `{ baseUrl, apiKey }`            | `authFetch` to the Vulog admin API, in both modes                                                              |
+| `accessToken`   | `getAccessToken()`: `{ accessToken, expiresAt }` | `authFetch` to the Vulog admin API **in an iframe**, and `authFetch` or `getAccessToken` for a third-party API |
+| `navigate`      | `navigate({ path })`                             | Moving the BO to another route                                                                                 |
+| `notify`        | `notify({ message, severity })`                  | Showing a BO snackbar                                                                                          |
+| `storage`       | `bo.storage`                                     | Keeping the widget's own data, see [Storing data](./storage)                                                   |
+| `sharedStorage` | `bo.sharedStorage`                               | Sharing data with the publisher's other widgets on the host, see [Storing data](./storage)                     |
 
 Declare only what the widget uses. Each permission appears once: a duplicate is an error.
 
@@ -32,11 +34,11 @@ The BO grants the permissions of the manifest in the handshake, and `bo.grantedP
 
 ## As a Web Component: declarative
 
-`bo.grantedPermissions` is `null`, and a request is not refused for a missing permission: permissions are declarative. Declare them anyway: they are part of the manifest the BO stores, and the widget keeps working if it moves to an iframe.
+`bo.grantedPermissions` is `null`, and a request is not refused for a missing permission: permissions are declarative. **Except `storage` and `sharedStorage`**: the BO checks them in both modes, and a storage call without its permission rejects with `FORBIDDEN`. Declare them anyway: they are part of the manifest the BO stores, and the widget keeps working if it moves to an iframe.
 
 `authFetch` to a Vulog API needs `apiInfo` only: the BO service worker adds the `Authorization` header.
 
-The fake back office follows the same rules: it enforces permissions in an iframe only. For a Web Component, it serves a request the manifest does not allow and logs a warning, so that you notice the missing permission before publishing.
+The fake back office follows the same rules: it enforces permissions in an iframe only, and the storage permissions in both modes. For a Web Component, it serves another request the manifest does not allow and logs a warning, so that you notice the missing permission before publishing.
 
 ## Use them well
 

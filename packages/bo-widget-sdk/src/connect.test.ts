@@ -509,3 +509,176 @@ describe('connect: logs', () => {
     bo.disconnect();
   });
 });
+
+/**
+ * A back office serving the storage as the real one does: permission of the menu entry checked in
+ * both modes (`FORBIDDEN`), payload checked (`invalid-payload`), then the server's answer (code and
+ * status). Two spaces, in memory; only what the widget code below uses.
+ */
+const storageBackOffice = (granted: string[]) => {
+  const spaces: Record<string, Map<string, { id: string; value: unknown; version: number }>> = {
+    storage: new Map(),
+    sharedStorage: new Map(),
+  };
+  const hostError = (code: string, message: string, status: number | null = null) =>
+    Object.assign(new Error(message), { code, status });
+  const run = (space: string, request: Record<string, unknown>) => {
+    const { op, collection, id, value, options } = request as {
+      op: string;
+      collection: string;
+      id: string;
+      value: unknown;
+      options?: { ifVersion?: number };
+    };
+    if (!granted.includes(space))
+      throw hostError('FORBIDDEN', `the '${space}' permission is required`);
+    if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(collection)) {
+      throw hostError('invalid-payload', `${space}.${op}: invalid collection`);
+    }
+    const docs = spaces[space] as Map<string, { id: string; value: unknown; version: number }>;
+    const key = `${collection}/${id}`;
+    const stored = docs.get(key);
+    switch (op) {
+      case 'get':
+        if (!stored) throw hostError('not-found', 'absent', 404);
+        return stored;
+      case 'set': {
+        const ifVersion = options?.ifVersion;
+        if (ifVersion !== undefined && ifVersion !== (stored?.version ?? 0)) {
+          throw hostError('version-conflict', 'conflict', 409);
+        }
+        const written = { id, value, version: (stored?.version ?? 0) + 1 };
+        docs.set(key, written);
+        return written;
+      }
+      case 'delete':
+        docs.delete(key);
+        return null;
+      default:
+        throw hostError('invalid-payload', `unknown op ${op}`);
+    }
+  };
+  const injectedSpace = (space: string) => ({
+    get: async (collection: string, id: string) => run(space, { op: 'get', collection, id }),
+    set: async (collection: string, id: string, value: unknown, options?: object) =>
+      run(space, { op: 'set', collection, id, value, options }),
+    delete: async (collection: string, id: string) => run(space, { op: 'delete', collection, id }),
+  });
+  const backOffice = fakeBackOffice();
+  const hostApi = {
+    ...backOffice.hostApi,
+    storage: injectedSpace('storage'),
+    sharedStorage: injectedSpace('sharedStorage'),
+  };
+  const parentWindow = {
+    postMessage(_hello: unknown, _origin: string, [port]: MessagePort[]) {
+      if (!port) return;
+      port.postMessage({ type: 'welcome', protocolVersion: 2, grantedPermissions: granted });
+      port.onmessage = ({ data: { id, type, payload } }) => {
+        if (type !== 'storage' && type !== 'sharedStorage') {
+          port.postMessage({ id, ok: false, error: { code: 'UNKNOWN_TYPE', message: type } });
+          return;
+        }
+        try {
+          port.postMessage({ id, ok: true, result: run(type, payload) });
+        } catch (error) {
+          const { code, message, status } = error as {
+            code: string;
+            message: string;
+            status: number;
+          };
+          const wire =
+            code === 'FORBIDDEN'
+              ? { code, message }
+              : code === 'invalid-payload'
+                ? { code: 'INVALID_PAYLOAD', message }
+                : { code: 'INTERNAL', message, reason: code, status };
+          port.postMessage({ id, ok: false, error: wire });
+        }
+      };
+    },
+  };
+  return { hostApi, parentWindow };
+};
+
+/** Widget code using the storage, written once. */
+const runStorageWidget = async (bo: BoClient) => {
+  const failure = (error: unknown) => {
+    const { code, reason, status } = error as BoError;
+    return { isBoError: error instanceof BoError, code, reason, status };
+  };
+  const prefs = bo.storage.collection<{ columns: string[] }>('prefs');
+  const before = await prefs.get('table');
+  const written = await prefs.set('table', { columns: ['plate'] });
+  const conflict = await prefs.set('table', { columns: [] }, { ifVersion: 5 }).catch(failure);
+  const shared = await bo.sharedStorage.collection('planning-stations').set('s1', { name: 'A' });
+  const sharedInOwnSpace = await bo.storage.collection('planning-stations').get('s1');
+  const invalid = await bo.storage.collection('Bad Name').get('x').catch(failure);
+  await prefs.delete('table');
+  const after = await prefs.get('table');
+  return { before, written, conflict, shared, sharedInOwnSpace, invalid, after };
+};
+
+describe('connect: storage', () => {
+  it('runs the same storage code as a Web Component and in an iframe', async () => {
+    const results = [];
+    for (const mode of ['webcomponent', 'iframe']) {
+      const backOffice = storageBackOffice(['storage', 'sharedStorage']);
+      vi.stubGlobal('window', { parent: backOffice.parentWindow });
+      const bo =
+        mode === 'webcomponent' ? await connect({ vulogBo: backOffice.hostApi }) : await connect();
+      expect(bo.mode).toBe(mode);
+      results.push(await runStorageWidget(bo));
+      bo.disconnect();
+    }
+    const [asWebComponent, inIframe] = results;
+    expect(asWebComponent).toEqual(inIframe);
+    expect(asWebComponent).toEqual({
+      before: null,
+      written: { id: 'table', value: { columns: ['plate'] }, version: 1 },
+      conflict: { isBoError: true, code: 'INTERNAL', reason: 'version-conflict', status: 409 },
+      shared: { id: 's1', value: { name: 'A' }, version: 1 },
+      sharedInOwnSpace: null,
+      invalid: { isBoError: true, code: 'INVALID_PAYLOAD', reason: null, status: null },
+      after: null,
+    });
+  });
+
+  it('connects without the permission, then rejects each call with FORBIDDEN, in both modes', async () => {
+    for (const mode of ['webcomponent', 'iframe']) {
+      const backOffice = storageBackOffice(['storage']);
+      vi.stubGlobal('window', { parent: backOffice.parentWindow });
+      const bo =
+        mode === 'webcomponent' ? await connect({ vulogBo: backOffice.hostApi }) : await connect();
+      await expect(bo.storage.collection('prefs').get('a')).resolves.toBeNull();
+      const error = await bo.sharedStorage
+        .collection('prefs')
+        .get('a')
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(BoError);
+      expect(error).toMatchObject({ code: 'FORBIDDEN', reason: null });
+      bo.disconnect();
+    }
+  });
+
+  it('rejects the storage with DISCONNECTED after disconnect, in both modes', async () => {
+    for (const mode of ['webcomponent', 'iframe']) {
+      const backOffice = storageBackOffice(['storage']);
+      vi.stubGlobal('window', { parent: backOffice.parentWindow });
+      const bo =
+        mode === 'webcomponent' ? await connect({ vulogBo: backOffice.hostApi }) : await connect();
+      bo.disconnect();
+      await expect(bo.storage.collection('prefs').get('a')).rejects.toMatchObject({
+        code: 'DISCONNECTED',
+      });
+    }
+  });
+
+  it('rejects with UNKNOWN_TYPE on a back office without storage', async () => {
+    const bo = await connect({ vulogBo: fakeBackOffice().hostApi });
+    await expect(bo.storage.collection('prefs').get('a')).rejects.toMatchObject({
+      code: 'UNKNOWN_TYPE',
+    });
+    bo.disconnect();
+  });
+});

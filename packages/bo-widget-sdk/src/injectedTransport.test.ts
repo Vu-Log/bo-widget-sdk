@@ -318,3 +318,157 @@ describe('createInjectedTransport: log', () => {
     }
   });
 });
+
+describe('createInjectedTransport: storage', () => {
+  const storageApi = () => ({
+    get: vi.fn(async (collection: string, id: unknown) => ({ collection, id })),
+    set: vi.fn(async (...args: unknown[]) => args),
+    add: vi.fn(async (...args: unknown[]) => args),
+    update: vi.fn(async (...args: unknown[]) => args),
+    delete: vi.fn(async () => null),
+    list: vi.fn(async (...args: unknown[]) => args),
+    query: vi.fn(async (...args: unknown[]) => args),
+    clear: vi.fn(async () => ({ deletedDocs: 0 })),
+  });
+
+  it('calls vulogBo.storage with the collection first, then the arguments of the operation', async () => {
+    const storage = storageApi();
+    const transport = createInjectedTransport(fakeHostApi({ storage }).api);
+    const value = { a: 1 };
+
+    await expect(
+      transport.storage('storage', { op: 'get', collection: 'c', id: 'd' }),
+    ).resolves.toEqual({ collection: 'c', id: 'd' });
+    await transport.storage('storage', {
+      op: 'set',
+      collection: 'c',
+      id: 'd',
+      value,
+      options: { ifVersion: 0 },
+    });
+    await transport.storage('storage', { op: 'add', collection: 'c', value });
+    await transport.storage('storage', { op: 'update', collection: 'c', id: 'd', value });
+    await transport.storage('storage', { op: 'delete', collection: 'c', id: 'd' });
+    await transport.storage('storage', { op: 'list', collection: 'c', options: { limit: 2 } });
+    await transport.storage('storage', {
+      op: 'query',
+      collection: 'c',
+      options: { where: { a: 1 } },
+    });
+    await expect(transport.storage('storage', { op: 'clear', collection: 'c' })).resolves.toEqual({
+      deletedDocs: 0,
+    });
+
+    expect(storage.set).toHaveBeenCalledWith('c', 'd', value, { ifVersion: 0 });
+    expect(storage.add).toHaveBeenCalledWith('c', value, undefined);
+    expect(storage.update).toHaveBeenCalledWith('c', 'd', value, undefined);
+    expect(storage.delete).toHaveBeenCalledWith('c', 'd');
+    expect(storage.list).toHaveBeenCalledWith('c', { limit: 2 });
+    expect(storage.query).toHaveBeenCalledWith('c', { where: { a: 1 } });
+    expect(storage.clear).toHaveBeenCalledWith('c');
+  });
+
+  it('keeps the two spaces apart', async () => {
+    const storage = storageApi();
+    const sharedStorage = storageApi();
+    const transport = createInjectedTransport(fakeHostApi({ storage, sharedStorage }).api);
+    await transport.storage('sharedStorage', { op: 'clear', collection: 'c' });
+    expect(sharedStorage.clear).toHaveBeenCalledWith('c');
+    expect(storage.clear).not.toHaveBeenCalled();
+  });
+
+  it('calls the method on its storage object', async () => {
+    const storage = {
+      prefix: 'shared',
+      async clear(this: { prefix: string }, collection: string) {
+        return `${this.prefix}:${collection}`;
+      },
+    };
+    const transport = createInjectedTransport(fakeHostApi({ storage } as never).api);
+    await expect(transport.storage('storage', { op: 'clear', collection: 'c' })).resolves.toBe(
+      'shared:c',
+    );
+  });
+
+  it.each([
+    ['without storage (older back office)', {}],
+    ['with storage that is not an object', { storage: 'yes' }],
+    ['without the operation', { storage: { get: vi.fn() } }],
+  ])('rejects with UNKNOWN_TYPE %s', async (_name, overrides) => {
+    const transport = createInjectedTransport(fakeHostApi(overrides as never).api);
+    await expect(
+      transport.storage('storage', { op: 'clear', collection: 'c' }),
+    ).rejects.toMatchObject({
+      code: 'UNKNOWN_TYPE',
+      message: 'storage.clear: not served by this back office',
+    });
+  });
+
+  it.each([
+    [
+      'FORBIDDEN, kept with its status',
+      { code: 'FORBIDDEN', status: 403, message: 'no permission' },
+      { code: 'FORBIDDEN', reason: null, status: 403 },
+    ],
+    [
+      'invalid-payload as INVALID_PAYLOAD',
+      { code: 'invalid-payload', status: null, message: 'bad id' },
+      { code: 'INVALID_PAYLOAD', reason: null, status: null },
+    ],
+    [
+      'a server code as INTERNAL with reason and status',
+      { code: 'version-conflict', status: 409, message: 'conflict' },
+      { code: 'INTERNAL', reason: 'version-conflict', status: 409 },
+    ],
+    [
+      'not-found as INTERNAL with reason and status',
+      { code: 'not-found', status: 404, message: 'absent' },
+      { code: 'INTERNAL', reason: 'not-found', status: 404 },
+    ],
+    [
+      'a transport code without status',
+      { code: 'ERR_NETWORK', status: null, message: 'offline' },
+      { code: 'INTERNAL', reason: 'ERR_NETWORK', status: null },
+    ],
+  ])('turns a rejection into a BoError: %s', async (_name, hostError, expected) => {
+    const storage = {
+      get: vi.fn(async () => {
+        throw Object.assign(new Error(hostError.message), hostError);
+      }),
+    };
+    const transport = createInjectedTransport(fakeHostApi({ storage }).api);
+    const error = await transport
+      .storage('storage', { op: 'get', collection: 'c', id: 'd' })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(BoError);
+    expect(error).toMatchObject({ ...expected, message: hostError.message });
+  });
+
+  it('turns a synchronous throw into a rejection', async () => {
+    const storage = {
+      get: () => {
+        throw Object.assign(new Error('bad'), { code: 'invalid-payload' });
+      },
+    };
+    const transport = createInjectedTransport(fakeHostApi({ storage } as never).api);
+    await expect(
+      transport.storage('storage', { op: 'get', collection: 'c', id: 'd' }),
+    ).rejects.toMatchObject({ code: 'INVALID_PAYLOAD' });
+  });
+
+  it('rejects pending and later storage requests with DISCONNECTED after close', async () => {
+    const storage = { get: vi.fn(() => new Promise(() => {})), clear: vi.fn() };
+    const transport = createInjectedTransport(fakeHostApi({ storage } as never).api);
+    const pending = transport.storage('storage', { op: 'get', collection: 'c', id: 'd' });
+    await Promise.resolve();
+    transport.close();
+    await expect(pending).rejects.toMatchObject({
+      code: 'DISCONNECTED',
+      message: 'storage.get: the connection to the back office is closed',
+    });
+    await expect(
+      transport.storage('sharedStorage', { op: 'clear', collection: 'c' }),
+    ).rejects.toMatchObject({ code: 'DISCONNECTED' });
+    expect(storage.clear).not.toHaveBeenCalled();
+  });
+});
