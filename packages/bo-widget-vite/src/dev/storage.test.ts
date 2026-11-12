@@ -759,6 +759,14 @@ describe('createFakeStorage', () => {
     });
   });
 
+  it('throws instead of looping when generateId keeps returning a stored id', () => {
+    const storage = createFakeStorage({ userId: 'u1', generateId: () => 'fixed' });
+    storage.run('storage', { op: 'add', collection: 'c', value: {} });
+    expect(() => storage.run('storage', { op: 'add', collection: 'c', value: {} })).toThrow(
+      'fake storage: generateId returned only ids already stored',
+    );
+  });
+
   it('refuses update with ifVersion 0: not-found when absent, already-exists when present', () => {
     const { run } = setup();
     const update = { op: 'update', collection: 'c', id: 'a', value: {}, options: { ifVersion: 0 } };

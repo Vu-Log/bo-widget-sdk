@@ -382,9 +382,11 @@ export const createFakeStorage = (options: FakeStorageOptions) => {
 
   /** An id `add` can use: never one of a stored document, even if `generateId` repeats itself. */
   const newId = (docs: Map<string, StoredDocument> | undefined): string => {
-    let id = generateId();
-    while (docs?.has(id)) id = generateId();
-    return id;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const id = generateId();
+      if (!docs?.has(id)) return id;
+    }
+    throw new Error('fake storage: generateId returned only ids already stored');
   };
 
   const isLive = (stored: StoredDocument | undefined, at: number): stored is StoredDocument =>
