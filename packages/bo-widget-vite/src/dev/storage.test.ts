@@ -276,6 +276,41 @@ describe('parseStorageRequest', () => {
     ).toEqual(invalid);
   });
 
+  it('accepts a value 20 levels deep', () => {
+    let deep: Record<string, unknown> = { leaf: 1 };
+    for (let level = 0; level < 19; level += 1) deep = { child: deep };
+    expect(
+      parseStorageRequest({ op: 'add', collection: 'c', value: deep }, 'storage').value,
+    ).toEqual(deep);
+  });
+
+  it.each([
+    [
+      'a key path over 1500 bytes',
+      { op: 'add', collection: 'c', value: { a: { [`${'k'.repeat(1490)}`]: 1 } } },
+    ],
+    ['a reserved where field', { op: 'query', collection: 'c', options: { where: { __x__: 1 } } }],
+    [
+      'a where field starting with a digit',
+      { op: 'query', collection: 'c', options: { where: { '1a': 1 } } },
+    ],
+    [
+      'a where number that is not finite',
+      { op: 'query', collection: 'c', options: { where: { a: Infinity } } },
+    ],
+    [
+      'a decimal ifVersion',
+      { op: 'set', collection: 'c', id: 'a', value: {}, options: { ifVersion: 1.5 } },
+    ],
+    ['a decimal limit', { op: 'list', collection: 'c', options: { limit: 1.5 } }],
+    [
+      'a cursor over 1024 characters',
+      { op: 'list', collection: 'c', options: { cursor: 'a'.repeat(1025) } },
+    ],
+  ])('refuses %s', (_name, payload) => {
+    expect(refusal(() => parseStorageRequest(payload, 'storage'))).toEqual(invalid);
+  });
+
   it('refuses a __proto__ key', () => {
     const value = JSON.parse('{"__proto__": {"admin": true}}') as unknown;
     expect(
@@ -675,6 +710,61 @@ describe('createFakeStorage', () => {
       version: 2,
     });
     expect(run({ op: 'delete', collection: 'a', id: '1' })).toBeNull();
+  });
+
+  it('keeps counting an expired document in the quotas and in clear, as the server does', () => {
+    const { run, advance } = setup({ docsPerCollection: 1 });
+    run({ op: 'set', collection: 'a', id: '1', value: {}, options: { ttlSeconds: 60 } });
+    advance(60);
+    expect(refusal(() => run({ op: 'add', collection: 'a', value: {} }))).toEqual({
+      code: 'quota-exceeded',
+      status: 422,
+    });
+    // Writing over the expired document takes its slot: it creates no document.
+    expect(run({ op: 'set', collection: 'a', id: '1', value: { n: 1 } })).toMatchObject({
+      version: 1,
+    });
+    advance(0);
+    run({ op: 'set', collection: 'b', id: '1', value: {}, options: { ttlSeconds: 60 } });
+    advance(60);
+    expect(run({ op: 'clear', collection: 'b' })).toEqual({ deletedDocs: 1 });
+  });
+
+  it('answers a short page, with a cursor, when expired documents fall in it', () => {
+    const { run, advance } = setup();
+    run({ op: 'set', collection: 'c', id: 'a', value: {}, options: { ttlSeconds: 60 } });
+    run({ op: 'set', collection: 'c', id: 'b', value: {}, options: { ttlSeconds: 60 } });
+    run({ op: 'set', collection: 'c', id: 'c', value: {} });
+    advance(60);
+    const first = run({ op: 'list', collection: 'c', options: { limit: 2 } }) as {
+      items: unknown[];
+      nextCursor: string;
+    };
+    expect(first).toEqual({ items: [], nextCursor: 'Yg' });
+    expect(
+      run({ op: 'list', collection: 'c', options: { limit: 2, cursor: first.nextCursor } }),
+    ).toMatchObject({ items: [{ id: 'c' }], nextCursor: null });
+  });
+
+  it('never gives add the id of a stored document', () => {
+    const ids = ['x', 'x', 'y'];
+    const storage = createFakeStorage({ userId: 'u1', generateId: () => ids.shift() ?? 'z' });
+    storage.run('storage', { op: 'add', collection: 'c', value: { n: 1 } });
+    expect(storage.run('storage', { op: 'add', collection: 'c', value: { n: 2 } })).toMatchObject({
+      id: 'y',
+      version: 1,
+    });
+    expect(storage.run('storage', { op: 'get', collection: 'c', id: 'x' })).toMatchObject({
+      value: { n: 1 },
+    });
+  });
+
+  it('refuses update with ifVersion 0: not-found when absent, already-exists when present', () => {
+    const { run } = setup();
+    const update = { op: 'update', collection: 'c', id: 'a', value: {}, options: { ifVersion: 0 } };
+    expect(refusal(() => run(update))).toEqual({ code: 'not-found', status: 404 });
+    run({ op: 'set', collection: 'c', id: 'a', value: {} });
+    expect(refusal(() => run(update))).toEqual({ code: 'already-exists', status: 409 });
   });
 
   it('checks the request before the stored documents', () => {

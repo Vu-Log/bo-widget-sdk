@@ -15,7 +15,7 @@ The widget talks to the BO through one protocol. It reads the context (fleet, lo
 | Entry of the zip   | `index.js`, an ES module whose default export is the element class          | `index.html`                                                |
 | How the BO runs it | Registers the class under its own tag, injects its API, inserts the element | Loads the page in an iframe, then a `postMessage` handshake |
 | Isolation          | Shadow DOM                                                                  | A separate document                                         |
-| Permissions        | Declarative                                                                 | Enforced: a missing one rejects with `FORBIDDEN`            |
+| Permissions        | Declarative, except `storage` and `sharedStorage` (`FORBIDDEN`)             | Enforced: a missing one rejects with `FORBIDDEN`            |
 | Size               | Fills the content zone                                                      | Can ask for a height with `resize`                          |
 
 `connect()` of `@vulog/bo-widget-sdk` returns the same client in both modes, so the widget code does not change. Every template of `npm create @vulog/bo-widget` builds a Web Component. See [Web Component or iframe](./web-component-or-iframe) to choose.

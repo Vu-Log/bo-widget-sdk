@@ -8,19 +8,7 @@
  * @packageDocumentation
  */
 import type { BoStorageOp, BoStorageSpace } from '@vulog/bo-widget-sdk';
-import { WidgetHostError, invalidPayload } from './hostError.js';
-
-/** Operations of a storage request, one per method of a collection. */
-export const STORAGE_OPS: readonly BoStorageOp[] = [
-  'get',
-  'set',
-  'add',
-  'update',
-  'delete',
-  'list',
-  'query',
-  'clear',
-];
+import { WidgetHostError, invalidPayload, type StorageServerErrorCode } from './hostError.js';
 
 /** Name of a collection. */
 const COLLECTION_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -81,6 +69,9 @@ const OP_SHAPES: Record<
   query: { id: false, value: false, options: ['where', 'limit', 'cursor'], required: ['where'] },
   clear: { id: false, value: false, options: [] },
 };
+
+/** Operations of a storage request, one per method of a collection. */
+export const STORAGE_OPS = Object.freeze(Object.keys(OP_SHAPES)) as readonly BoStorageOp[];
 
 type JsonObject = Record<string, unknown>;
 
@@ -345,16 +336,25 @@ const decodeCursor = (cursor: string): string | undefined => {
   return DOC_ID_PATTERN.test(id) && encodeCursor(id) === cursor ? id : undefined;
 };
 
-const serverError = (
-  code: ConstructorParameters<typeof WidgetHostError>[0],
-  status: number,
-  message: string,
-): WidgetHostError => new WidgetHostError(code, message, status);
+/** HTTP status of each refusal of the server. */
+const SERVER_STATUS: Record<StorageServerErrorCode, number> = {
+  'not-found': 404,
+  'version-conflict': 409,
+  'already-exists': 409,
+  'value-too-large': 413,
+  'quota-exceeded': 422,
+  'invalid-cursor': 400,
+};
+
+const serverError = (code: StorageServerErrorCode, message: string): WidgetHostError =>
+  new WidgetHostError(code, message, SERVER_STATUS[code]);
 
 /**
  * Creates the in-memory storage of the fake back office: the widget's space (`storage`) and its
  * publisher's shared space (`sharedStorage`), apart from each other. It answers like the server:
  *
+ * - an expired document is absent for `get`, `set`, `update`, `list` and `query`, but, as on the
+ *   server until it deletes it, it still counts in the quotas and in `deletedDocs` of `clear`;
  * - `get` of a missing or expired document: `not-found` (404);
  * - `set` creates or replaces; `update` merges the first-level fields and needs the document
  *   (`not-found`); `ifVersion: 0` refuses an existing document (`already-exists`, 409), another
@@ -362,7 +362,8 @@ const serverError = (
  * - `ttlSeconds` sets the expiry from now, `null` removes it; without it, `set` and `add` write a
  *   document that does not expire and `update` keeps the expiry. An expired document is absent;
  * - `list` and `query` answer pages in id order, `nextCursor` the base64url id of the last
- *   document; a cursor it did not make is `invalid-cursor` (400);
+ *   document of the page (expired documents are left out of `items`, so a page may be short or
+ *   empty while `nextCursor` is not `null`); a cursor it did not make is `invalid-cursor` (400);
  * - a merged value over 64 KB is `value-too-large` (413); a write past a quota (collections per
  *   space, documents per collection, bytes per space) is `quota-exceeded` (422);
  * - `delete` answers `null`, even for a missing document; `clear` answers `{ deletedDocs }`.
@@ -379,15 +380,15 @@ export const createFakeStorage = (options: FakeStorageOptions) => {
     sharedStorage: new Map(),
   };
 
+  /** An id `add` can use: never one of a stored document, even if `generateId` repeats itself. */
+  const newId = (docs: Map<string, StoredDocument> | undefined): string => {
+    let id = generateId();
+    while (docs?.has(id)) id = generateId();
+    return id;
+  };
+
   const isLive = (stored: StoredDocument | undefined, at: number): stored is StoredDocument =>
     stored !== undefined && (stored.expiresAt === undefined || stored.expiresAt > at);
-
-  /** Deletes the expired documents of a space, as the server eventually does. */
-  const purge = (space: BoStorageSpace, at: number): void => {
-    for (const docs of spaces[space].values()) {
-      for (const [id, stored] of docs) if (!isLive(stored, at)) docs.delete(id);
-    }
-  };
 
   const toDocument = (id: string, stored: StoredDocument): StorageDocument => ({
     id,
@@ -413,14 +414,12 @@ export const createFakeStorage = (options: FakeStorageOptions) => {
     if (!docs && collections.size >= quotas.collectionsPerSpace) {
       throw serverError(
         'quota-exceeded',
-        422,
         `${space}: ${quotas.collectionsPerSpace} collections at most`,
       );
     }
     if (createsDocument && (docs?.size ?? 0) >= quotas.docsPerCollection) {
       throw serverError(
         'quota-exceeded',
-        422,
         `${space}: ${quotas.docsPerCollection} documents per collection at most`,
       );
     }
@@ -430,24 +429,25 @@ export const createFakeStorage = (options: FakeStorageOptions) => {
       for (const stored of collectionDocs.values()) used += stored.size;
     }
     if (used + bytesDelta > quotas.bytesPerSpace) {
-      throw serverError('quota-exceeded', 422, `${space}: ${quotas.bytesPerSpace} bytes at most`);
+      throw serverError('quota-exceeded', `${space}: ${quotas.bytesPerSpace} bytes at most`);
     }
   };
 
   const write = (space: BoStorageSpace, request: StorageRequest, id: string, at: number) => {
     const { op, collection, options: writeOptions } = request;
     const docs = spaces[space].get(collection);
-    const live = docs?.get(id);
+    // An expired document is absent, but still stored: its bytes and its slot count in the quotas.
+    const stored = docs?.get(id);
+    const live = isLive(stored, at) ? stored : undefined;
     if (op === 'update' && !live)
-      throw serverError('not-found', 404, `${space}.update: no document ${id}`);
+      throw serverError('not-found', `${space}.update: no document ${id}`);
     const { ifVersion, ttlSeconds } = writeOptions;
     if (ifVersion === 0 && live) {
-      throw serverError('already-exists', 409, `${space}.${op}: the document ${id} exists`);
+      throw serverError('already-exists', `${space}.${op}: the document ${id} exists`);
     }
     if (ifVersion !== undefined && ifVersion !== 0 && ifVersion !== (live?.version ?? 0)) {
       throw serverError(
         'version-conflict',
-        409,
         `${space}.${op}: the document ${id} is not at version ${ifVersion}`,
       );
     }
@@ -455,9 +455,9 @@ export const createFakeStorage = (options: FakeStorageOptions) => {
       op === 'update' && live ? { ...live.value, ...request.value } : (request.value as JsonObject);
     const size = utf8Bytes(JSON.stringify(value));
     if (size > STORAGE_VALUE_MAX_BYTES) {
-      throw serverError('value-too-large', 413, `${space}.${op}: ${VALUE_TOO_LARGE}`);
+      throw serverError('value-too-large', `${space}.${op}: ${VALUE_TOO_LARGE}`);
     }
-    checkQuotas(space, collection, !live, size - (live?.size ?? 0));
+    checkQuotas(space, collection, !stored, size - (stored?.size ?? 0));
     const expiresAt =
       ttlSeconds === undefined
         ? op === 'update'
@@ -466,7 +466,7 @@ export const createFakeStorage = (options: FakeStorageOptions) => {
         : ttlSeconds === null
           ? undefined
           : at + ttlSeconds * 1000;
-    const stored: StoredDocument = {
+    const written: StoredDocument = {
       value,
       size,
       version: live ? live.version + 1 : 1,
@@ -476,17 +476,20 @@ export const createFakeStorage = (options: FakeStorageOptions) => {
       updatedBy: options.userId,
       ...(expiresAt === undefined ? {} : { expiresAt }),
     };
-    if (docs) docs.set(id, stored);
-    else spaces[space].set(collection, new Map([[id, stored]]));
-    return toDocument(id, stored);
+    if (docs) docs.set(id, written);
+    else spaces[space].set(collection, new Map([[id, written]]));
+    return toDocument(id, written);
   };
 
-  const page = (space: BoStorageSpace, { collection, options: pageOptions }: StorageRequest) => {
+  const page = (
+    space: BoStorageSpace,
+    { collection, options: pageOptions }: StorageRequest,
+    at: number,
+  ) => {
     const after = pageOptions.cursor === undefined ? undefined : decodeCursor(pageOptions.cursor);
     if (pageOptions.cursor !== undefined && after === undefined) {
       throw serverError(
         'invalid-cursor',
-        400,
         `${space}: the cursor must be a nextCursor answered by a list`,
       );
     }
@@ -501,10 +504,13 @@ export const createFakeStorage = (options: FakeStorageOptions) => {
         ),
       )
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    const items = matching.slice(0, limit);
-    const last = items.at(-1);
+    // As the server: the page is read with the expired documents, which are then left out.
+    const pageDocs = matching.slice(0, limit);
+    const last = pageDocs.at(-1);
     return {
-      items: items.map(([id, stored]) => toDocument(id, stored)),
+      items: pageDocs
+        .filter(([, stored]) => isLive(stored, at))
+        .map(([id, stored]) => toDocument(id, stored)),
       nextCursor: matching.length > limit && last ? encodeCursor(last[0]) : null,
     };
   };
@@ -522,26 +528,26 @@ export const createFakeStorage = (options: FakeStorageOptions) => {
     run(space: BoStorageSpace, payload: unknown): unknown {
       const request = parseStorageRequest(payload, space);
       const at = now();
-      purge(space, at);
       const { op, collection, id } = request;
       const docs = spaces[space].get(collection);
       switch (op) {
         case 'get': {
           const stored = docs?.get(id as string);
-          if (!stored) throw serverError('not-found', 404, `${space}.get: no document ${id}`);
+          if (!isLive(stored, at))
+            throw serverError('not-found', `${space}.get: no document ${id}`);
           return toDocument(id as string, stored);
         }
         case 'set':
         case 'update':
           return write(space, request, id as string, at);
         case 'add':
-          return write(space, request, generateId(), at);
+          return write(space, request, newId(docs), at);
         case 'delete':
           docs?.delete(id as string);
           return null;
         case 'list':
         case 'query':
-          return page(space, request);
+          return page(space, request, at);
         case 'clear':
           spaces[space].delete(collection);
           return { deletedDocs: docs?.size ?? 0 };

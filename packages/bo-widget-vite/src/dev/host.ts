@@ -22,13 +22,15 @@ import type {
   BoNotifySeverity,
   BoResizePayload,
   BoSettings,
+  BoStorageArgs,
+  BoStorageOp,
   BoStorageSpace,
   BoTheme,
 } from '@vulog/bo-widget-sdk';
 import type { WidgetManifest, WidgetPermission } from '@vulog/bo-widget-sdk/manifest';
 import { WidgetHostError, invalidPayload } from './hostError.js';
 import type { ResolvedDevMode } from './server.js';
-import { STORAGE_OPS, createFakeStorage } from './storage.js';
+import { createFakeStorage } from './storage.js';
 
 export { WidgetHostError, type WidgetHostErrorCode } from './hostError.js';
 
@@ -412,23 +414,24 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
           return result;
         } catch (error) {
           ui.log(`${space}.${String(request.op)} failed: ${(error as Error).message}`, 'error');
+          // A bug of the fake back office itself: keep its stack in the console.
+          if (!(error instanceof WidgetHostError)) console.error(error);
           throw error;
         }
       };
-      return Object.freeze({
-        get: (collection: unknown, id: unknown) => run({ op: 'get', collection, id }),
-        set: (collection: unknown, id: unknown, value: unknown, options?: unknown) =>
-          run({ op: 'set', collection, id, value, options }),
-        add: (collection: unknown, value: unknown, options?: unknown) =>
-          run({ op: 'add', collection, value, options }),
-        update: (collection: unknown, id: unknown, value: unknown, options?: unknown) =>
+      // The arguments of the SDK (`BoStorageArgs`), turned into the request of the port.
+      const api: { [K in BoStorageOp]: (...args: BoStorageArgs[K]) => Promise<unknown> } = {
+        get: (collection, id) => run({ op: 'get', collection, id }),
+        set: (collection, id, value, options) => run({ op: 'set', collection, id, value, options }),
+        add: (collection, value, options) => run({ op: 'add', collection, value, options }),
+        update: (collection, id, value, options) =>
           run({ op: 'update', collection, id, value, options }),
-        delete: (collection: unknown, id: unknown) => run({ op: 'delete', collection, id }),
-        list: (collection: unknown, options?: unknown) => run({ op: 'list', collection, options }),
-        query: (collection: unknown, options?: unknown) =>
-          run({ op: 'query', collection, options }),
-        clear: (collection: unknown) => run({ op: 'clear', collection }),
-      } satisfies Record<(typeof STORAGE_OPS)[number], unknown>);
+        delete: (collection, id) => run({ op: 'delete', collection, id }),
+        list: (collection, options) => run({ op: 'list', collection, options }),
+        query: (collection, options) => run({ op: 'query', collection, options }),
+        clear: (collection) => run({ op: 'clear', collection }),
+      };
+      return Object.freeze(api);
     };
     return Object.freeze({
       protocolVersion: config.protocolVersion,

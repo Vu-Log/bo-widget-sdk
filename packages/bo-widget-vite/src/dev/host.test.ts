@@ -1232,6 +1232,14 @@ describe('storage of the fake back office', () => {
     const invalid = await prefs.add([] as never).catch(failure);
     const tooLarge = await prefs.set('big', { columns: ['x'.repeat(70_000)] }).catch(failure);
     const missing = await prefs.update('nothing', { columns: [] }).catch(failure);
+    const added = await bo.storage
+      .collection<{ draft: string }>('drafts')
+      .add({ draft: 'x' }, { ttlSeconds: 60 });
+    const readBack = await bo.storage.collection('drafts').get(added.id);
+    const half = 'x'.repeat(40_000);
+    const big = bo.storage.collection<{ a?: string; b?: string }>('big');
+    await big.set('doc', { a: half });
+    const mergedTooLarge = await big.update('doc', { b: half }).catch(failure);
     await prefs.delete('table');
     const cleared = await tickets.clear();
     return {
@@ -1245,6 +1253,13 @@ describe('storage of the fake back office', () => {
       invalid,
       tooLarge,
       missing,
+      added: {
+        generatedId: /^[A-Za-z0-9]{20}$/.test(added.id),
+        value: added.value,
+        expires: typeof added.expiresAt === 'string',
+      },
+      readBack: readBack?.value,
+      mergedTooLarge,
       after: await prefs.get('table'),
       cleared,
     };
@@ -1261,6 +1276,9 @@ describe('storage of the fake back office', () => {
     invalid: { isBoError: true, code: 'INVALID_PAYLOAD', reason: null, status: null },
     tooLarge: { isBoError: true, code: 'INVALID_PAYLOAD', reason: null, status: null },
     missing: { isBoError: true, code: 'INTERNAL', reason: 'not-found', status: 404 },
+    added: { generatedId: true, value: { draft: 'x' }, expires: true },
+    readBack: { draft: 'x' },
+    mergedTooLarge: { isBoError: true, code: 'INTERNAL', reason: 'value-too-large', status: 413 },
     after: null,
     cleared: { deletedDocs: 2 },
   };

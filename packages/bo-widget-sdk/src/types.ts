@@ -130,9 +130,10 @@ export interface BoLogger {
 /**
  * A value a widget stores: a plain JSON object, never an array nor a scalar (store a scalar as
  * `{ value: 42 }`). The back office refuses, with `INVALID_PAYLOAD`, a value larger than 64 KB as
- * UTF-8 JSON, nested deeper than 20 levels, with a `__proto__` key, an empty key or a key that
- * starts and ends with `__`, with an array directly inside an array, or holding anything that is
- * not JSON (a `Date`, a function, `NaN`…). A property set to `undefined` is dropped.
+ * UTF-8 JSON, nested deeper than 20 levels, with a `__proto__` key, an empty key, a key that
+ * starts and ends with `__` or a key path longer than 1 500 bytes, with an array directly inside
+ * an array or an `undefined` array item, or holding anything that is not JSON (a `Date`, a
+ * function, `NaN`…). A property set to `undefined` is dropped.
  */
 export type BoStorageValue = Record<string, unknown>;
 
@@ -160,7 +161,7 @@ export interface BoStoragePage<T extends object = BoStorageValue> {
    * The documents of the page. Expired documents are left out, so a page may hold fewer than
    * `limit` documents, or none, while `nextCursor` is not `null`.
    */
-  readonly items: BoStorageDocument<T>[];
+  readonly items: readonly BoStorageDocument<T>[];
   /** Pass it as `cursor` to read the next page; `null` on the last page. */
   readonly nextCursor: string | null;
 }
@@ -180,7 +181,9 @@ export interface BoStorageWriteOptions extends BoStorageExpiryOptions {
   /**
    * Writes only when the stored document has this version, otherwise rejects with `INTERNAL`,
    * reason `version-conflict` (status 409). `0` means "only if it does not exist": rejects with
-   * reason `already-exists` (status 409) when it does, which makes a lock with `set`.
+   * reason `already-exists` (status 409) when it does, which makes a lock with `set`. With
+   * `update`, which needs the document, `0` always rejects (`not-found` or `already-exists`). An
+   * expired document counts as absent.
    */
   ifVersion?: number;
 }
@@ -200,7 +203,8 @@ export type BoStorageWhereValue = string | number | boolean | null;
 export interface BoStorageQueryOptions extends BoStorageListOptions {
   /**
    * 1 to 5 first-level fields of the value, each equal to the given value (`{ status: 'open' }`).
-   * A field name is a JavaScript-like identifier; a string is 1 500 UTF-8 bytes at most.
+   * A field name matches `^[A-Za-z_][A-Za-z0-9_]{0,63}$` and does not both start and end with
+   * `__`; a string is 1 500 UTF-8 bytes at most, a number is finite.
    */
   where: Record<string, BoStorageWhereValue>;
 }
@@ -268,22 +272,53 @@ export interface BoStorage {
 /** Name of a storage space, as the request type of the protocol. */
 export type BoStorageSpace = 'storage' | 'sharedStorage';
 
+/**
+ * Arguments of each method of the storage API the back office injects into a Web Component
+ * (`vulogBo.storage.set(collection, id, value, options)`…): the collection first, then the id,
+ * the value and the options the operation takes, in this order. Options left out are passed as
+ * `undefined`.
+ */
+export interface BoStorageArgs {
+  get: [collection: string, id: string];
+  set: [
+    collection: string,
+    id: string,
+    value: unknown,
+    options?: BoStorageWriteOptions | undefined,
+  ];
+  add: [collection: string, value: unknown, options?: BoStorageExpiryOptions | undefined];
+  update: [
+    collection: string,
+    id: string,
+    value: unknown,
+    options?: BoStorageWriteOptions | undefined,
+  ];
+  delete: [collection: string, id: string];
+  list: [collection: string, options?: BoStorageListOptions | undefined];
+  query: [collection: string, options: BoStorageQueryOptions];
+  clear: [collection: string];
+}
+
 /** Operation of a storage request. */
-export type BoStorageOp = 'get' | 'set' | 'add' | 'update' | 'delete' | 'list' | 'query' | 'clear';
+export type BoStorageOp = keyof BoStorageArgs;
 
 /**
- * A storage request, as the `payload` of a `storage` or `sharedStorage` request on the port.
- * Internal to the SDK.
+ * A storage request, as the `payload` of a `storage` or `sharedStorage` request on the port: each
+ * operation with the fields it takes, and only those. Internal to the SDK.
  */
-export interface BoStorageRequest {
-  op: BoStorageOp;
-  collection: string;
-  /** For `get`, `set`, `update` and `delete`. */
-  id?: string;
-  /** For `set`, `add` and `update`. */
-  value?: unknown;
-  options?: BoStorageWriteOptions | BoStorageQueryOptions | BoStorageListOptions;
-}
+export type BoStorageRequest =
+  | { op: 'get' | 'delete'; collection: string; id: string }
+  | {
+      op: 'set' | 'update';
+      collection: string;
+      id: string;
+      value: unknown;
+      options?: BoStorageWriteOptions;
+    }
+  | { op: 'add'; collection: string; value: unknown; options?: BoStorageExpiryOptions }
+  | { op: 'list'; collection: string; options?: BoStorageListOptions }
+  | { op: 'query'; collection: string; options: BoStorageQueryOptions }
+  | { op: 'clear'; collection: string };
 
 /** Data of each event the back office pushes to the widget. */
 export interface BoEventMap {

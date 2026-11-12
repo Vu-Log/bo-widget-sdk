@@ -149,7 +149,7 @@ Known `reason` values:
 | `reason`                                                                                                                 | Meaning                                                                                |
 | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
 | `no-token`                                                                                                               | Session expired: no access token                                                       |
-| `not-installed`                                                                                                          | The widget is not installed, so it has no settings                                     |
+| `not-installed`                                                                                                          | The widget is not installed, so it has no settings and no storage                      |
 | `disposed`                                                                                                               | The widget was removed from the page                                                   |
 | `version-conflict`, `already-exists`, `not-found`, `value-too-large`, `quota-exceeded`, `rate-limited`, `invalid-cursor` | A refusal of the storage, with its HTTP `status`: see [Storing data](./storage#errors) |
 | `ERR_NETWORK`, or another code                                                                                           | A transport or server error                                                            |

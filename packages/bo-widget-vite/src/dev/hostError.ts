@@ -5,7 +5,7 @@
  * @packageDocumentation
  */
 
-/** Codes the server of the storage answers, kept as `reason` by the SDK. */
+/** Refusals of the server that the fake storage answers (a subset of the server's), kept as `reason` by the SDK. */
 export type StorageServerErrorCode =
   | 'not-found'
   | 'version-conflict'

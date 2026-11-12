@@ -32,6 +32,7 @@ export {
   type BoResizePayload,
   type BoSettings,
   type BoStorage,
+  type BoStorageArgs,
   type BoStorageCollection,
   type BoStorageDocument,
   type BoStorageExpiryOptions,

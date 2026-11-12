@@ -14,25 +14,9 @@ import type {
 const isNotFound = (error: unknown): boolean =>
   error instanceof BoError && error.code === 'INTERNAL' && error.reason === 'not-found';
 
-/**
- * A storage request without the fields left `undefined`, so that the port carries only what the
- * widget passed. The back office checks everything else.
- */
-const buildRequest = (
-  op: BoStorageRequest['op'],
-  collection: string,
-  {
-    id,
-    value,
-    options,
-  }: { [K in 'id' | 'value' | 'options']?: BoStorageRequest[K] | undefined } = {},
-): BoStorageRequest => ({
-  op,
-  collection,
-  ...(id === undefined ? {} : { id }),
-  ...(value === undefined ? {} : { value }),
-  ...(options === undefined ? {} : { options }),
-});
+/** Adds `options` to a request only when the widget passed them, so that the port carries no `undefined`. */
+const withOptions = <R extends BoStorageRequest>(request: R, options: object | undefined): R =>
+  options === undefined ? request : { ...request, options };
 
 /**
  * Builds `bo.storage` or `bo.sharedStorage` over a transport. Each method of a collection sends
@@ -52,30 +36,35 @@ export const createStorage = (transport: BoTransport, space: BoStorageSpace): Bo
         transport.storage(space, request);
       const collection: BoStorageCollection<T> = {
         name,
-        get: async (id: string) => {
+        get: async (id) => {
           try {
-            return (await send(buildRequest('get', name, { id }))) as BoStorageDocument<T>;
+            return (await send({ op: 'get', collection: name, id })) as BoStorageDocument<T>;
           } catch (error) {
             if (isNotFound(error)) return null;
             throw error;
           }
         },
         set: async (id, value, options) =>
-          (await send(buildRequest('set', name, { id, value, options }))) as BoStorageDocument<T>,
+          (await send(
+            withOptions({ op: 'set', collection: name, id, value }, options),
+          )) as BoStorageDocument<T>,
         add: async (value, options) =>
-          (await send(buildRequest('add', name, { value, options }))) as BoStorageDocument<T>,
+          (await send(
+            withOptions({ op: 'add', collection: name, value }, options),
+          )) as BoStorageDocument<T>,
         update: async (id, patch, options) =>
           (await send(
-            buildRequest('update', name, { id, value: patch, options }),
+            withOptions({ op: 'update', collection: name, id, value: patch }, options),
           )) as BoStorageDocument<T>,
         delete: async (id) => {
-          await send(buildRequest('delete', name, { id }));
+          await send({ op: 'delete', collection: name, id });
         },
         list: async (options) =>
-          (await send(buildRequest('list', name, { options }))) as BoStoragePage<T>,
+          (await send(withOptions({ op: 'list', collection: name }, options))) as BoStoragePage<T>,
         query: async (options) =>
-          (await send(buildRequest('query', name, { options }))) as BoStoragePage<T>,
-        clear: async () => (await send(buildRequest('clear', name))) as { deletedDocs: number },
+          (await send({ op: 'query', collection: name, options })) as BoStoragePage<T>,
+        clear: async () =>
+          (await send({ op: 'clear', collection: name })) as { deletedDocs: number },
       };
       return Object.freeze(collection);
     },

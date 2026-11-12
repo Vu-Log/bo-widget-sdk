@@ -6,6 +6,7 @@ import {
   type BoLogLevel,
   type BoEventName,
   type BoRequests,
+  type BoStorageArgs,
   type BoStorageOp,
   type BoStorageRequest,
   type BoStorageSpace,
@@ -13,12 +14,14 @@ import {
 } from './types.js';
 
 /**
- * `vulogBo.storage` / `vulogBo.sharedStorage`: one method per operation, the collection first.
- * Rejects with an error whose `code` is `FORBIDDEN`, `invalid-payload` or a server code.
+ * `vulogBo.storage` / `vulogBo.sharedStorage`: one method per operation, with the arguments of
+ * {@link BoStorageArgs}. Rejects with an error whose `code` is `FORBIDDEN`, `invalid-payload`, a
+ * server code (`not-found`, `version-conflict`…) or a code of the back office (`not-installed`,
+ * `disposed`, `ERR_NETWORK`…). A method an older back office lacks is `UNKNOWN_TYPE`.
  */
-export type InjectedStorageApi = Partial<
-  Record<BoStorageOp, (collection: string, ...args: unknown[]) => Promise<unknown>>
->;
+export type InjectedStorageApi = Partial<{
+  [K in BoStorageOp]: (...args: BoStorageArgs[K]) => Promise<unknown>;
+}>;
 
 /**
  * API the back office injects into a Web Component as `element.vulogBo`, before inserting it. It
@@ -71,25 +74,23 @@ const reportLater = (error: unknown): void => {
 const disconnected = (request: string): BoError =>
   new BoError('DISCONNECTED', `${request}: the connection to the back office is closed`);
 
-/**
- * The arguments of a `vulogBo.storage` method for a request: the collection, then the id, the
- * value and the options the operation takes, in this order.
- */
-const storageArguments = ({ op, collection, id, value, options }: BoStorageRequest): unknown[] => {
-  switch (op) {
+/** The arguments of the `vulogBo.storage` method of a request, in the order of {@link BoStorageArgs}. */
+const storageArguments = (request: BoStorageRequest): BoStorageArgs[BoStorageOp] => {
+  switch (request.op) {
     case 'get':
     case 'delete':
-      return [collection, id];
+      return [request.collection, request.id];
     case 'set':
     case 'update':
-      return [collection, id, value, options];
+      return [request.collection, request.id, request.value, request.options];
     case 'add':
-      return [collection, value, options];
+      return [request.collection, request.value, request.options];
     case 'list':
+      return [request.collection, request.options];
     case 'query':
-      return [collection, options];
+      return [request.collection, request.options];
     case 'clear':
-      return [collection];
+      return [request.collection];
   }
 };
 

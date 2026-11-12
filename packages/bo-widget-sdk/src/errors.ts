@@ -40,7 +40,7 @@ export interface BoErrorDetails {
  * refuses.
  *
  * Known `reason` values: `no-token` (session expired: no access token), `not-installed` (the
- * widget is not installed, so it has no settings), `disposed` (the widget was removed from the
+ * widget is not installed, so it has no settings and no storage), `disposed` (the widget was removed from the
  * page), the storage codes of the server (`version-conflict`, `already-exists`, `not-found`,
  * `value-too-large`, `quota-exceeded`, `rate-limited`, `invalid-cursor`…, with the HTTP `status`),
  * `ERR_NETWORK` or another transport or server error code, and, for a back office that

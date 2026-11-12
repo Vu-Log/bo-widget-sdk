@@ -127,6 +127,7 @@ await tickets.update(id, { status: 'closed' }, { ifVersion: 1 });
 const open = await tickets.query({ where: { status: 'open' }, limit: 50 }); // { items, nextCursor }
 
 // Lock: created only if absent, freed after 5 minutes
+const user = await bo.getCurrentUser();
 await bo.sharedStorage
   .collection('planning-locks')
   .set('vehicle-V1', { by: user.id }, { ifVersion: 0, ttlSeconds: 300 });
