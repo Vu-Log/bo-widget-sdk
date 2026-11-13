@@ -75,7 +75,7 @@ export default class FleetReport extends HTMLElement {
 | `entry`        | `src/main.ts`                      | Web Component only: module whose default export is the element class.                                                                                              |
 | `minBoVersion` | none                               | Oldest BO version the widget works with.                                                                                                                           |
 | `menu`         | none                               | `{ defaultSection?, defaultTarget?, defaultPosition?, defaultRoles?, label? }`.                                                                                    |
-| `permissions`  | `[]`                               | `accessToken`, `apiInfo`, `navigate`, `notify`.                                                                                                                    |
+| `permissions`  | `[]`                               | `accessToken`, `apiInfo`, `navigate`, `notify`, `storage`, `sharedStorage`.                                                                                        |
 | `settings`     | `[]`                               | `{ key, type, required?, label?, default? }`, `type` among `string`, `url`, `number`, `boolean` and `default` of that type. Filled in at installation. No secrets. |
 | `dev`          | `{}`                               | Fake BO options, see below.                                                                                                                                        |
 
@@ -92,6 +92,8 @@ Its context defaults to the fleet `DEV-FLEET`, the locale `en_GB`, the host `BO_
 In an iframe, the fake BO only serves the `hello` of a page of this dev server, and its pages and the widget page can only be framed by this dev server (`Content-Security-Policy: frame-ancestors 'self'`): another site that framed them could otherwise navigate the widget frame to its own page and ask for the token. As in the BO, permissions are enforced in an iframe only (`FORBIDDEN`); for a Web Component, a request the manifest does not allow is served, with a warning in the log. In an iframe, `authFetch` needs `accessToken` as well as `apiInfo`, since the SDK adds the token itself.
 
 Errors the widget throws (loading the entry, constructor, `connectedCallback`, rejected promises) show in the log too, and in the browser console.
+
+`bo.storage` and `bo.sharedStorage` are served from memory, as two separate spaces, with the checks of the BO and the answers of the Vulog server: names, values of 64 KB at most, options, `ifVersion` (`version-conflict`, `already-exists`), `ttlSeconds` (an expired document is gone, but counts in the quotas until **Clear storage**, as on the server until it deletes it), pages in id order with their cursor, `where`, and the default quotas (20 collections per space, 10 000 documents per collection, 50 MB per space: `quota-exceeded`). As in the BO, their permissions are enforced in both modes (`FORBIDDEN`). There is no rate limit. The data is lost when the page reloads; the **Clear storage** button of the bar empties both spaces. Each request and its answer show in the log.
 
 `getApiInfo` returns a `baseUrl` on the dev server (`http://localhost:5173/__bo-widget/api/boapi/proxy/`), so `authFetch` calls it: in mock mode it answers the static responses, in token and login modes it forwards to the real API, as the BO service worker does. It only answers the pages it serves: a call from another origin gets `403`.
 

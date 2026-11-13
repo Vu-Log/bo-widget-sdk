@@ -4,6 +4,7 @@ import {
   type BoEventListener,
   type BoEventName,
   type BoRequests,
+  type BoStorageSpace,
   type BoTransport,
 } from './types.js';
 
@@ -163,7 +164,7 @@ export const openPortTransport = (options: PortTransportOptions): Promise<BoTran
   }
 
   const request =
-    (type: keyof BoRequests | 'log') =>
+    (type: keyof BoRequests | 'log' | BoStorageSpace) =>
     (payload?: unknown): Promise<never> =>
       new Promise((resolve, reject) => {
         if (closed) {
@@ -246,6 +247,7 @@ export const openPortTransport = (options: PortTransportOptions): Promise<BoTran
       // Answered `null` by the back office: nothing to wait for. A rejection (older back office
       // without `log`, timeout, closed channel) is dropped: logging must not break the widget.
       const sendLog = request('log');
+      const sendStorage = { storage: request('storage'), sharedStorage: request('sharedStorage') };
       resolve({
         mode: 'iframe',
         protocolVersion: message.protocolVersion,
@@ -273,6 +275,8 @@ export const openPortTransport = (options: PortTransportOptions): Promise<BoTran
             () => {},
           );
         },
+        // `{ op, collection, id?, value?, options? }`, answered with the result of the operation.
+        storage: (space, storageRequest) => sendStorage[space](storageRequest),
         close: () => close(),
       });
     };

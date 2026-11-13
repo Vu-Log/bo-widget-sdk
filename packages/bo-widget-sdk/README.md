@@ -61,27 +61,29 @@ bo.on('localeChanged', ({ locale }) => render(locale));
 
 `connect(element?, options?)` resolves with a `BoClient`:
 
-| Member                                         | Permission    | Result                                                                                                                                  |
-| ---------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`                                         |               | `'webcomponent'` or `'iframe'`                                                                                                          |
-| `protocolVersion`                              |               | Protocol version served by the BO                                                                                                       |
-| `grantedPermissions`                           |               | Permissions granted (iframe), `null` for a Web Component                                                                                |
-| `getContext()`                                 |               | `{ fleetId, host, locale, timezone, currency, boVersion, basename }`                                                                    |
-| `getCurrentUser()`                             |               | The connected user: names, email, roles, fleets                                                                                         |
-| `getSettings()`                                |               | Settings of the widget installation                                                                                                     |
-| `getTheme()`                                   |               | `{ palette, typography, mode }` of the BO (MUI shape)                                                                                   |
-| `getApiInfo()`                                 | `apiInfo`     | `{ baseUrl, apiKey }` of the Vulog API                                                                                                  |
-| `getAccessToken()`                             | `accessToken` | `{ accessToken, expiresAt }` (ms since the epoch, or `null`)                                                                            |
-| `navigate({ path })`                           | `navigate`    | Navigates the BO: `/app/...` is a BO route, `details/1` is relative to the widget's view                                                |
-| `notify({ message, severity? })`               | `notify`      | Shows a BO snackbar (`success`, `info`, `warning`, `error`)                                                                             |
-| `resize({ height })`                           |               | Asks for a height in pixels, or `null` (iframe only; a Web Component already fills the content zone)                                    |
-| `on(name, listener)`                           |               | Listens to `localeChanged`, `fleetChanged`, `userChanged`, `themeChanged`, `routeChanged`; returns a function that removes the listener |
-| `off(name, listener)`                          |               | Removes a listener                                                                                                                      |
-| `authFetch(input, init?)`                      | see below     | `fetch` with the Vulog authentication                                                                                                   |
-| `log.debug/info/warn/error(message, context?)` |               | Sends a log to the BO, see below                                                                                                        |
-| `disconnect()`                                 |               | Stops listening; pending and later requests reject with `DISCONNECTED`, in both modes                                                   |
+| Member                                         | Permission      | Result                                                                                                                                  |
+| ---------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`                                         |                 | `'webcomponent'` or `'iframe'`                                                                                                          |
+| `protocolVersion`                              |                 | Protocol version served by the BO                                                                                                       |
+| `grantedPermissions`                           |                 | Permissions granted (iframe), `null` for a Web Component                                                                                |
+| `getContext()`                                 |                 | `{ fleetId, host, locale, timezone, currency, boVersion, basename }`                                                                    |
+| `getCurrentUser()`                             |                 | The connected user: names, email, roles, fleets                                                                                         |
+| `getSettings()`                                |                 | Settings of the widget installation                                                                                                     |
+| `getTheme()`                                   |                 | `{ palette, typography, mode }` of the BO (MUI shape)                                                                                   |
+| `getApiInfo()`                                 | `apiInfo`       | `{ baseUrl, apiKey }` of the Vulog API                                                                                                  |
+| `getAccessToken()`                             | `accessToken`   | `{ accessToken, expiresAt }` (ms since the epoch, or `null`)                                                                            |
+| `navigate({ path })`                           | `navigate`      | Navigates the BO: `/app/...` is a BO route, `details/1` is relative to the widget's view                                                |
+| `notify({ message, severity? })`               | `notify`        | Shows a BO snackbar (`success`, `info`, `warning`, `error`)                                                                             |
+| `resize({ height })`                           |                 | Asks for a height in pixels, or `null` (iframe only; a Web Component already fills the content zone)                                    |
+| `on(name, listener)`                           |                 | Listens to `localeChanged`, `fleetChanged`, `userChanged`, `themeChanged`, `routeChanged`; returns a function that removes the listener |
+| `off(name, listener)`                          |                 | Removes a listener                                                                                                                      |
+| `authFetch(input, init?)`                      | see below       | `fetch` with the Vulog authentication                                                                                                   |
+| `log.debug/info/warn/error(message, context?)` |                 | Sends a log to the BO, see below                                                                                                        |
+| `storage.collection(name)`                     | `storage`       | The widget's data, see below                                                                                                            |
+| `sharedStorage.collection(name)`               | `sharedStorage` | The data shared by the publisher's widgets on the host, see below                                                                       |
+| `disconnect()`                                 |                 | Stops listening; pending and later requests reject with `DISCONNECTED`, in both modes                                                   |
 
-Permissions are declared in the widget manifest (`widget.json`). In an iframe, a request without its permission rejects with `FORBIDDEN`.
+Permissions are declared in the widget manifest (`widget.json`). In an iframe, a request without its permission rejects with `FORBIDDEN`; the storage does so in both modes.
 
 ### `authFetch`
 
@@ -111,6 +113,27 @@ bo.log.warn('Export failed', { status: response.status });
 ```
 
 `bo.log.debug`, `info`, `warn` and `error` return nothing and never throw. The BO keeps `warn` and `error`, and `debug` and `info` while the debug mode of the installation is on. `console.log` is never relayed. The message is cut at 2048 characters; an `Error` in the context keeps its name, message and stack (cut); a context bigger than 3 KB as JSON, deeper than 5 levels or not serializable becomes `{ truncated: true, reason }`; a repeated log is sent at once, then at most once every 10 s with `context.repeated`. In an iframe, uncaught errors and unhandled rejections are sent as `error` logs. Never log personal data or secrets.
+
+### Storage
+
+```ts
+const prefs = bo.storage.collection<{ list: string[] }>('prefs');
+await prefs.set('columns', { list: ['plate', 'status'] }); // creates or replaces
+const doc = await prefs.get('columns'); // { id, value, version, … } or null
+
+const tickets = bo.sharedStorage.collection<{ status: string }>('planning-tickets');
+const { id } = await tickets.add({ status: 'open' });
+await tickets.update(id, { status: 'closed' }, { ifVersion: 1 });
+const open = await tickets.query({ where: { status: 'open' }, limit: 50 }); // { items, nextCursor }
+
+// Lock: created only if absent, freed after 5 minutes
+const user = await bo.getCurrentUser();
+await bo.sharedStorage
+  .collection('planning-locks')
+  .set('vehicle-V1', { by: user.id }, { ifVersion: 0, ttlSeconds: 300 });
+```
+
+A collection has `get`, `set`, `add`, `update` (first-level merge), `delete`, `list({ limit?, cursor? })`, `query({ where, limit?, cursor? })` and `clear()`. A value is a JSON object of 64 KB at most. A refusal rejects with `FORBIDDEN` (permission missing, in both modes), `INVALID_PAYLOAD` (name, id, value or option refused by the BO) or `INTERNAL` with the server code as `reason` and its `status` (`version-conflict`, `already-exists`, `not-found`, `value-too-large`, `quota-exceeded`, `rate-limited`, `invalid-cursor`). Every user of the BO host can read the data: never store secrets. See [Storing data](https://vu-log.github.io/bo-widget-sdk/guide/storage).
 
 ### Errors
 

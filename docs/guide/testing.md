@@ -41,7 +41,7 @@ const fakeBo = (overrides: Record<string, unknown> = {}) => {
 
 With this fake:
 
-- a request the fake does not define rejects with `UNKNOWN_TYPE`;
+- a request the fake does not define rejects with `UNKNOWN_TYPE`: give it `storage` / `sharedStorage` objects (`get(collection, id)`, `set(collection, id, value, options)`…) to test a widget that stores data, or run it in the fake back office, which keeps them in memory (see [Storing data](./storage#in-the-fake-back-office));
 - a method that rejects gives a `BoError`, as in the BO: test the error state with `fakeBo({ getContext: () => Promise.reject(new Error('boom')) })`;
 - `resize` resolves `{ height: null }`;
 - the kept listeners let you `emit` events.

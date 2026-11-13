@@ -9,7 +9,7 @@ You are writing or changing a **Vulog back office (BO) widget**: a page the BO s
 - Web Component: `connect(this)` inside `connectedCallback`. iframe: `connect()` without argument.
 - All requests are async and reject with `BoError` (`code`, `reason`, `status`), never with another error type, except `authFetch`, which may also reject with what `fetch` rejects with (`TypeError` on network failure, `AbortError` on abort) and with a `TypeError` for an input it refuses (a `Request` object, a path outside `baseUrl`).
 - Events: `on(name, listener)` returns the unsubscribe function. Names: `localeChanged`, `fleetChanged`, `userChanged`, `themeChanged`, `routeChanged`. The initial state is **not** pushed: read it first with `getContext` (locale, fleet), `getCurrentUser` and `getTheme`. No getter gives the current route: `getContext().basename` is the widget's view, then follow `routeChanged`.
-- Permissions (`accessToken`, `apiInfo`, `navigate`, `notify`) come from the `permissions` of `widget.json`. In an iframe, a missing permission rejects with `FORBIDDEN`; as a Web Component, they are declarative.
+- Permissions (`accessToken`, `apiInfo`, `navigate`, `notify`, `storage`, `sharedStorage`) come from the `permissions` of `widget.json`. In an iframe, a missing permission rejects with `FORBIDDEN`; as a Web Component, they are declarative, except `storage` and `sharedStorage`, which reject with `FORBIDDEN` in both modes.
 
 ## Rules
 
@@ -24,6 +24,7 @@ You are writing or changing a **Vulog back office (BO) widget**: a page the BO s
 9. Handle a `401` from `authFetch` (session lost) by showing a message, never by retrying in a loop. When the SDK adds the token itself (iframe, or a third-party URL), it has already retried once with a new token.
 10. Keep secrets out of the widget bundle: it is public. Settings needing a secret belong to your backend.
 11. Log with `bo.log.warn(message, context?)` and `bo.log.error(...)` (`debug` and `info` are kept only while the debug mode of the installation is on). `console.log` never reaches the BO. Never put personal data, tokens or secrets in a message or a context; keep the context small (3 KB of JSON at most, otherwise it becomes `{ truncated: true, reason }`); pass a caught error as `{ error }`, its name, message and stack (cut) are kept. In an iframe, uncaught errors are sent for you.
+12. Keep the widget's data with `bo.storage.collection<T>(name)` (permission `storage`) or `bo.sharedStorage` (permission `sharedStorage`, shared by the publisher's widgets on the host: prefix collection names with your domain, `planning-stations`). Methods: `get(id)` (`null` when absent), `set(id, value, { ifVersion?, ttlSeconds? })`, `add(value, { ttlSeconds? })`, `update(id, patch, { ifVersion?, ttlSeconds? })` (first-level merge), `delete(id)`, `list({ limit?, cursor? })` and `query({ where, limit?, cursor? })` (`{ items, nextCursor }`, read until `nextCursor` is `null`), `clear()`. A value is a JSON object of 64 KB at most (`{ value: 42 }` for a scalar, ISO strings for dates). Branch on `error.reason`: `version-conflict` and `already-exists` (`ifVersion`; `ifVersion: 0` creates only if absent, a lock with `ttlSeconds`), `not-found`, `quota-exceeded`, `rate-limited` (wait, never retry in a loop). Never store secrets or needless personal data: every user of the host can read it.
 
 ## Finding a Vulog API endpoint
 
@@ -41,7 +42,7 @@ try {
   switch (error.code) {
     case 'FORBIDDEN': // add the permission to widget.json
     case 'INVALID_PAYLOAD': // fix the payload
-    case 'INTERNAL': // error.reason: 'no-token' | 'not-installed' | 'disposed' | server code
+    case 'INTERNAL': // error.reason: 'no-token' | 'not-installed' | 'disposed' | server code ('version-conflict'…)
     case 'UNKNOWN_TYPE': // older BO: degrade gracefully
     case 'TIMEOUT':
     case 'DISCONNECTED':

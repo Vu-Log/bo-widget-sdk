@@ -4,6 +4,7 @@ import { BoError } from './errors.js';
 import { createInjectedTransport, isInjectedHostApi } from './injectedTransport.js';
 import { createLogger } from './log.js';
 import { openPortTransport } from './portTransport.js';
+import { createStorage } from './storage.js';
 import type { BoClient, BoTransport } from './types.js';
 
 /** Options of {@link connect}. */
@@ -73,6 +74,8 @@ const toClient = (transport: BoTransport, errorTarget?: unknown): BoClient => {
     },
     off: (name, listener) => transport.off(name, listener),
     log: logger.api,
+    storage: createStorage(transport, 'storage'),
+    sharedStorage: createStorage(transport, 'sharedStorage'),
     // Its cache would otherwise keep sending authenticated calls after `disconnect`.
     authFetch: (input, init) =>
       disconnected

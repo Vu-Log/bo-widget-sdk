@@ -504,3 +504,93 @@ describe('openPortTransport: log', () => {
     }
   });
 });
+
+describe('openPortTransport: storage', () => {
+  it('sends a storage or sharedStorage request with the request as payload', async () => {
+    const received: unknown[] = [];
+    const { target } = servingParent((request) => {
+      received.push(request);
+      return { id: request.id, ok: true, result: { deletedDocs: 2 } };
+    });
+    const transport = await open(options(target));
+
+    await expect(transport.storage('storage', { op: 'clear', collection: 'c' })).resolves.toEqual({
+      deletedDocs: 2,
+    });
+    await transport.storage('sharedStorage', {
+      op: 'set',
+      collection: 'c',
+      id: 'd',
+      value: { a: 1 },
+      options: { ttlSeconds: 60 },
+    });
+
+    expect(received).toEqual([
+      { id: '1', type: 'storage', payload: { op: 'clear', collection: 'c' } },
+      {
+        id: '2',
+        type: 'sharedStorage',
+        payload: {
+          op: 'set',
+          collection: 'c',
+          id: 'd',
+          value: { a: 1 },
+          options: { ttlSeconds: 60 },
+        },
+      },
+    ]);
+  });
+
+  it.each([
+    [
+      'FORBIDDEN (without status)',
+      { code: 'FORBIDDEN', message: 'no permission' },
+      { code: 'FORBIDDEN', reason: null, status: null },
+    ],
+    [
+      'INVALID_PAYLOAD',
+      { code: 'INVALID_PAYLOAD', message: 'bad id' },
+      { code: 'INVALID_PAYLOAD', reason: null, status: null },
+    ],
+    [
+      'INTERNAL with the server code and status',
+      { code: 'INTERNAL', message: 'quota', reason: 'quota-exceeded', status: 422 },
+      { code: 'INTERNAL', reason: 'quota-exceeded', status: 422 },
+    ],
+    [
+      'INTERNAL not-installed without status',
+      { code: 'INTERNAL', message: 'no widgetId', reason: 'not-installed' },
+      { code: 'INTERNAL', reason: 'not-installed', status: null },
+    ],
+  ])('rejects with the error of the answer: %s', async (_name, wire, expected) => {
+    const { target } = servingParent((request) => ({ id: request.id, ok: false, error: wire }));
+    const transport = await open(options(target));
+    await expect(
+      transport.storage('storage', { op: 'get', collection: 'c', id: 'd' }),
+    ).rejects.toMatchObject({ ...expected, message: wire.message });
+  });
+
+  it('rejects a value that cannot be cloned with INVALID_PAYLOAD, without sending it', async () => {
+    const answer = vi.fn();
+    const { target } = servingParent(answer);
+    const transport = await open(options(target));
+    await expect(
+      transport.storage('storage', { op: 'add', collection: 'c', value: { run: () => 1 } }),
+    ).rejects.toMatchObject({
+      code: 'INVALID_PAYLOAD',
+      message: 'storage: cannot send the request',
+    });
+    expect(answer).not.toHaveBeenCalled();
+  });
+
+  it('rejects with DISCONNECTED once closed', async () => {
+    const { target } = servingParent(() => undefined);
+    const transport = await open(options(target));
+    const pending = transport.storage('storage', { op: 'list', collection: 'c' });
+    transport.close();
+    await expect(pending).rejects.toMatchObject({ code: 'DISCONNECTED' });
+    await expect(
+      transport.storage('sharedStorage', { op: 'list', collection: 'c' }),
+    ).rejects.toMatchObject({ code: 'DISCONNECTED' });
+  });
+});

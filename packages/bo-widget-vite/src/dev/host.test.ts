@@ -1206,3 +1206,193 @@ describe('isInView', () => {
     expect(isInView('/', '/anything')).toBe(true);
   });
 });
+
+describe('storage of the fake back office', () => {
+  const storageConfig = (permissions: FakeBoConfig['widget']['permissions']) =>
+    fakeConfig({ widget: { ...fakeConfig().widget, permissions } });
+
+  /** Widget code using both spaces, written once for both modes. */
+  const runStorageWidget = async (bo: BoClient) => {
+    const failure = (error: unknown) => {
+      const { code, reason, status } = error as BoError;
+      return { isBoError: error instanceof BoError, code, reason, status };
+    };
+    const prefs = bo.storage.collection<{ columns: string[] }>('prefs');
+    const before = await prefs.get('table');
+    const written = await prefs.set('table', { columns: ['plate'] });
+    const conflict = await prefs.set('table', { columns: [] }, { ifVersion: 0 }).catch(failure);
+    const updated = await prefs.update('table', { columns: ['status'] }, { ifVersion: 1 });
+    const tickets = bo.sharedStorage.collection<{ status: string }>('planning-tickets');
+    await tickets.set('t1', { status: 'open' });
+    await tickets.set('t2', { status: 'closed' });
+    const open = await tickets.query({ where: { status: 'open' } });
+    const page = await tickets.list({ limit: 1 });
+    const next = await tickets.list({ limit: 1, cursor: page.nextCursor ?? '' });
+    const notShared = await bo.storage.collection('planning-tickets').get('t1');
+    const invalid = await prefs.add([] as never).catch(failure);
+    const tooLarge = await prefs.set('big', { columns: ['x'.repeat(70_000)] }).catch(failure);
+    const missing = await prefs.update('nothing', { columns: [] }).catch(failure);
+    const added = await bo.storage
+      .collection<{ draft: string }>('drafts')
+      .add({ draft: 'x' }, { ttlSeconds: 60 });
+    const readBack = await bo.storage.collection('drafts').get(added.id);
+    const half = 'x'.repeat(40_000);
+    const big = bo.storage.collection<{ a?: string; b?: string }>('big');
+    await big.set('doc', { a: half });
+    const mergedTooLarge = await big.update('doc', { b: half }).catch(failure);
+    await prefs.delete('table');
+    const cleared = await tickets.clear();
+    return {
+      before,
+      written: { id: written.id, value: written.value, version: written.version },
+      conflict,
+      updated: { value: updated.value, version: updated.version },
+      open: open.items.map(({ id }) => id),
+      pages: [page.items.map(({ id }) => id), next.items.map(({ id }) => id), next.nextCursor],
+      notShared,
+      invalid,
+      tooLarge,
+      missing,
+      added: {
+        generatedId: /^[A-Za-z0-9]{20}$/.test(added.id),
+        value: added.value,
+        expires: typeof added.expiresAt === 'string',
+      },
+      readBack: readBack?.value,
+      mergedTooLarge,
+      after: await prefs.get('table'),
+      cleared,
+    };
+  };
+
+  const expected = {
+    before: null,
+    written: { id: 'table', value: { columns: ['plate'] }, version: 1 },
+    conflict: { isBoError: true, code: 'INTERNAL', reason: 'already-exists', status: 409 },
+    updated: { value: { columns: ['status'] }, version: 2 },
+    open: ['t1'],
+    pages: [['t1'], ['t2'], null],
+    notShared: null,
+    invalid: { isBoError: true, code: 'INVALID_PAYLOAD', reason: null, status: null },
+    tooLarge: { isBoError: true, code: 'INVALID_PAYLOAD', reason: null, status: null },
+    missing: { isBoError: true, code: 'INTERNAL', reason: 'not-found', status: 404 },
+    added: { generatedId: true, value: { draft: 'x' }, expires: true },
+    readBack: { draft: 'x' },
+    mergedTooLarge: { isBoError: true, code: 'INTERNAL', reason: 'value-too-large', status: 413 },
+    after: null,
+    cleared: { deletedDocs: 2 },
+  };
+
+  it('runs the same widget code with the real SDK as a Web Component and in an iframe', async () => {
+    const config = storageConfig(['storage', 'sharedStorage']);
+    const { Widget, client } = widgetClass();
+    await startFakeBo(config, load(Widget));
+    const asWebComponent = await runStorageWidget(await client());
+
+    const { client: iframeClient } = await connectIframe(config);
+    const inIframe = await runStorageWidget(iframeClient);
+
+    expect(asWebComponent).toEqual(expected);
+    expect(inIframe).toEqual(expected);
+    iframeClient.disconnect();
+  });
+
+  it('rejects the storage without its permission with FORBIDDEN, at the call, in both modes', async () => {
+    const config = storageConfig(['storage']);
+    const { Widget, client } = widgetClass();
+    await startFakeBo(config, load(Widget));
+    const { client: iframeClient } = await connectIframe(config);
+
+    for (const bo of [await client(), iframeClient]) {
+      await expect(bo.storage.collection('prefs').get('a')).resolves.toBeNull();
+      const error = await bo.sharedStorage
+        .collection('prefs')
+        .set('a', {})
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(BoError);
+      expect(error).toMatchObject({ code: 'FORBIDDEN', reason: null, status: null });
+    }
+    expect(document.querySelector('.bo-log')?.textContent).toMatch(
+      /sharedStorage\.set failed: sharedStorage: the 'sharedStorage' permission is required/,
+    );
+    iframeClient.disconnect();
+  });
+
+  it('logs each storage request with its answer', async () => {
+    const { Widget, client } = widgetClass();
+    await startFakeBo(storageConfig(['storage']), load(Widget));
+    const bo = await client();
+    await bo.storage.collection('prefs').set('a', { n: 1 });
+    expect(document.querySelector('.bo-log')?.textContent).toMatch(
+      /storage\.set → \{"id":"a","value":\{"n":1\},"version":1,/,
+    );
+  });
+
+  it('empties both spaces with the Clear storage button', async () => {
+    const { Widget, client } = widgetClass();
+    await startFakeBo(storageConfig(['storage', 'sharedStorage']), load(Widget));
+    const bo = await client();
+    await bo.storage.collection('prefs').set('a', {});
+    await bo.sharedStorage.collection('shared').set('b', {});
+
+    const button = [...document.querySelectorAll('.bo-bar button')].find(
+      ({ textContent }) => textContent === 'Clear storage',
+    ) as HTMLButtonElement;
+    button.click();
+
+    expect(document.querySelector('.bo-log')?.textContent).toMatch(
+      /storage cleared: 2 documents deleted/,
+    );
+    await expect(bo.storage.collection('prefs').get('a')).resolves.toBeNull();
+    await expect(bo.sharedStorage.collection('shared').get('b')).resolves.toBeNull();
+  });
+
+  it('answers the errors on the port with the envelope of the back office', async () => {
+    const ui = fakeUi();
+    const backOffice = createFakeBackOffice(storageConfig(['storage']), ui);
+    const { port1, port2 } = new MessageChannel();
+    const answers: unknown[] = [];
+    port1.onmessage = ({ data }) => answers.push(data);
+    backOffice.servePort(port2);
+    port1.postMessage({
+      id: '1',
+      type: 'sharedStorage',
+      payload: { op: 'clear', collection: 'c' },
+    });
+    port1.postMessage({ id: '2', type: 'storage', payload: { op: 'clear', collection: 'C' } });
+    port1.postMessage({
+      id: '3',
+      type: 'storage',
+      payload: { op: 'get', collection: 'c', id: 'x' },
+    });
+    port1.postMessage({ id: '4', type: 'storage', payload: { op: 'clear', collection: 'c' } });
+    await vi.waitFor(() => expect(answers).toHaveLength(5));
+    expect(answers.slice(1)).toEqual([
+      {
+        id: '1',
+        ok: false,
+        error: { code: 'FORBIDDEN', message: 'sharedStorage needs the "sharedStorage" permission' },
+      },
+      {
+        id: '2',
+        ok: false,
+        error: {
+          code: 'INVALID_PAYLOAD',
+          message: 'storage.clear: collection must match /^[a-z0-9][a-z0-9_-]{0,63}$/',
+        },
+      },
+      {
+        id: '3',
+        ok: false,
+        error: {
+          code: 'INTERNAL',
+          reason: 'not-found',
+          status: 404,
+          message: 'storage.get: no document x',
+        },
+      },
+      { id: '4', ok: true, result: { deletedDocs: 0 } },
+    ]);
+    port1.close();
+  });
+});

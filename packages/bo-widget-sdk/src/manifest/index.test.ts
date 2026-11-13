@@ -332,9 +332,25 @@ describe('widgetManifestSchema', () => {
   it('rejects an unknown permission', () => {
     const result = widgetManifestSchema.safeParse({
       ...docManifest(),
-      permissions: ['accessToken', 'storage'],
+      permissions: ['accessToken', 'database'],
     });
     expect(issuePaths(result)).toEqual(['permissions.1']);
+  });
+
+  it('accepts the storage permissions', () => {
+    const result = publishedWidgetManifestSchema.safeParse({
+      ...docManifest(),
+      permissions: ['storage', 'sharedStorage'],
+    });
+    expect(result.success && result.data.permissions).toEqual(['storage', 'sharedStorage']);
+  });
+
+  it('rejects a duplicate storage permission', () => {
+    const result = widgetManifestSchema.safeParse({
+      ...docManifest(),
+      permissions: ['sharedStorage', 'storage', 'sharedStorage'],
+    });
+    expect(issuePaths(result)).toEqual(['permissions.2']);
   });
 
   it('rejects a duplicate permission', () => {

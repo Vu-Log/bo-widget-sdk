@@ -36,7 +36,7 @@ What the BO does:
 
 The BO only sees the errors thrown synchronously when it inserts the element. Show the others in the widget: every template has an error state.
 
-As a Web Component, permissions are declarative, and the BO service worker adds the token to the Vulog API calls.
+As a Web Component, permissions are declarative (except `storage` and `sharedStorage`, refused with `FORBIDDEN` in both modes), and the BO service worker adds the token to the Vulog API calls.
 
 `@vulog/bo-widget-vite` warns at build time, and `bo-widget validate` at packing, when a `.js` file of the bundle calls `customElements.define(`, dependencies included.
 

@@ -299,6 +299,12 @@ describe('buildManifest', () => {
     );
   });
 
+  it('writes the storage permissions into the manifest', () => {
+    expect(
+      buildManifest({ name: 'Report', permissions: ['storage', 'sharedStorage'] }, pkg).permissions,
+    ).toEqual(['storage', 'sharedStorage']);
+  });
+
   it('refuses a duplicate permission', () => {
     expect(issuesOf({ name: 'Report', permissions: ['notify', 'notify'] })).toEqual([
       'permissions.1: Duplicate permission "notify"',

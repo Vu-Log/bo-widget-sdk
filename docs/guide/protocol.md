@@ -43,6 +43,8 @@ Every request is async.
 | `notify({ message, severity? })` | `notify`                                       | Shows a BO snackbar: `success`, `info` (default), `warning` or `error`                                           |
 | `resize({ height })`             |                                                | Asks for a height in pixels, or `null` (iframe only)                                                             |
 | `log.warn(message, context?)`    |                                                | Sends a log to the BO, see [Logs](#logs); also `log.debug`, `log.info` and `log.error`                           |
+| `storage.collection(name)`       | `storage`                                      | The widget's data, see [Storing data](./storage)                                                                 |
+| `sharedStorage.collection(name)` | `sharedStorage`                                | The data shared by the publisher's widgets on the host, see [Storing data](./storage)                            |
 | `authFetch(input, init?)`        | see [Calling Vulog APIs](./calling-vulog-apis) | `fetch` with the Vulog authentication                                                                            |
 
 `getCurrentUser()` is the way to know who is connected. Never decode the token.
@@ -133,24 +135,25 @@ Every request rejects with a `BoError`, never another error type, the same way i
 
 A `BoError` has a `code`, a `reason` (or `null`) and an HTTP `status` (or `null`).
 
-| `code`            | Meaning                                                                                        |
-| ----------------- | ---------------------------------------------------------------------------------------------- |
-| `FORBIDDEN`       | The manifest does not declare the permission (iframe)                                          |
-| `INVALID_PAYLOAD` | The BO refused the payload: external URL to `navigate`, empty `notify` message, invalid height |
-| `INTERNAL`        | The request failed in the BO: see `reason` and `status`                                        |
-| `UNKNOWN_TYPE`    | The BO does not serve this request (older BO)                                                  |
-| `TIMEOUT`         | No answer in time                                                                              |
-| `DISCONNECTED`    | Closed connection, or not displayed by the BO                                                  |
+| `code`            | Meaning                                                                                                                 |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `FORBIDDEN`       | The manifest does not declare the permission (iframe; both modes for the storage)                                       |
+| `INVALID_PAYLOAD` | The BO refused the payload: external URL to `navigate`, empty `notify` message, invalid height, invalid storage request |
+| `INTERNAL`        | The request failed in the BO: see `reason` and `status`                                                                 |
+| `UNKNOWN_TYPE`    | The BO does not serve this request (older BO)                                                                           |
+| `TIMEOUT`         | No answer in time                                                                                                       |
+| `DISCONNECTED`    | Closed connection, or not displayed by the BO                                                                           |
 
 Known `reason` values:
 
-| `reason`                                                                                                       | Meaning                                            |
-| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `no-token`                                                                                                     | Session expired: no access token                   |
-| `not-installed`                                                                                                | The widget is not installed, so it has no settings |
-| `disposed`                                                                                                     | The widget was removed from the page               |
-| `ERR_NETWORK`, or another code                                                                                 | A transport or server error                        |
-| `invalid-welcome`, `invalid-host-api`, `invalid-api-info`, `invalid-token`, `malformed-answer`, `messageerror` | The BO answered something unexpected               |
+| `reason`                                                                                                                 | Meaning                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `no-token`                                                                                                               | Session expired: no access token                                                       |
+| `not-installed`                                                                                                          | The widget is not installed, so it has no settings and no storage                      |
+| `disposed`                                                                                                               | The widget was removed from the page                                                   |
+| `version-conflict`, `already-exists`, `not-found`, `value-too-large`, `quota-exceeded`, `rate-limited`, `invalid-cursor` | A refusal of the storage, with its HTTP `status`: see [Storing data](./storage#errors) |
+| `ERR_NETWORK`, or another code                                                                                           | A transport or server error                                                            |
+| `invalid-welcome`, `invalid-host-api`, `invalid-api-info`, `invalid-token`, `malformed-answer`, `messageerror`           | The BO answered something unexpected                                                   |
 
 A wire code the SDK does not know becomes `INTERNAL`, with that code as `reason`.
 
@@ -176,13 +179,13 @@ try {
 
 ## Same API in both modes
 
-| Behavior                           | Web Component                                                   | iframe                   |
-| ---------------------------------- | --------------------------------------------------------------- | ------------------------ |
-| `connect`                          | `connect(this)`                                                 | `connect()`              |
-| Missing permission                 | Served (permissions are declarative)                            | `FORBIDDEN`              |
-| `resize`                           | Resolves `{ height: null }`: the element fills the content zone | Asks the BO for a height |
-| `authFetch` to a Vulog API         | The BO service worker adds the token                            | The SDK adds the token   |
-| Request an older BO does not serve | `UNKNOWN_TYPE`                                                  | `UNKNOWN_TYPE`           |
-| After `disconnect()`               | `DISCONNECTED`                                                  | `DISCONNECTED`           |
+| Behavior                           | Web Component                                                         | iframe                   |
+| ---------------------------------- | --------------------------------------------------------------------- | ------------------------ |
+| `connect`                          | `connect(this)`                                                       | `connect()`              |
+| Missing permission                 | Served (permissions are declarative), except the storage: `FORBIDDEN` | `FORBIDDEN`              |
+| `resize`                           | Resolves `{ height: null }`: the element fills the content zone       | Asks the BO for a height |
+| `authFetch` to a Vulog API         | The BO service worker adds the token                                  | The SDK adds the token   |
+| Request an older BO does not serve | `UNKNOWN_TYPE`                                                        | `UNKNOWN_TYPE`           |
+| After `disconnect()`               | `DISCONNECTED`                                                        | `DISCONNECTED`           |
 
 The full API and its TSDoc are in the [SDK README](https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-sdk#api) and in `dist/index.d.ts` of the package.

@@ -2,9 +2,10 @@
  * Code of a {@link BoError}.
  *
  * - `UNKNOWN_TYPE`: the back office does not serve this request (older back office).
- * - `FORBIDDEN`: the widget's manifest does not declare the permission the request needs.
+ * - `FORBIDDEN`: the widget's manifest does not declare the permission the request needs (in an
+ *   iframe; for `storage` and `sharedStorage`, in both modes).
  * - `INVALID_PAYLOAD`: the back office refused the payload (external URL to `navigate`, empty
- *   `notify` message, invalid height).
+ *   `notify` message, invalid height, invalid storage request).
  * - `INTERNAL`: the request failed in the back office; `reason` tells why when known.
  * - `TIMEOUT`: no answer in time (handshake or request).
  * - `DISCONNECTED`: the connection is closed, or the widget is not displayed by a back office.
@@ -39,8 +40,10 @@ export interface BoErrorDetails {
  * refuses.
  *
  * Known `reason` values: `no-token` (session expired: no access token), `not-installed` (the
- * widget is not installed, so it has no settings), `disposed` (the widget was removed from the
- * page), `ERR_NETWORK` or another transport or server error code, and, for a back office that
+ * widget is not installed, so it has no settings and no storage), `disposed` (the widget was removed from the
+ * page), the storage codes of the server (`version-conflict`, `already-exists`, `not-found`,
+ * `value-too-large`, `quota-exceeded`, `rate-limited`, `invalid-cursor`…, with the HTTP `status`),
+ * `ERR_NETWORK` or another transport or server error code, and, for a back office that
  * answers something unexpected, `invalid-welcome`, `invalid-host-api`, `invalid-api-info`,
  * `invalid-token`, `malformed-answer` or `messageerror`. A wire code this SDK does not know becomes
  * `INTERNAL` with that code as `reason`.

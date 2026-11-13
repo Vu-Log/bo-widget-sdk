@@ -10,20 +10,20 @@ You do not write it by hand: `@vulog/bo-widget-vite` generates it at build time 
 
 ## Fields
 
-| Field             | Required | Value                                                                                                                        |
-| ----------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `manifestVersion` | yes      | `1`                                                                                                                          |
-| `id`              | yes      | Lowercase letters and digits joined by single hyphens (`fleet-report`), 63 characters at most                                |
-| `name`            | yes      | Name shown to the BO admins, not blank                                                                                       |
-| `version`         | yes      | [Semantic version](https://semver.org) without build metadata: `1.4.2`, `2.0.0-beta.1`; not `v1.4.2` nor `1.4.2+build.7`     |
-| `runtime`         | yes      | `{ "type": "webcomponent", "entry": "index.js" }` or `{ "type": "iframe", "entry": "index.html" }`, no other entry           |
-| `protocol`        | yes      | `{ "version": 2 }`, plus `minBoVersion` (a semantic version), the oldest BO version the widget works with                    |
-| `description`     | no       | What the widget does, in Markdown: not blank, 2000 characters at most                                                        |
-| `author`          | no       | `{ "name": "…", "email": "…" }`, `email` optional                                                                            |
-| `icon`            | no       | Path of a file of the bundle (`icon.svg`, `assets/logo.png`): letters, digits, `.`, `_`, `-` and `/`, no `.` or `..` segment |
-| `menu`            | no       | Default menu entry, see below                                                                                                |
-| `permissions`     | no       | Array of `accessToken`, `apiInfo`, `navigate`, `notify`, each once. Default `[]`. See [Permissions](./permissions)           |
-| `settings`        | no       | Installation settings, see below. Default `[]`                                                                               |
+| Field             | Required | Value                                                                                                                                          |
+| ----------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `manifestVersion` | yes      | `1`                                                                                                                                            |
+| `id`              | yes      | Lowercase letters and digits joined by single hyphens (`fleet-report`), 63 characters at most                                                  |
+| `name`            | yes      | Name shown to the BO admins, not blank                                                                                                         |
+| `version`         | yes      | [Semantic version](https://semver.org) without build metadata: `1.4.2`, `2.0.0-beta.1`; not `v1.4.2` nor `1.4.2+build.7`                       |
+| `runtime`         | yes      | `{ "type": "webcomponent", "entry": "index.js" }` or `{ "type": "iframe", "entry": "index.html" }`, no other entry                             |
+| `protocol`        | yes      | `{ "version": 2 }`, plus `minBoVersion` (a semantic version), the oldest BO version the widget works with                                      |
+| `description`     | no       | What the widget does, in Markdown: not blank, 2000 characters at most                                                                          |
+| `author`          | no       | `{ "name": "…", "email": "…" }`, `email` optional                                                                                              |
+| `icon`            | no       | Path of a file of the bundle (`icon.svg`, `assets/logo.png`): letters, digits, `.`, `_`, `-` and `/`, no `.` or `..` segment                   |
+| `menu`            | no       | Default menu entry, see below                                                                                                                  |
+| `permissions`     | no       | Array of `accessToken`, `apiInfo`, `navigate`, `notify`, `storage`, `sharedStorage`, each once. Default `[]`. See [Permissions](./permissions) |
+| `settings`        | no       | Installation settings, see below. Default `[]`                                                                                                 |
 
 Objects are strict: **an unknown field is an error**, at any level, so that a typo such as `permisions` cannot silently become an empty list.
 

@@ -4,8 +4,8 @@
  * `vulogBo`) or in an iframe (`hello` / `welcome` handshake and `MessagePort`), and answers its
  * requests with the dev fixtures.
  *
- * Runs in the browser. It imports nothing at runtime (type imports only): what it needs from Node
- * comes in {@link FakeBoConfig}.
+ * Runs in the browser. At runtime it imports only its sibling browser modules (`hostError.ts`,
+ * `storage.ts`): what it needs from Node comes in {@link FakeBoConfig}.
  *
  * @packageDocumentation
  */
@@ -22,10 +22,17 @@ import type {
   BoNotifySeverity,
   BoResizePayload,
   BoSettings,
+  BoStorageArgs,
+  BoStorageOp,
+  BoStorageSpace,
   BoTheme,
 } from '@vulog/bo-widget-sdk';
 import type { WidgetManifest, WidgetPermission } from '@vulog/bo-widget-sdk/manifest';
+import { WidgetHostError, invalidPayload } from './hostError.js';
 import type { ResolvedDevMode } from './server.js';
+import { createFakeStorage } from './storage.js';
+
+export { WidgetHostError, type WidgetHostErrorCode } from './hostError.js';
 
 /**
  * Where the fake back office gets its access token from: the fake token of mock mode, or the dev
@@ -99,22 +106,6 @@ export const WIDGET_LOG_EVENT = 'bo-widget:log';
 /** Levels a widget log may have, as the back office accepts them. */
 export const WIDGET_LOG_LEVELS: readonly BoLogLevel[] = ['debug', 'info', 'warn', 'error'];
 
-/** Codes of the errors the back office API throws, which the SDK turns into `reason`. */
-export type WidgetHostErrorCode = 'invalid-payload' | 'no-token';
-
-/** Error the back office API throws, with the codes of the real one. */
-export class WidgetHostError extends Error {
-  readonly code: WidgetHostErrorCode;
-  readonly status: number | null;
-
-  constructor(code: WidgetHostErrorCode, message: string, status: number | null = null) {
-    super(message);
-    this.name = 'WidgetHostError';
-    this.code = code;
-    this.status = Number.isInteger(status) ? status : null;
-  }
-}
-
 type Listener = (data: unknown) => void;
 type Handler = (payload: unknown) => unknown;
 type HandlerName =
@@ -127,7 +118,8 @@ type HandlerName =
   | 'navigate'
   | 'notify'
   | 'resize'
-  | 'log';
+  | 'log'
+  | BoStorageSpace;
 
 /** Permission each request needs; the others are always served. */
 const REQUIRED_PERMISSION: Partial<Record<HandlerName, WidgetPermission>> = {
@@ -135,6 +127,8 @@ const REQUIRED_PERMISSION: Partial<Record<HandlerName, WidgetPermission>> = {
   getAccessToken: 'accessToken',
   navigate: 'navigate',
   notify: 'notify',
+  storage: 'storage',
+  sharedStorage: 'sharedStorage',
 };
 
 const NOTIFY_SEVERITIES: readonly BoNotifySeverity[] = ['success', 'info', 'warning', 'error'];
@@ -164,9 +158,6 @@ const THEMES: Record<'light' | 'dark', BoTheme> = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
-
-const invalidPayload = (message: string): WidgetHostError =>
-  new WidgetHostError('invalid-payload', message);
 
 /** Origin to resolve the routes against: only their path, query and hash are kept. */
 const ROUTE_ORIGIN = 'http://fake-bo.invalid';
@@ -291,6 +282,7 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
   const ports = new Set<MessagePort>();
   const context: BoContext = structuredClone(config.context);
   let themeMode: 'light' | 'dark' = 'light';
+  const storage = createFakeStorage({ userId: config.user.id ?? 'dev-user' });
 
   const handlers: Record<HandlerName, Handler> = {
     getContext: () => structuredClone(context),
@@ -346,6 +338,8 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
       ui.widgetLog(parseWidgetLog(payload));
       return null;
     },
+    storage: (payload) => storage.run('storage', payload),
+    sharedStorage: (payload) => storage.run('sharedStorage', payload),
   };
 
   const missingPermission = (type: HandlerName): WidgetPermission | null => {
@@ -370,7 +364,8 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
   /**
    * The API injected into the Web Component as `vulogBo`. Permissions are only declarative for a
    * Web Component, as in the back office: a request the manifest does not allow is served, with a
-   * warning in the log, since it would be refused in an iframe.
+   * warning in the log, since it would be refused in an iframe. The storage is the exception: as
+   * in the back office, it rejects with `FORBIDDEN` without its permission.
    */
   const createHostApi = () => {
     const call =
@@ -408,9 +403,41 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
           ]),
         ) as Record<BoLogLevel, (message: unknown, context?: unknown) => void>,
       );
+    /** `vulogBo.storage` / `vulogBo.sharedStorage`: the collection first, as the back office. */
+    const storageApi = (space: BoStorageSpace) => {
+      const run = async (request: Record<string, unknown>): Promise<unknown> => {
+        const permission = missingPermission(space);
+        try {
+          if (permission) throw forbidden(space, permission);
+          const result = await handlers[space](request);
+          ui.log(`${space}.${String(request.op)} → ${forLog(result)}`);
+          return result;
+        } catch (error) {
+          ui.log(`${space}.${String(request.op)} failed: ${(error as Error).message}`, 'error');
+          // A bug of the fake back office itself: keep its stack in the console.
+          if (!(error instanceof WidgetHostError)) console.error(error);
+          throw error;
+        }
+      };
+      // The arguments of the SDK (`BoStorageArgs`), turned into the request of the port.
+      const api: { [K in BoStorageOp]: (...args: BoStorageArgs[K]) => Promise<unknown> } = {
+        get: (collection, id) => run({ op: 'get', collection, id }),
+        set: (collection, id, value, options) => run({ op: 'set', collection, id, value, options }),
+        add: (collection, value, options) => run({ op: 'add', collection, value, options }),
+        update: (collection, id, value, options) =>
+          run({ op: 'update', collection, id, value, options }),
+        delete: (collection, id) => run({ op: 'delete', collection, id }),
+        list: (collection, options) => run({ op: 'list', collection, options }),
+        query: (collection, options) => run({ op: 'query', collection, options }),
+        clear: (collection) => run({ op: 'clear', collection }),
+      };
+      return Object.freeze(api);
+    };
     return Object.freeze({
       protocolVersion: config.protocolVersion,
       log,
+      storage: storageApi('storage'),
+      sharedStorage: storageApi('sharedStorage'),
       getContext: call('getContext'),
       getCurrentUser: call('getCurrentUser'),
       getSettings: call('getSettings'),
@@ -453,12 +480,14 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
           error:
             error.code === 'invalid-payload'
               ? { code: 'INVALID_PAYLOAD', message: error.message }
-              : {
-                  code: 'INTERNAL',
-                  reason: error.code,
-                  status: error.status,
-                  message: error.message,
-                },
+              : error.code === 'FORBIDDEN'
+                ? { code: 'FORBIDDEN', message: error.message }
+                : {
+                    code: 'INTERNAL',
+                    reason: error.code,
+                    status: error.status,
+                    message: error.message,
+                  },
         };
       }
       // A bug of the fake back office itself: keep its stack in the console.
@@ -530,8 +559,21 @@ export const createFakeBackOffice = (config: FakeBoConfig, ui: FakeBoUi) => {
       emit('themeChanged', structuredClone(THEMES[themeMode]));
       return themeMode;
     },
+    /** Empties both storage spaces, as a purge would. */
+    clearStorage() {
+      const deleted = storage.clear();
+      ui.log(`storage cleared: ${deleted} document${deleted === 1 ? '' : 's'} deleted`);
+      return deleted;
+    },
   };
 };
+
+/** The refusal of a storage request without its permission, in both modes. */
+const forbidden = (space: BoStorageSpace, permission: WidgetPermission): WidgetHostError =>
+  new WidgetHostError(
+    'FORBIDDEN',
+    `${space}: the '${permission}' permission is required: add it to the permissions of widget.config.ts`,
+  );
 
 const STYLES = `
   :root { color-scheme: light; font-family: Roboto, Helvetica, Arial, sans-serif; }
@@ -596,6 +638,12 @@ const createPage = (config: FakeBoConfig, terminal?: WidgetLogTerminal) => {
   }
   locale.value = initialLocale;
   const theme = element('button', { type: 'button', textContent: 'Theme: light' });
+  const clearStorage = element('button', {
+    type: 'button',
+    textContent: 'Clear storage',
+    title:
+      'Deletes every document of bo.storage and bo.sharedStorage (kept in memory until a reload)',
+  });
   const bar = element('header', { className: 'bo-bar' });
   bar.append(
     element('strong', {
@@ -605,6 +653,7 @@ const createPage = (config: FakeBoConfig, terminal?: WidgetLogTerminal) => {
     element('span', { className: 'bo-badge', textContent: `${config.mode} mode` }),
     locale,
     theme,
+    clearStorage,
   );
   const content = element('main', { className: 'bo-content' });
   const log = element('pre', { className: 'bo-log' });
@@ -659,7 +708,7 @@ const createPage = (config: FakeBoConfig, terminal?: WidgetLogTerminal) => {
   const showRoute = (): void => {
     route.textContent = `${location.pathname}${location.search}${location.hash}`;
   };
-  return { ui, fail, content, locale, theme, showRoute };
+  return { ui, fail, content, locale, theme, clearStorage, showRoute };
 };
 
 const isElementClass = (value: unknown): value is CustomElementConstructor =>
@@ -816,6 +865,7 @@ export const startFakeBo = async (
   page.theme.addEventListener('click', () => {
     page.theme.textContent = `Theme: ${backOffice.toggleTheme()}`;
   });
+  page.clearStorage.addEventListener('click', () => backOffice.clearStorage());
   globalThis.addEventListener('popstate', () => {
     page.showRoute();
     backOffice.routeChanged();
