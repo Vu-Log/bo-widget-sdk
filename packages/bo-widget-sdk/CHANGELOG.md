@@ -1,5 +1,11 @@
 # @vulog/bo-widget-sdk
 
+## 0.1.0-next.7
+
+### Minor Changes
+
+- 89f8513: Widget data storage: `bo.storage` (the widget's own space, permission `storage`) and `bo.sharedStorage` (the space shared by the publisher's widgets on the back office host, permission `sharedStorage`), the same in both modes. `collection<T>(name)` gives `get(id)` (`null` when the document is absent or expired), `set(id, value, { ifVersion?, ttlSeconds? })`, `add(value, { ttlSeconds? })`, `update(id, patch, { ifVersion?, ttlSeconds? })` (first-level merge), `delete(id)`, `list({ limit?, cursor? })`, `query({ where, limit?, cursor? })` and `clear()`. A refusal rejects with a `BoError`: `FORBIDDEN` without the permission (in both modes, at the call), `INVALID_PAYLOAD` for a request the back office refuses, `INTERNAL` with the server code as `reason` and the HTTP `status` (`version-conflict`, `already-exists`, `not-found`, `value-too-large`, `quota-exceeded`, `rate-limited`, `invalid-cursor`…). The manifest schema (`@vulog/bo-widget-sdk/manifest`) accepts the `storage` and `sharedStorage` permissions. New types: `BoStorage`, `BoStorageCollection`, `BoStorageDocument`, `BoStoragePage`, `BoStorageValue`, the option types and `BoStorageSpace`, `BoStorageOp`.
+
 ## 0.1.0-next.6
 
 ### Minor Changes

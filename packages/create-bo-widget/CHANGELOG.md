@@ -1,5 +1,11 @@
 # @vulog/create-bo-widget
 
+## 0.1.0-next.6
+
+### Patch Changes
+
+- 89f8513: New projects depend on the versions of `@vulog/bo-widget-sdk` and `@vulog/bo-widget-vite` that bring the widget data storage (`bo.storage`, `bo.sharedStorage`) and its fake back office, and their `AGENTS.md` lists the `storage` and `sharedStorage` permissions.
+
 ## 0.1.0-next.5
 
 ### Patch Changes
