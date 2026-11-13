@@ -183,16 +183,16 @@ After `TIMEOUT`, `DISCONNECTED` or a network error, a write may have been done a
 
 ## Limits
 
-| Limit                     | Default                     |
-| ------------------------- | --------------------------- |
-| Value of a document       | 64 KB                       |
-| Collections per space     | 20                          |
-| Documents per collection  | 10 000                      |
-| Bytes per space           | 50 MB                       |
-| Requests per user         | 10 per second, bursts of 30 |
-| Requests per installation | 50 per second               |
+| Limit                    | Default |
+| ------------------------ | ------- |
+| Value of a document      | 64 KB   |
+| Collections per space    | 20      |
+| Documents per collection | 10 000  |
+| Bytes per space          | 50 MB   |
 
 The three volume quotas may be set otherwise for a host. Reads, `delete` and `clear` are never refused by a quota.
+
+The number of requests is also limited, per user and per installation of the widget (`rate-limited`). Vulog can give these rates on request.
 
 ## What the isolation guarantees
 
