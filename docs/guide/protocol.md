@@ -7,7 +7,7 @@ description: connect, the requests of BoClient, the events, the initial state, d
 A widget talks to the BO only through `@vulog/bo-widget-sdk`. `connect()` returns a `BoClient`, the same in both modes: write the widget once, run it as a Web Component or in an iframe.
 
 ```bash
-npm install @vulog/bo-widget-sdk@next
+npm install @vulog/bo-widget-sdk
 ```
 
 ## `connect`

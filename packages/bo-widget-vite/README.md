@@ -10,8 +10,8 @@ Vite plugin to build widgets for the Vulog back office (BO), as a Web Component 
 ## Install
 
 ```bash
-npm install --save-dev vite @vulog/bo-widget-vite@next
-npm install @vulog/bo-widget-sdk@next
+npm install --save-dev vite @vulog/bo-widget-vite
+npm install @vulog/bo-widget-sdk
 ```
 
 Requires Vite 7 or 8, and Node.js `^20.19` or `>=22.12` (those of Vite).

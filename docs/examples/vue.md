@@ -7,7 +7,7 @@ description: A complete BO widget in Vue 3.5, from the vue template - defineCust
 The `vue` template builds the widget with a [Vue 3.5](https://vuejs.org) component defined as a custom element. It uses `@vulog/bo-widget-sdk` directly: no dedicated Vue package is needed.
 
 ```bash
-npm create @vulog/bo-widget@next my-widget -- --template vue
+npm create @vulog/bo-widget my-widget -- --template vue
 ```
 
 The code below is the template itself, built and tested by the CI of the SDK. <span v-pre>`{{name}}`</span> and <span v-pre>`{{title}}`</span> are replaced at creation by the widget id and its display name.

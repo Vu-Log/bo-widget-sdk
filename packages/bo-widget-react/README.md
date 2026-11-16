@@ -9,7 +9,7 @@ React bindings for widgets embedded in the Vulog back office (BO), as a Web Comp
 ## Install
 
 ```bash
-npm install @vulog/bo-widget-react@next @vulog/bo-widget-sdk@next
+npm install @vulog/bo-widget-react @vulog/bo-widget-sdk
 npm install react react-dom @mui/material @emotion/react @emotion/styled @emotion/cache
 ```
 

@@ -6,15 +6,15 @@ A BO widget is a page added to the Vulog back office menu, delivered either as a
 
 ## Packages
 
-| Package                                                 | Description                                                                               | Status      |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------- |
-| [`@vulog/bo-widget-sdk`](packages/bo-widget-sdk/)       | Framework-agnostic client of the widget protocol                                          | Pre-release |
-| [`@vulog/bo-widget-vite`](packages/bo-widget-vite/)     | Vite plugin: `widget.json`, bundle layout, fake back office in dev                        | Pre-release |
-| [`@vulog/bo-widget-react`](packages/bo-widget-react/)   | React bindings: Web Component wrapper (Shadow DOM, MUI), iframe entry, hooks              | Pre-release |
-| [`@vulog/bo-widget-cli`](packages/bo-widget-cli/)       | `bo-widget` command: validate and pack the zip to publish, dev with a token               | Pre-release |
-| [`@vulog/create-bo-widget`](packages/create-bo-widget/) | `npm create @vulog/bo-widget`: project templates (React + MUI, Svelte, Vue, Lit, vanilla) | Pre-release |
+| Package                                                 | Description                                                                               | Status |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------ |
+| [`@vulog/bo-widget-sdk`](packages/bo-widget-sdk/)       | Framework-agnostic client of the widget protocol                                          | `0.x`  |
+| [`@vulog/bo-widget-vite`](packages/bo-widget-vite/)     | Vite plugin: `widget.json`, bundle layout, fake back office in dev                        | `0.x`  |
+| [`@vulog/bo-widget-react`](packages/bo-widget-react/)   | React bindings: Web Component wrapper (Shadow DOM, MUI), iframe entry, hooks              | `0.x`  |
+| [`@vulog/bo-widget-cli`](packages/bo-widget-cli/)       | `bo-widget` command: validate and pack the zip to publish, dev with a token               | `0.x`  |
+| [`@vulog/create-bo-widget`](packages/create-bo-widget/) | `npm create @vulog/bo-widget`: project templates (React + MUI, Svelte, Vue, Lit, vanilla) | `0.x`  |
 
-Start a widget with `npm create @vulog/bo-widget@next <widget-id>`, then follow the [documentation](https://vu-log.github.io/bo-widget-sdk/) (sources in [`docs/`](docs/), `npm run docs:dev` to preview it).
+Start a widget with `npm create @vulog/bo-widget <widget-id>`, then follow the [documentation](https://vu-log.github.io/bo-widget-sdk/) (sources in [`docs/`](docs/), `npm run docs:dev` to preview it).
 
 ## AI coding agents
 
@@ -103,7 +103,7 @@ npx changeset pre enter next   # following versions are x.y.z-next.N, published 
 npx changeset pre exit         # back to stable releases
 ```
 
-Commit `.changeset/pre.json` (and later `.changeset/pre/`). `pre exit` marks the pre-release mode as ending: the next Version Packages pull request removes these files and releases stable versions.
+Commit `.changeset/pre.json` (and later `.changeset/pre/`). `pre exit` marks the pre-release mode as ending: the next Version Packages pull request removes these files and releases stable versions. Once they are published, point the `next` tag to them too (`npm dist-tag add @vulog/<package>@<version> next`, with an npm login), so `@next` never installs an older version.
 
 ## Contributing and security
 

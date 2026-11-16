@@ -12,7 +12,7 @@ Framework-agnostic client for widgets embedded in the Vulog back office (BO), as
 ## Install
 
 ```bash
-npm install @vulog/bo-widget-sdk@next
+npm install @vulog/bo-widget-sdk
 ```
 
 ## Quick start

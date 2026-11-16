@@ -7,7 +7,7 @@ description: A complete BO widget as a plain Web Component in TypeScript, from t
 The `vanilla` template builds the widget as a plain Web Component in TypeScript, with no framework.
 
 ```bash
-npm create @vulog/bo-widget@next my-widget -- --template vanilla
+npm create @vulog/bo-widget my-widget -- --template vanilla
 ```
 
 The code below is the template itself, built and tested by the CI of the SDK. <span v-pre>`{{name}}`</span> and <span v-pre>`{{title}}`</span> are replaced at creation by the widget id and its display name.

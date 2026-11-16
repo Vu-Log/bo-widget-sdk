@@ -22,7 +22,7 @@ The widget talks to the BO through one protocol. It reads the context (fleet, lo
 
 ## The packages
 
-The SDK is a set of npm packages under the `@vulog` scope. They are pre-releases, published under the `next` tag.
+The SDK is a set of npm packages under the `@vulog` scope. They are published under the `latest` tag. Until `1.0.0`, a minor version (`0.2.0`) can break the API.
 
 | Package                                                                                                  | Description                                                                               |
 | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -36,7 +36,7 @@ The README of each package holds its detailed API. This site explains the concep
 
 ## Lifecycle of a widget
 
-1. Create the project: `npm create @vulog/bo-widget@next my-widget`.
+1. Create the project: `npm create @vulog/bo-widget my-widget`.
 2. Develop in the fake back office: `npm run dev`.
 3. Test: `npm test`.
 4. Build the zip: `npm run build`, which also checks it.
