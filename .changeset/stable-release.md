@@ -6,4 +6,4 @@
 "@vulog/create-bo-widget": patch
 ---
 
-First stable release: leave the `next` pre-release mode. Install without the `@next` tag.
+First stable release, published under the `latest` npm tag: install without `@next`.

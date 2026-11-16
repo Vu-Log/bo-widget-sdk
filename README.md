@@ -103,7 +103,7 @@ npx changeset pre enter next   # following versions are x.y.z-next.N, published 
 npx changeset pre exit         # back to stable releases
 ```
 
-Commit `.changeset/pre.json` (and later `.changeset/pre/`). `pre exit` marks the pre-release mode as ending: the next Version Packages pull request removes these files and releases stable versions.
+Commit `.changeset/pre.json` (and later `.changeset/pre/`). `pre exit` marks the pre-release mode as ending: the next Version Packages pull request removes these files and releases stable versions. Once they are published, point the `next` tag to them too (`npm dist-tag add @vulog/<package>@<version> next`, with an npm login), so `@next` never installs an older version.
 
 ## Contributing and security
 
