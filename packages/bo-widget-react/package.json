@@ -1,6 +1,6 @@
 {
   "name": "@vulog/bo-widget-react",
-  "version": "0.1.0-next.0",
+  "version": "0.1.0",
   "description": "React bindings for Vulog back office widgets: Web Component wrapper with Shadow DOM and MUI support, and hooks.",
   "license": "MIT",
   "author": "Vulog",
@@ -44,7 +44,7 @@
     "check:package": "publint --strict && attw --pack . --profile esm-only && node --input-type=module -e \"const m = await import('@vulog/bo-widget-react'); if (typeof m.toCustomElement !== 'function' || typeof m.renderIframeWidget !== 'function' || typeof m.useBoContext !== 'function') throw new Error('@vulog/bo-widget-react: exports not resolved from dist');\""
   },
   "dependencies": {
-    "@vulog/bo-widget-sdk": "^0.1.0-next.2"
+    "@vulog/bo-widget-sdk": "^0.1.0"
   },
   "peerDependencies": {
     "@emotion/cache": "^11.0.0",
