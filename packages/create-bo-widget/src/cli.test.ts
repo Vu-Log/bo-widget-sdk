@@ -53,7 +53,7 @@ describe('runCli', () => {
     const { io, out } = await fakeIo();
 
     expect(await runCli(['--help'], io)).toBe(0);
-    expect(out.join('\n')).toMatch(/Usage: npm create @vulog\/bo-widget@next/);
+    expect(out.join('\n')).toMatch(/Usage: npm create @vulog\/bo-widget /);
     expect(out.join('\n')).toMatch(/react-mui +React and MUI/);
   });
 

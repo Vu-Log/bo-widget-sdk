@@ -32,7 +32,7 @@ const DEFAULT_NAME = 'my-widget';
 
 const TEMPLATE_NAMES = Object.keys(TEMPLATES) as TemplateName[];
 
-const HELP = `Usage: npm create @vulog/bo-widget@next [dir] -- [--template <name>]
+const HELP = `Usage: npm create @vulog/bo-widget [dir] -- [--template <name>]
        create-bo-widget [dir] [--template <name>]
 
 Creates the project of a Vulog back office widget in dir, a new or empty folder whose name is

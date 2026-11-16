@@ -11,7 +11,7 @@ There is no publish command: you publish the zip in the BO, Configuration > Widg
 ## Install
 
 ```bash
-npm install --save-dev @vulog/bo-widget-cli@next
+npm install --save-dev @vulog/bo-widget-cli
 ```
 
 Requires Node.js `^20.19` or `>=22.12`. `dev` also needs `vite` and [`@vulog/bo-widget-vite`](../bo-widget-vite/) in the project.

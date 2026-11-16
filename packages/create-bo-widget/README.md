@@ -7,7 +7,7 @@ The project is ready to develop in a fake BO, test, build and publish: Vite with
 ## Usage
 
 ```bash
-npm create @vulog/bo-widget@next fleet-report
+npm create @vulog/bo-widget fleet-report
 cd fleet-report
 npm install
 npm run dev      # the widget in a fake back office
@@ -17,8 +17,8 @@ npm run build    # fleet-report-0.1.0.zip, to publish in the BO: Configuration >
 The folder is the widget id: lowercase letters and digits joined by single hyphens, 63 characters at most. It must be new or empty. In a terminal, without a folder, the command asks for the folder, and for the template unless `--template` is given.
 
 ```bash
-npm create @vulog/bo-widget@next fleet-report -- --template vue
-npx @vulog/create-bo-widget@next fleet-report --template vue   # same
+npm create @vulog/bo-widget fleet-report -- --template vue
+npx @vulog/create-bo-widget fleet-report --template vue   # same
 ```
 
 Requires Node.js `^20.19` or `>=22.12`.

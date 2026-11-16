@@ -7,7 +7,7 @@ description: A complete BO widget with Lit, from the lit template - connect(this
 The `lit` template builds the widget with a [Lit](https://lit.dev) element.
 
 ```bash
-npm create @vulog/bo-widget@next my-widget -- --template lit
+npm create @vulog/bo-widget my-widget -- --template lit
 ```
 
 The code below is the template itself, built and tested by the CI of the SDK. <span v-pre>`{{name}}`</span> and <span v-pre>`{{title}}`</span> are replaced at creation by the widget id and its display name.

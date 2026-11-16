@@ -7,7 +7,7 @@ description: A complete BO widget in React and MUI, from the react-mui template 
 The `react-mui` template, the default one, builds the widget with React and [MUI](https://mui.com) 7.3.6 or later, through `toCustomElement` of [`@vulog/bo-widget-react`](https://github.com/Vu-Log/bo-widget-sdk/tree/main/packages/bo-widget-react).
 
 ```bash
-npm create @vulog/bo-widget@next my-widget
+npm create @vulog/bo-widget my-widget
 ```
 
 The code below is the template itself, built and tested by the CI of the SDK. <span v-pre>`{{name}}`</span> and <span v-pre>`{{title}}`</span> are replaced at creation by the widget id (`my-widget`) and its display name (`My widget`).

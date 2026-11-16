@@ -9,7 +9,7 @@ A BO widget is a page the Vulog back office shows in its menu. The BO loads the 
 
 ## Start
 
-- **New widget**: `npm create @vulog/bo-widget@next <widget-id> -- --template <react-mui | svelte | vue | lit | vanilla>` (without `--template`, React + MUI; the template is asked only when the folder is not given either). The id is kebab-case, 63 characters at most. Then `npm install`, `npm run dev`.
+- **New widget**: `npm create @vulog/bo-widget <widget-id> -- --template <react-mui | svelte | vue | lit | vanilla>` (without `--template`, React + MUI; the template is asked only when the folder is not given either). The id is kebab-case, 63 characters at most. Then `npm install`, `npm run dev`.
 - **Existing widget**: read its `AGENTS.md` (every generated project has one), then `node_modules/@vulog/bo-widget-sdk/AGENTS.md`, the contract versioned with the installed SDK. It overrides anything you remember about other widget systems.
 
 ## Rules that are easy to get wrong

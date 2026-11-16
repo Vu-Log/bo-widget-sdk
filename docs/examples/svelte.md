@@ -7,7 +7,7 @@ description: A complete BO widget in Svelte 5, from the svelte template - a comp
 The `svelte` template builds the widget with a [Svelte 5](https://svelte.dev) component compiled as a custom element. It uses `@vulog/bo-widget-sdk` directly: no dedicated Svelte package is needed.
 
 ```bash
-npm create @vulog/bo-widget@next my-widget -- --template svelte
+npm create @vulog/bo-widget my-widget -- --template svelte
 ```
 
 The code below is the template itself, built and tested by the CI of the SDK. <span v-pre>`{{name}}`</span> and <span v-pre>`{{title}}`</span> are replaced at creation by the widget id and its display name.

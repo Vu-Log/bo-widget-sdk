@@ -15,7 +15,7 @@ This guide takes you from an empty folder to a widget published in the back offi
 ## Create the project
 
 ```bash
-npm create @vulog/bo-widget@next my-widget
+npm create @vulog/bo-widget my-widget
 ```
 
 `my-widget` is both the folder of the project and the **widget id**: lowercase letters and digits joined by single hyphens, 63 characters at most. The folder must be new or empty.
@@ -23,7 +23,7 @@ npm create @vulog/bo-widget@next my-widget
 With a folder given, the command uses the default template, `react-mui`. To choose another one, add `--template` after `--`:
 
 ```bash
-npm create @vulog/bo-widget@next my-widget -- --template vue
+npm create @vulog/bo-widget my-widget -- --template vue
 ```
 
 | Template              | Widget                                                                           |
@@ -37,7 +37,7 @@ npm create @vulog/bo-widget@next my-widget -- --template vue
 Without a folder, in a terminal, the command asks for the widget id (default `my-widget`), then for the template, by number or name:
 
 ```bash
-npm create @vulog/bo-widget@next
+npm create @vulog/bo-widget
 ```
 
 The command does not install the dependencies. Install them:
