@@ -58,7 +58,7 @@ With it, `index.js` only re-exports the class from `assets/shell-[hash].js`, and
 ```tsx
 import { Alert, Button, CircularProgress } from '@mui/material';
 import { useBoClient } from '@vulog/bo-widget-react';
-import { Component, lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
+import { Component, lazy, Suspense, useState, type ReactNode } from 'react';
 
 // A literal import(), at module scope: Vite makes the dialog a chunk of its own.
 const loadAboutDialog = () => import('./AboutDialog.tsx');
@@ -85,20 +85,21 @@ class ChunkBoundary extends Component<
 
 export function LazyAbout({ onClose }: { onClose: () => void }) {
   const bo = useBoClient();
-  const [attempt, setAttempt] = useState(0);
   // React.lazy keeps a failed import: each attempt needs a new lazy component.
-  const AboutDialog = useMemo(() => lazy(loadAboutDialog), [attempt]);
+  const [AboutDialog, setAboutDialog] = useState(() => lazy(loadAboutDialog));
+  const [attempt, setAttempt] = useState(0);
+  const retry = () => {
+    setAboutDialog(() => lazy(loadAboutDialog));
+    setAttempt((count) => count + 1);
+  };
 
   return (
     <ChunkBoundary
       key={attempt}
-      onError={(error) => bo.log.error('The about dialog could not be loaded', { error })}
+      onError={(error) => bo.log.error('The about dialog failed', { error })}
       failed={
-        <Alert
-          severity="error"
-          action={<Button onClick={() => setAttempt((count) => count + 1)}>Retry</Button>}
-        >
-          This part of the widget could not be loaded.
+        <Alert severity="error" action={<Button onClick={retry}>Retry</Button>}>
+          This part of the widget could not be shown.
         </Alert>
       }
     >
@@ -110,6 +111,8 @@ export function LazyAbout({ onClose }: { onClose: () => void }) {
 }
 ```
 
-`AboutDialog.tsx` has a default export, the dialog component. Render `<LazyAbout>` only while the dialog is open: its chunk is loaded the first time.
+`AboutDialog.tsx` has a default export, the dialog component. Render `<LazyAbout>` only while the dialog is open: its chunk is loaded the first time. The boundary also catches the errors the dialog throws once loaded: the logged `error` tells them apart from a chunk that failed.
 
-With Svelte, Vue, Lit or vanilla, `await import('./AboutDialog.ts')` in a `try`/`catch`, with the same loading state, and a Retry that calls the function again.
+With Svelte, Vue, Lit or vanilla, `await import('./AboutDialog.ts')` in a `try`/`catch`, with the same loading state; in the `catch`, log with `bo.log.error('…', { error })` and show a Retry that calls the function again.
+
+Some browser versions keep a failed module fetch: there, Retry fails again at once, and only a reload of the page loads the chunk. Say so in the error message when Retry keeps failing.

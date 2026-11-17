@@ -144,7 +144,8 @@ const readPackageJson = (root: string): Record<string, unknown> => {
  *   the widget bundles its dependencies (React reads it).
  * - Web Component build with Vite 8: minifies the whitespace too (`build.rolldownOptions.output.minify`),
  *   which library mode keeps, unless the project sets `build.minify` to `false` or another
- *   minifier, or its own `output.minify`. Without effect with Vite 7.
+ *   minifier, or its own `output.minify`, in `vite.config.ts` (a later plugin's are not seen).
+ *   Without effect with Vite 7.
  * - In dev, serves a fake back office on `/__bo-widget/` that displays the widget, in mock mode
  *   or, with `BO_WIDGET_TOKEN`, against a real Vulog API: with `BO_WIDGET_HOST`, its URL and key
  *   come from the anonymous conf of that back office, read at startup. With `BO_WIDGET_LOGIN`
