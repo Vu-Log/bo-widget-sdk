@@ -43,6 +43,7 @@ export default defineConfig({
           { text: 'Calling Vulog APIs', link: '/guide/calling-vulog-apis' },
           { text: 'Storing data', link: '/guide/storage' },
           { text: 'Layout and isolation', link: '/guide/layout-and-isolation' },
+          { text: 'Code splitting', link: '/guide/code-splitting' },
           { text: 'UI guidelines', link: '/guide/ui-guidelines' },
           { text: 'Testing', link: '/guide/testing' },
         ],

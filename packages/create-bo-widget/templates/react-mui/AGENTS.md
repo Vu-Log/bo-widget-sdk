@@ -29,6 +29,7 @@ Before you say a change is done: `npm test` and `npm run build` pass.
 - The BO registers the class under a tag it chooses: never call `customElements.define`, never register other elements globally, never assume the tag name.
 - Fill the content zone: `:host` at 100 %, a column root, only the main area scrolls (`flex: 1; min-height: 0; overflow: auto`). Never use `100vh` or `100vw`.
 - Keep every style in the shadow root: nothing in `document.head`.
+- Keep `index.js` small: load heavy or rarely used UI (dialogs, drawers, maps, other languages) with a literal `import()`, never also imported statically, with a loading state and a Retry when its chunk fails. See <https://vu-log.github.io/bo-widget-sdk/guide/code-splitting>.
 - A request needing a permission (`apiInfo`, `accessToken`, `navigate`, `notify`, `storage`, `sharedStorage`) needs it in `permissions` of `widget.config.ts`.
 - The bundle is public: no secret, no API key, no token in the code or in `widget.config.ts`. `.env.local` holds the developer's values and is never committed.
 - Errors the BO cannot see (anything after the element is inserted) are shown by the widget itself, with a loading and an error state.
