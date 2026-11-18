@@ -81,7 +81,7 @@ export default class FleetReport extends HTMLElement {
 
 The `version` of `widget.json` is always the `package.json` version. An unknown field is an error, inside `dev` too, so a typo cannot be silently dropped. `buildManifest(config, packageJson)` is exported to build the manifest outside Vite; it throws a `BoWidgetConfigError` whose `issues` list each problem with its path, and say when the value came from `package.json`.
 
-The plugin sets `base: './'` (and warns if you set another one) and, for a Web Component, `build.lib` and `process.env.NODE_ENV` (library mode leaves it, but the widget bundles its dependencies, which read it). CSS imported as a regular file is emitted next to `index.js`, outside the Shadow DOM: import your styles inline (`?inline`) or let your framework inject them in the shadow root.
+The plugin sets `base: './'` (and warns if you set another one) and, for a Web Component, `build.lib` and `process.env.NODE_ENV` (library mode leaves it, but the widget bundles its dependencies, which read it). With Vite 8, it also minifies a Web Component fully, whitespace included, with `build.rolldownOptions.output.minify: true`: library mode keeps the whitespace of an ES build, even with `build.minify`, for the bundlers of a library's users, but a widget is never bundled again. Set `build.minify: false` (or another minifier), or your own `output.minify`, to keep yours. With Vite 7, the output keeps its whitespace. CSS imported as a regular file is emitted next to `index.js`, outside the Shadow DOM: import your styles inline (`?inline`) or let your framework inject them in the shadow root.
 
 ## Fake back office
 

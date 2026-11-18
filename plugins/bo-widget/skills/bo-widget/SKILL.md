@@ -24,6 +24,7 @@ A BO widget is a page the Vulog back office shows in its menu. The BO loads the 
 8. Every request rejects with `BoError` (`code`, `reason`, `status`); a `401` from `authFetch` is shown to the user, never retried in a loop.
 9. The bundle is public: no secret, key or token in the code or in `widget.config.ts`.
 10. Data a widget keeps goes to `bo.storage.collection(name)` (permission `storage`) or `bo.sharedStorage` (permission `sharedStorage`, shared with the publisher's other widgets on the host; prefix names with your domain). `get` resolves `null` when absent; branch on `error.reason` (`version-conflict`, `already-exists`, `quota-exceeded`…). Never store secrets: every user of the host can read it.
+11. Heavy or rarely used UI (dialogs, drawers, maps, other languages) goes in a chunk: a literal `import()`, never also imported statically (`INEFFECTIVE_DYNAMIC_IMPORT`), with a loading state and a Retry logged with `bo.log.error`. CSS of a chunk goes to the shadow root (`?inline`), never to `document.head`.
 
 ## Check and publish
 

@@ -6,6 +6,7 @@ import {
   loadEnv,
   normalizePath,
   searchForWorkspaceRoot,
+  type BuildEnvironmentOptions,
   type Plugin,
   type ResolvedConfig,
   type ViteDevServer,
@@ -71,6 +72,22 @@ const processEnvDefines = (nodeEnv: string): Record<string, string> => {
 };
 
 /**
+ * Whether the plugin minifies a Web Component build fully: library mode keeps the whitespace of
+ * an ES build (for the bundlers of a library's users, `build.minify` included), but a widget is
+ * never bundled again. Only when the project leaves the minifier to Vite's default (`build.minify`
+ * unset, `true` or `'oxc'`) and sets no `output.minify` itself: `build.minify: false`, another
+ * minifier, an `output.minify` or several outputs are kept as they are.
+ */
+const minifiesFully = (build: BuildEnvironmentOptions | undefined): boolean => {
+  const minify: unknown = build?.minify;
+  if (minify !== undefined && minify !== true && minify !== 'oxc') return false;
+  // `rollupOptions` is the former name of `rolldownOptions`, still accepted.
+  const output = build?.rolldownOptions?.output ?? build?.rollupOptions?.output;
+  if (Array.isArray(output)) return false;
+  return output?.minify === undefined;
+};
+
+/**
  * Typed helper for `widget.config.ts`: returns its argument.
  *
  * @example
@@ -125,6 +142,10 @@ const readPackageJson = (root: string): Record<string, unknown> => {
  *   office registers the class itself.
  * - Web Component build: defines `process.env.NODE_ENV`, which library mode leaves as is, since
  *   the widget bundles its dependencies (React reads it).
+ * - Web Component build with Vite 8: minifies the whitespace too (`build.rolldownOptions.output.minify`),
+ *   which library mode keeps, unless the project sets `build.minify` to `false` or another
+ *   minifier, or its own `output.minify`, in `vite.config.ts` (a later plugin's are not seen).
+ *   Without effect with Vite 7.
  * - In dev, serves a fake back office on `/__bo-widget/` that displays the widget, in mock mode
  *   or, with `BO_WIDGET_TOKEN`, against a real Vulog API: with `BO_WIDGET_HOST`, its URL and key
  *   come from the anonymous conf of that back office, read at startup. With `BO_WIDGET_LOGIN`
@@ -182,6 +203,10 @@ export const boWidget = (config: WidgetConfig): Plugin => {
           ? {
               build: {
                 lib: { entry, formats: ['es' as const], fileName: () => 'index.js' },
+                // Rolldown (Vite 8): `build.minify` alone keeps the whitespace of a library build.
+                ...(minifiesFully(userConfig.build)
+                  ? { rolldownOptions: { output: { minify: true } } }
+                  : {}),
               },
               ...(userConfig.define?.['process.env.NODE_ENV'] === undefined
                 ? { define: processEnvDefines(process.env.NODE_ENV || mode) }

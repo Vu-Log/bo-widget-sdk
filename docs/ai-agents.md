@@ -10,7 +10,7 @@ The SDK gives AI coding agents what they need to write a widget correctly: the r
 
 Every project created by `npm create @vulog/bo-widget` has, at its root:
 
-- **`AGENTS.md`**: instructions for the agent. What to read first, the commands, the rules of the template (export the class, styles and overlays in the shadow root, layout, permissions, no secrets), how to call the Vulog API, how to test. It is read by Codex, Cursor, GitHub Copilot, Gemini CLI and other agents that support the `AGENTS.md` convention.
+- **`AGENTS.md`**: instructions for the agent. What to read first, the commands, the rules of the template (export the class, styles and overlays in the shadow root, layout, lazy chunks, permissions, no secrets), how to call the Vulog API, how to test. It is read by Codex, Cursor, GitHub Copilot, Gemini CLI and other agents that support the `AGENTS.md` convention.
 - **`CLAUDE.md`**: one line, `@AGENTS.md`, that imports it for Claude Code.
 
 Keep them in your repository and extend them with the rules of your widget.

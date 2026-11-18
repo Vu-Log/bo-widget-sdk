@@ -1,10 +1,17 @@
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { widgetManifestSchema } from '@vulog/bo-widget-sdk/manifest';
-import { build, createLogger, normalizePath, type InlineConfig, type Logger } from 'vite';
+import {
+  build,
+  createLogger,
+  normalizePath,
+  type InlineConfig,
+  type Logger,
+  type UserConfig,
+} from 'vite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BoWidgetConfigError, type WidgetConfig } from './manifest.js';
 import { boWidget, defineWidgetConfig, MANIFEST_FILE } from './plugin.js';
@@ -183,7 +190,8 @@ describe('boWidget build', () => {
 
     const code = await readFile(join(root, 'dist/index.js'), 'utf8');
     expect(code).not.toContain('process.env');
-    expect(code).toContain('"production"');
+    // Minified: the string may be written with backquotes.
+    expect(code).toMatch(/["`]production["`]/);
   });
 
   it('keeps a process.env.NODE_ENV the project defines', async () => {
@@ -197,7 +205,7 @@ describe('boWidget build', () => {
       { define: { 'process.env.NODE_ENV': JSON.stringify('staging') } },
     );
 
-    expect(await readFile(join(root, 'dist/index.js'), 'utf8')).toContain('"staging"');
+    expect(await readFile(join(root, 'dist/index.js'), 'utf8')).toMatch(/["`]staging["`]/);
   });
 
   it('fails on an invalid configuration, before building', async () => {
@@ -258,6 +266,114 @@ describe('boWidget build', () => {
 
     const warnings = customLogger.warn.mock.calls.map(([message]) => String(message));
     expect(warnings).toContainEqual(expect.stringMatching(/calls customElements\.define/));
+  });
+});
+
+/** An entry that loads a part of the widget on demand: a chunk next to `index.js`. */
+const LAZY_ENTRY = `
+export default class FleetReport extends HTMLElement {
+  connectedCallback() {
+    const root = this.attachShadow({ mode: 'open' });
+    void import('./details.ts').then((details) => details.render(root));
+  }
+}
+`;
+const LAZY_MODULE = `
+export const render = (root: ShadowRoot) => {
+  const message = 'Fleet details';
+  root.textContent = message;
+};
+`;
+
+/** The JavaScript files of `dist/`, by name (`.mjs` chunks without `"type": "module"`). */
+const builtScripts = async (root: string): Promise<Map<string, string>> => {
+  const scripts = new Map<string, string>();
+  for (const file of await readdir(join(root, 'dist'), { recursive: true })) {
+    if (/\.m?js$/.test(file)) scripts.set(file, await readFile(join(root, 'dist', file), 'utf8'));
+  }
+  return scripts;
+};
+
+/** Whitespace a minifier removes: an indented line. */
+const INDENTED_LINE = /\n[\t ]+\S/;
+
+describe('boWidget minification', () => {
+  it('minifies a Web Component and its chunks, whitespace included, by default', async () => {
+    const root = await project({ 'src/main.ts': LAZY_ENTRY, 'src/details.ts': LAZY_MODULE });
+
+    await buildWidget(root, { name: 'Report' });
+
+    const scripts = await builtScripts(root);
+    expect(scripts.size).toBe(2);
+    for (const code of scripts.values()) {
+      expect(code).not.toMatch(INDENTED_LINE);
+      expect(code).not.toMatch(/^\/\//m);
+    }
+    const chunk = [...scripts.keys()].find((file) => file !== 'index.js');
+    expect(scripts.get('index.js')).toContain(`import(\`./${chunk}\`)`);
+  });
+
+  it.each<[string, NonNullable<InlineConfig['build']>]>([
+    ['build.minify: false', { minify: false }],
+    ['rolldownOptions.output.minify: false', { rolldownOptions: { output: { minify: false } } }],
+    ['rollupOptions.output.minify: false', { rollupOptions: { output: { minify: false } } }],
+  ])('keeps the whitespace with %s', async (_name, buildOptions) => {
+    const root = await project({ 'src/main.ts': LAZY_ENTRY, 'src/details.ts': LAZY_MODULE });
+
+    await buildWidget(root, { name: 'Report' }, { build: buildOptions });
+
+    for (const code of (await builtScripts(root)).values()) expect(code).toMatch(INDENTED_LINE);
+  });
+});
+
+describe('boWidget config', () => {
+  type Env = { command: 'build' | 'serve'; mode: string };
+
+  /** What the plugin adds to the configuration of the project. */
+  const configOf = (
+    widget: WidgetConfig,
+    user: UserConfig = {},
+    env: Env = { command: 'build', mode: 'production' },
+  ): UserConfig =>
+    (boWidget(widget).config as (config: UserConfig, env: Env) => UserConfig)(user, env);
+
+  it.each<[string, NonNullable<UserConfig['build']>]>([
+    ['an empty build', {}],
+    ['build.minify: true', { minify: true }],
+    ["build.minify: 'oxc'", { minify: 'oxc' }],
+    ['another output option', { rolldownOptions: { output: { chunkFileNames: 'a-[hash].js' } } }],
+  ])('minifies a Web Component build fully with %s', (_name, buildOptions) => {
+    const config = configOf({ name: 'Report' }, { build: buildOptions });
+
+    expect(config.build?.rolldownOptions).toEqual({ output: { minify: true } });
+  });
+
+  it.each<[string, NonNullable<UserConfig['build']>]>([
+    ['build.minify: false', { minify: false }],
+    ["build.minify: 'terser'", { minify: 'terser' }],
+    ["build.minify: 'esbuild'", { minify: 'esbuild' }],
+    ['build.minify: "false" (command line)', { minify: 'false' as unknown as false }],
+    ['its own output.minify', { rolldownOptions: { output: { minify: 'dce-only' } } }],
+    ['its own output.minify, under rollupOptions', { rollupOptions: { output: { minify: {} } } }],
+    ['several outputs', { rolldownOptions: { output: [{}, {}] } }],
+  ])('leaves the minifier of the project with %s', (_name, buildOptions) => {
+    const config = configOf({ name: 'Report' }, { build: buildOptions });
+
+    expect(config.build?.lib).toBeDefined();
+    expect(config.build?.rolldownOptions).toBeUndefined();
+  });
+
+  it('minifies a Web Component build fully without build options', () => {
+    expect(configOf({ name: 'Report' }).build?.rolldownOptions).toEqual({
+      output: { minify: true },
+    });
+  });
+
+  it('leaves an iframe build and the dev server to Vite', () => {
+    expect(configOf({ name: 'Report', runtime: 'iframe' }).build).toBeUndefined();
+    expect(
+      configOf({ name: 'Report' }, {}, { command: 'serve', mode: 'development' }).build,
+    ).toBeUndefined();
   });
 });
 
