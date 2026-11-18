@@ -10,17 +10,20 @@
 import { execFileSync } from 'node:child_process';
 import { isMainModule, workspaceVersions } from './template-floors.mjs';
 
+/** Version written by `changeset version --snapshot next`, e.g. `0.2.0-next-20261118120000`. */
+const SNAPSHOT_VERSION = /-next-\d/;
+
 /**
  * Splits the packages of the repository between the snapshot ones and the others.
  *
  * @param {Record<string, string>} versions - Version of each package, by name.
  * @returns {{ snapshot: string[], unchanged: string[] }} Package names, sorted.
- * @throws {Error} When no package has a `-next` version: the snapshot did not run, or bumped
+ * @throws {Error} When no package has a snapshot `-next-<timestamp>` version: the snapshot did not run, or bumped
  *   nothing, and a dry-run would then test nothing.
  */
 export const splitSnapshotPackages = (versions) => {
   const names = Object.keys(versions).sort();
-  const snapshot = names.filter((name) => versions[name].includes('-next'));
+  const snapshot = names.filter((name) => SNAPSHOT_VERSION.test(versions[name]));
   if (snapshot.length === 0) {
     throw new Error(
       'No package has a -next version: run `changeset version --snapshot next` first',

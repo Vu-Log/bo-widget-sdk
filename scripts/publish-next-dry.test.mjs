@@ -22,6 +22,12 @@ describe('splitSnapshotPackages', () => {
     expect(result).toEqual({ snapshot: ['a', 'b'], unchanged: [] });
   });
 
+  it('leaves a pre-release version such as 0.2.0-next.3 out of the snapshot', () => {
+    const result = splitSnapshotPackages({ a: '0.2.0-next.3', b: '0.2.0-next-20261118120000' });
+
+    expect(result).toEqual({ snapshot: ['b'], unchanged: ['a'] });
+  });
+
   it('fails when no package has a -next version', () => {
     expect(() => splitSnapshotPackages({ a: '0.1.0', b: '0.1.0' })).toThrow(
       /No package has a -next version/,
