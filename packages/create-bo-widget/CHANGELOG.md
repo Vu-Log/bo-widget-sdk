@@ -1,5 +1,11 @@
 # @vulog/create-bo-widget
 
+## 0.1.1
+
+### Patch Changes
+
+- bf3feae: New projects depend on the version of `@vulog/bo-widget-vite` that minifies the Web Component build fully, and their `AGENTS.md` asks to load heavy or rarely used UI as chunks, with a literal `import()`, a loading state and a Retry (see the new Code splitting guide).
+
 ## 0.1.0
 
 ### Minor Changes
