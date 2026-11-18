@@ -21,7 +21,7 @@
     "changeset": "changeset",
     "version-packages": "changeset version && node scripts/template-floors.mjs",
     "release": "npm run build && npm run check:package && changeset publish",
-    "release:next:dry": "changeset version --snapshot next && npm run build && npm publish --workspaces --tag next --dry-run",
+    "release:next:dry": "changeset version --snapshot next && npm run build && node scripts/publish-next-dry.mjs",
     "check:package": "npm run check:package --workspaces",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
