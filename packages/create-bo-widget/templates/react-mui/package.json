@@ -25,7 +25,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",
     "@vulog/bo-widget-cli": "^0.1.0",
-    "@vulog/bo-widget-vite": "^0.1.0",
+    "@vulog/bo-widget-vite": "^0.2.0",
     "happy-dom": "^21.0.4",
     "typescript": "~6.0.3",
     "vite": "^8.3.5",
