@@ -35,19 +35,24 @@ The archive is checked as `validate` does before it is written: when the BO woul
 
 Checks a zip; without argument, the only `.zip` of the current folder, or, when it holds several (one per version built), the one of the version in `package.json` (`{id}-{version}.zip`, as `pack` names it). Prints each error and warning with its code, and exits with `1` when there is an error, `0` otherwise (warnings do not block publication).
 
-| Code                    | Type    | Cause                                                                                                                             |
-| ----------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `archive-too-large`     | error   | Archive above 10 MB                                                                                                               |
-| `invalid-archive`       | error   | Not a zip, or a zip that cannot be read safely: ZIP64, multi-part, encrypted, method other than stored/deflate, CRC or size wrong |
-| `too-many-files`        | error   | More than 1000 entries, folders and macOS files included                                                                          |
-| `zip-bomb`              | error   | More than 50 MB once decompressed                                                                                                 |
-| `unsafe-path`           | error   | A character outside `A-Z a-z 0-9 . _ - /`, a leading `/`, an empty, `.` or `..` segment                                           |
-| `duplicate-path`        | error   | The same path twice                                                                                                               |
-| `forbidden-extension`   | error   | Extension other than `js mjs css html json svg png jpg webp woff2 map` (lowercase; `jpeg` is refused)                             |
-| `manifest-missing`      | error   | No `widget.json` at the root (the message says where it is when the folder itself was zipped)                                     |
-| `manifest-invalid`      | error   | `widget.json` is not valid JSON, breaks a rule of the manifest (one error per field), or names an `icon` that is not in the zip   |
-| `entry-missing`         | error   | The file of `runtime.entry` is not in the zip                                                                                     |
-| `custom-element-define` | warning | A `.js` or `.mjs` of a Web Component calls `customElements.define(`: the BO registers your class itself                           |
+| Code                    | Type    | Cause                                                                                                                                                                                                                             |
+| ----------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `archive-too-large`     | error   | Archive above 10 MB                                                                                                                                                                                                               |
+| `invalid-archive`       | error   | Not a zip, or a zip that cannot be read safely: ZIP64, multi-part, encrypted, method other than stored/deflate, CRC or size wrong                                                                                                 |
+| `too-many-files`        | error   | More than 1000 entries, folders and macOS files included                                                                                                                                                                          |
+| `zip-bomb`              | error   | More than 50 MB once decompressed                                                                                                                                                                                                 |
+| `unsafe-path`           | error   | A character outside `A-Z a-z 0-9 . _ - /`, a leading `/`, an empty, `.` or `..` segment                                                                                                                                           |
+| `duplicate-path`        | error   | The same path twice                                                                                                                                                                                                               |
+| `forbidden-extension`   | error   | Extension other than `js mjs css html json svg png jpg webp woff2 map` (lowercase; `jpeg` is refused)                                                                                                                             |
+| `unsafe-svg`            | error   | An SVG with active content: `<script>`, `<foreignObject>` and similar elements, `on*` attributes, a link or CSS `url()` other than `#id` or a base64 PNG/JPEG/GIF/WEBP, entities, not UTF-8, over 5 MB. Export a plain SVG (SVGO) |
+| `content-mismatch`      | error   | Content that does not match the extension: a `png`, `jpg`, `webp` or `woff2` without its signature, a text file that is not UTF-8 or holds NUL, a `json` or `map` that is not JSON; an empty text file is accepted                |
+| `webcomponent-html`     | error   | An `.html` file in a Web Component widget, which is loaded from `index.js` only (publish it as an iframe if it needs pages)                                                                                                       |
+| `manifest-missing`      | error   | No `widget.json` at the root (the message says where it is when the folder itself was zipped)                                                                                                                                     |
+| `manifest-invalid`      | error   | `widget.json` is not valid JSON, breaks a rule of the manifest (one error per field), or names an `icon` that is not in the zip                                                                                                   |
+| `entry-missing`         | error   | The file of `runtime.entry` is not in the zip                                                                                                                                                                                     |
+| `custom-element-define` | warning | A `.js` or `.mjs` of a Web Component calls `customElements.define(`: the BO registers your class itself                                                                                                                           |
+
+On publication, the BO may also return warnings from a scan of your code that `validate` does not run: hosts the code loads or calls, `eval`, `document.cookie`, `navigator.serviceWorker`, secrets written in the bundle, published source maps. They never block publication.
 
 Structural errors (`archive-too-large`, `invalid-archive`, `too-many-files`, `zip-bomb`) stop the check; the others are all reported at once. `__MACOSX/` and `.DS_Store` are ignored.
 

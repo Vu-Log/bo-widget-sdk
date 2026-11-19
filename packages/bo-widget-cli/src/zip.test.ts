@@ -19,7 +19,11 @@ describe('createZip', () => {
       { path: 'widget.json', data: text(MANIFEST) },
       { path: 'index.js', data: text('export default class extends HTMLElement {}\n'.repeat(50)) },
       { path: 'assets/empty.css', data: new Uint8Array() },
-      { path: 'assets/img/logo.png', data: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]) },
+      {
+        // The full PNG signature: the validator checks it (content-mismatch).
+        path: 'assets/img/logo.png',
+        data: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      },
     ];
 
     const result = validateWidgetArchive(createZip(files));
