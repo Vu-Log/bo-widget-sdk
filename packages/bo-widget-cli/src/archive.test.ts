@@ -776,6 +776,200 @@ describe('validateWidgetArchive', () => {
     });
   });
 
+  describe('SVG files (unsafe-svg)', () => {
+    const PLAIN_ICON =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2 2h20v20H2z"/></svg>';
+    const ACTIVE_SVG =
+      '<svg xmlns="http://www.w3.org/2000/svg"><script>document.cookie="a=b"</script></svg>';
+
+    it('accepts a plain SVG icon declared in the manifest', () => {
+      const result = validateWidgetArchive(
+        buildZip([
+          manifestEntry({ ...MANIFEST, icon: 'icon.svg' }),
+          INDEX_JS,
+          { name: 'icon.svg', content: PLAIN_ICON },
+        ]),
+      );
+
+      expect(result).toMatchObject({ ok: true });
+    });
+
+    it('refuses an SVG with a script, naming the file and the reason', () => {
+      const result = validateWidgetArchive(
+        buildZip([...validEntries(), { name: 'assets/logo.svg', content: ACTIVE_SVG }]),
+      );
+
+      expect(errorsOf(result)).toEqual([
+        {
+          code: 'unsafe-svg',
+          path: 'assets/logo.svg',
+          message:
+            '"assets/logo.svg" contains a <script> element: export it as a plain SVG (for example with SVGO), without scripts, events or external links',
+        },
+      ]);
+    });
+
+    it('refuses an active icon declared in the manifest', () => {
+      const result = validateWidgetArchive(
+        buildZip([
+          manifestEntry({ ...MANIFEST, icon: 'icon.svg' }),
+          INDEX_JS,
+          { name: 'icon.svg', content: '<svg xmlns="http://www.w3.org/2000/svg" onload="x()"/>' },
+        ]),
+      );
+
+      expect(errorsOf(result)).toMatchObject([{ code: 'unsafe-svg', path: 'icon.svg' }]);
+    });
+
+    it('only scans .svg files', () => {
+      const result = validateWidgetArchive(
+        buildZip([...validEntries(), { name: 'doc.json', content: JSON.stringify(ACTIVE_SVG) }]),
+      );
+
+      expect(result).toMatchObject({ ok: true });
+    });
+
+    it('reports every unsafe SVG together with the path and manifest errors', () => {
+      const result = validateWidgetArchive(
+        buildZip([
+          manifestEntry({ ...MANIFEST, icon: 'missing.png' }),
+          INDEX_JS,
+          { name: 'run.sh', content: 'x' },
+          { name: 'a.svg', content: ACTIVE_SVG },
+          { name: 'b.svg', content: Buffer.from([0xff, 0xfe, 0x3c, 0x00]) },
+        ]),
+      );
+
+      expect(errorsOf(result).map(({ code, path }) => [code, path])).toEqual([
+        ['forbidden-extension', 'run.sh'],
+        ['unsafe-svg', 'a.svg'],
+        ['unsafe-svg', 'b.svg'],
+        ['manifest-invalid', 'widget.json'],
+      ]);
+    });
+  });
+
+  describe('.html in a Web Component (webcomponent-html)', () => {
+    it('refuses every .html file of a Web Component widget, naming each', () => {
+      const result = validateWidgetArchive(
+        buildZip([
+          ...validEntries(),
+          { name: 'index.html', content: '<!doctype html>' },
+          { name: 'demo/page.html', content: '<p>demo</p>' },
+        ]),
+      );
+
+      expect(errorsOf(result).map(({ code, path }) => [code, path])).toEqual([
+        ['webcomponent-html', 'index.html'],
+        ['webcomponent-html', 'demo/page.html'],
+      ]);
+      expect(messagesOf(result)[0]).toBe(
+        `"index.html": a Web Component widget is loaded from its entry file, an .html file has no use in it and, opened directly, would run on the client's iframe origin outside any iframe of the BO; remove it, or publish the widget as an iframe`,
+      );
+    });
+
+    it('accepts .html files in an iframe widget', () => {
+      const result = validateWidgetArchive(
+        buildZip([
+          manifestEntry(IFRAME_MANIFEST),
+          { name: 'index.html', content: '<!doctype html>' },
+          { name: 'help.html', content: '<p>help</p>' },
+        ]),
+      );
+
+      expect(result).toMatchObject({ ok: true });
+    });
+
+    it('reports it with the other errors once the manifest is valid', () => {
+      const result = validateWidgetArchive(
+        buildZip([
+          ...validEntries(),
+          { name: 'run.sh', content: 'x' },
+          { name: 'logo.svg', content: '<svg xmlns="http://www.w3.org/2000/svg" onload="x()"/>' },
+          { name: 'index.html', content: '<!doctype html>' },
+        ]),
+      );
+
+      expect(codesOf(result)).toEqual(['forbidden-extension', 'unsafe-svg', 'webcomponent-html']);
+    });
+
+    it('keeps the customElements.define warning next to the error', () => {
+      const result = validateWidgetArchive(
+        buildZip([
+          manifestEntry(),
+          { name: 'index.js', content: 'customElements.define("x-a", A)' },
+          { name: 'index.html', content: '<!doctype html>' },
+        ]),
+      );
+
+      expect(codesOf(result)).toEqual(['webcomponent-html']);
+      expect(result.warnings.map((issue) => issue.code)).toEqual(['custom-element-define']);
+    });
+
+    it('is not checked while the manifest is invalid, since the runtime is unknown', () => {
+      const result = validateWidgetArchive(
+        buildZip([
+          manifestEntry({ ...MANIFEST, version: 'x' }),
+          INDEX_JS,
+          { name: 'index.html', content: '' },
+        ]),
+      );
+
+      expect(codesOf(result)).not.toContain('webcomponent-html');
+      expect(codesOf(result)).toContain('manifest-invalid');
+    });
+  });
+
+  describe('file contents (content-mismatch)', () => {
+    const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+    it('refuses a file whose content does not match its extension, naming it', () => {
+      const result = validateWidgetArchive(
+        buildZip([...validEntries(), { name: 'logo.png', content: '<html></html>' }]),
+      );
+
+      expect(errorsOf(result)).toEqual([
+        {
+          code: 'content-mismatch',
+          path: 'logo.png',
+          message:
+            '"logo.png" does not start with the signature of a .png file: its content must match its extension',
+        },
+      ]);
+    });
+
+    it('accepts real images and an empty JSON file', () => {
+      const result = validateWidgetArchive(
+        buildZip([
+          ...validEntries(),
+          { name: 'logo.png', content: PNG },
+          { name: 'empty.json', content: '' },
+        ]),
+      );
+
+      expect(result).toMatchObject({ ok: true, warnings: [] });
+    });
+
+    it('checks the contents even while the manifest is invalid', () => {
+      const result = validateWidgetArchive(
+        buildZip([
+          manifestEntry({ ...MANIFEST, version: 'x' }),
+          INDEX_JS,
+          { name: 'data.json', content: '{' },
+        ]),
+      );
+
+      expect(codesOf(result)).toEqual(['content-mismatch', 'manifest-invalid']);
+    });
+
+    it('reports a root widget.json that is not JSON once, as manifest-invalid', () => {
+      const result = validateWidgetArchive(
+        buildZip([{ name: 'widget.json', content: '{ id: ' }, INDEX_JS]),
+      );
+
+      expect(codesOf(result)).toEqual(['manifest-invalid']);
+    });
+  });
+
   describe('customElements.define', () => {
     it.each([
       'customElements.define("x-a", A)',

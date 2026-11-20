@@ -6,6 +6,9 @@ import {
   publishedWidgetManifestSchema,
 } from '@vulog/bo-widget-sdk/manifest';
 
+import { findContentMismatch } from './content.js';
+import { findUnsafeSvgContent } from './svg.js';
+
 /**
  * Validation of a widget zip, with the rules the Vulog back office applies when
  * a version is published. Pure: it takes the archive bytes and returns either
@@ -14,7 +17,9 @@ import {
  * This is a copy of the validation run by the Vulog server, which stays the
  * source of truth: same limits, rules, codes and messages, so that an archive
  * this module accepts passes the same checks on publication (the namespace and
- * version checks excepted). A rule changed there must be changed here.
+ * version checks excepted). A rule changed there must be changed here. The
+ * server's code scan warnings (external URLs, `eval`, secrets…) are not
+ * copied either: they never block a publication.
  *
  * The zip is read here rather than with `unzip-stream` or a similar library on
  * purpose: those trust the uncompressed size declared in the headers, so a zip
@@ -64,7 +69,10 @@ export const WIDGET_ARCHIVE_EXTENSIONS = [
 /** Name of the manifest, at the root of the archive. */
 export const WIDGET_MANIFEST_FILE = 'widget.json';
 
-/** The only warning code: it never blocks publishing. */
+/**
+ * The warning code of this module: it never blocks publishing. On
+ * publication, the server may return other warning codes, from its code scan.
+ */
 export type WidgetArchiveWarningCode = 'custom-element-define';
 
 /** Error codes: any of them refuses the archive. */
@@ -76,6 +84,9 @@ export type WidgetArchiveErrorCode =
   | 'unsafe-path'
   | 'duplicate-path'
   | 'forbidden-extension'
+  | 'unsafe-svg'
+  | 'webcomponent-html'
+  | 'content-mismatch'
   | 'manifest-missing'
   | 'manifest-invalid'
   | 'entry-missing';
@@ -430,6 +441,52 @@ const checkManifest = (
   return errors.length > 0 ? { manifest: null, errors } : { manifest: parsed.data, errors: [] };
 };
 
+/** An SVG file opened directly runs its scripts on the widgets origin: one with active content is refused (`svg.ts`). */
+const checkSvgFiles = (files: WidgetArchiveFile[]): WidgetArchiveError[] =>
+  files.flatMap(({ path, data }): WidgetArchiveError[] => {
+    if (!path.endsWith('.svg')) return [];
+    const reason = findUnsafeSvgContent(data);
+    return reason === null
+      ? []
+      : [
+          {
+            code: 'unsafe-svg',
+            path,
+            message: `"${path}" ${reason}: export it as a plain SVG (for example with SVGO), without scripts, events or external links`,
+          },
+        ];
+  });
+
+/** A file whose content does not match its extension is refused (`content.ts`): binary signatures, UTF-8 text, JSON. */
+const checkContents = (files: WidgetArchiveFile[]): WidgetArchiveError[] =>
+  files.flatMap(({ path, data }): WidgetArchiveError[] => {
+    const reason = findContentMismatch(path, data);
+    return reason === null
+      ? []
+      : [
+          {
+            code: 'content-mismatch',
+            path,
+            message: `"${path}" ${reason}: its content must match its extension`,
+          },
+        ];
+  });
+
+/**
+ * A Web Component widget is loaded from its `index.js`: an `.html` file has no
+ * use in it, and opened directly it would run on the client's iframe origin,
+ * outside any iframe of the BO. Checked once `widget.json` passes all its
+ * checks, since it depends on `runtime.type`.
+ */
+const checkWebComponentHtml = (files: WidgetArchiveFile[]): WidgetArchiveError[] =>
+  files
+    .filter(({ path }) => path.endsWith('.html'))
+    .map(({ path }) => ({
+      code: 'webcomponent-html',
+      path,
+      message: `"${path}": a Web Component widget is loaded from its entry file, an .html file has no use in it and, opened directly, would run on the client's iframe origin outside any iframe of the BO; remove it, or publish the widget as an iframe`,
+    }));
+
 /**
  * A Web Component widget must not register itself: the BO registers its class
  * under a tag it computes. A static search, so a warning
@@ -515,9 +572,11 @@ const readEntries = (
 /**
  * Validates a widget zip: archive size, structure, number of entries and decompressed size (zip bombs), safe paths
  * (no `..`, no absolute path) with allowed extensions, a valid `widget.json` at
- * the root whose `runtime.entry` exists. A Web Component bundle that calls
- * `customElements.define` gets a warning. macOS metadata (`__MACOSX/`,
- * `.DS_Store`) is skipped.
+ * the root whose `runtime.entry` exists, SVG files without active content
+ * (`unsafe-svg`), no `.html` in a Web Component bundle (`webcomponent-html`),
+ * and contents that match their extensions (`content-mismatch`). A Web
+ * Component bundle that calls `customElements.define` gets a warning. macOS
+ * metadata (`__MACOSX/`, `.DS_Store`) is skipped.
  *
  * Errors are gathered so that they can all be fixed at once, except the
  * structural ones (`archive-too-large`, `invalid-archive`, `too-many-files`,
@@ -564,9 +623,15 @@ export const validateWidgetArchive = (
 
   const { files } = read;
   const manifestCheck = checkManifest(files);
-  const errors = [...read.errors, ...manifestCheck.errors];
-  const warnings =
-    manifestCheck.manifest?.runtime.type === 'webcomponent' ? findCustomElementDefines(files) : [];
+  const isWebComponent = manifestCheck.manifest?.runtime.type === 'webcomponent';
+  const errors = [
+    ...read.errors,
+    ...checkSvgFiles(files),
+    ...checkContents(files),
+    ...manifestCheck.errors,
+    ...(isWebComponent ? checkWebComponentHtml(files) : []),
+  ];
+  const warnings = isWebComponent ? findCustomElementDefines(files) : [];
 
   const [firstError, ...otherErrors] = errors;
   if (firstError) return { ok: false, errors: [firstError, ...otherErrors], warnings };
