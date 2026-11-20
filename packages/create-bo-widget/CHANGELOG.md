@@ -1,5 +1,11 @@
 # @vulog/create-bo-widget
 
+## 0.1.2
+
+### Patch Changes
+
+- ffd0405: The templates depend on the new `@vulog/bo-widget-cli`, whose `validate` and `pack` apply the BO's `unsafe-svg`, `content-mismatch` and `webcomponent-html` rules.
+
 ## 0.1.1
 
 ### Patch Changes
